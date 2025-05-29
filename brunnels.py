@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 """
 Brunnel (Bridge/Tunnel) Visualization Tool
+
+
+Requirements:
+    pip install gpxpy
+
 """
 
 
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass
 import argparse
 import logging
+import sys
+import gpxpy
+import gpxpy.gpx
+
+import gpx
 
 # Configure logging
-logger = logging.getLogger("brunnels")
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -54,6 +64,12 @@ def main():
     )
 
     parser.add_argument(
+        "filename",
+        type=str,
+        help="GPX file to process (use '-' for stdin)",
+    )
+
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -65,6 +81,26 @@ def main():
 
     # Setup logging
     setup_logging(args.log_level)
+
+    try:
+        # Load and parse the GPX file into a route
+        route = gpx.load_gpx_route(args.filename)
+        logger.info(f"Successfully loaded route with {len(route)} points")
+
+        # TODO: Process the route for brunnel analysis
+
+    except (FileNotFoundError, PermissionError) as e:
+        logger.error(f"Failed to read file '{args.filename}': {e}")
+        sys.exit(1)
+    except gpxpy.gpx.GPXException as e:
+        logger.error(f"Failed to parse GPX file: {e}")
+        sys.exit(1)
+    except gpx.RouteValidationError as e:
+        logger.error(f"Route validation failed: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
