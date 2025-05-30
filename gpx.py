@@ -4,9 +4,10 @@ GPX file parsing and validation for brunnel analysis.
 """
 
 
-from typing import List, TextIO
+from typing import List, TextIO, Tuple
 import sys
 import logging
+from math import cos, radians
 import gpxpy
 import gpxpy.gpx
 from models import Position
@@ -63,6 +64,51 @@ def parse_gpx_to_route(file_input: TextIO) -> List[Position]:
     _validate_route(route)
 
     return route
+
+
+def calculate_route_bbox(
+    route: List[Position], buffer_km: float = 1.0
+) -> Tuple[float, float, float, float]:
+    """
+    Calculate bounding box for route with optional buffer.
+
+    Args:
+        route: List of Position objects
+        buffer_km: Buffer distance in kilometers (default: 1.0)
+
+    Returns:
+        Tuple of (south, west, north, east) in decimal degrees
+
+    Raises:
+        ValueError: If route is empty
+    """
+    if not route:
+        raise ValueError("Cannot calculate bounding box for empty route")
+
+    latitudes = [pos.latitude for pos in route]
+    longitudes = [pos.longitude for pos in route]
+
+    min_lat, max_lat = min(latitudes), max(latitudes)
+    min_lon, max_lon = min(longitudes), max(longitudes)
+
+    # Convert buffer from km to approximate degrees
+    # 1 degree latitude ≈ 111 km
+    # longitude varies by latitude, use average
+    avg_lat = (min_lat + max_lat) / 2
+    lat_buffer = buffer_km / 111.0
+    lon_buffer = buffer_km / (111.0 * abs(cos(radians(avg_lat))))
+
+    # Apply buffer (ensure we don't exceed valid coordinate ranges)
+    south = max(-90.0, min_lat - lat_buffer)
+    north = min(90.0, max_lat + lat_buffer)
+    west = max(-180.0, min_lon - lon_buffer)
+    east = min(180.0, max_lon + lon_buffer)
+
+    logger.info(
+        f"Route bounding box: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {buffer_km}km buffer"
+    )
+
+    return (south, west, north, east)
 
 
 def _validate_route(route: List[Position]) -> None:

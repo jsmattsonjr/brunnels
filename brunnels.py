@@ -4,7 +4,7 @@ Brunnel (Bridge/Tunnel) Visualization Tool
 
 
 Requirements:
-    pip install gpxpy folium
+    pip install gpxpy folium requests
 
 """
 
@@ -20,6 +20,7 @@ import gpxpy.gpx
 from models import Position
 import gpx
 import visualization
+import overpass
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -68,6 +69,13 @@ def main():
     )
 
     parser.add_argument(
+        "--buffer",
+        type=float,
+        default=0.1,
+        help="Search buffer around route in kilometers (default: 0.1)",
+    )
+
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -85,11 +93,17 @@ def main():
         route = gpx.load_gpx_route(args.filename)
         logger.info(f"Loaded GPX route with {len(route)} points")
 
+        # Find bridges and tunnels near the route
+        brunnels = overpass.find_route_brunnels(route, args.buffer)
+        bridges = [b for b in brunnels if b.brunnel_type == overpass.BrunnelType.BRIDGE]
+        tunnels = [b for b in brunnels if b.brunnel_type == overpass.BrunnelType.TUNNEL]
+        logger.info(f"Found {len(bridges)} bridges and {len(tunnels)} tunnels")
+
         # Create visualization map
-        visualization.create_route_map(route, args.output)
+        visualization.create_route_map(route, args.output, brunnels)
         logger.info(f"Map saved to {args.output}")
 
-        # TODO: Process the route for brunnel analysis
+        # TODO: Process the route for brunnel analysis (intersection detection)
 
     except (FileNotFoundError, PermissionError) as e:
         logger.error(f"Failed to read file '{args.filename}': {e}")
