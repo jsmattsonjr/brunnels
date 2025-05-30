@@ -4,7 +4,7 @@ Brunnel (Bridge/Tunnel) Visualization Tool
 
 
 Requirements:
-    pip install gpxpy
+    pip install gpxpy folium
 
 """
 
@@ -17,21 +17,12 @@ import sys
 import gpxpy
 import gpxpy.gpx
 
+from models import Position
 import gpx
+import visualization
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class Position:
-    latitude: float
-    longitude: float
-    elevation: Optional[float] = None
-
-    def has_elevation(self) -> bool:
-        """Check if position has elevation data."""
-        return self.elevation is not None
 
 
 def setup_logging(log_level: str) -> None:
@@ -70,6 +61,13 @@ def main():
     )
 
     parser.add_argument(
+        "--output",
+        type=str,
+        default="brunnel_map.html",
+        help="Output HTML map file (default: brunnel_map.html)",
+    )
+
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -85,7 +83,11 @@ def main():
     try:
         # Load and parse the GPX file into a route
         route = gpx.load_gpx_route(args.filename)
-        logger.info(f"Successfully loaded route with {len(route)} points")
+        logger.info(f"Loaded GPX route with {len(route)} points")
+
+        # Create visualization map
+        visualization.create_route_map(route, args.output)
+        logger.info(f"Map saved to {args.output}")
 
         # TODO: Process the route for brunnel analysis
 

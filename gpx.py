@@ -9,7 +9,7 @@ import sys
 import logging
 import gpxpy
 import gpxpy.gpx
-from brunnels import Position
+from models import Position
 
 logger = logging.getLogger(__name__)
 
