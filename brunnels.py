@@ -9,15 +9,14 @@ Requirements:
 """
 
 
-from typing import Optional, List
-from dataclasses import dataclass
+import subprocess
 import argparse
+import platform
 import logging
 import sys
 import gpxpy
 import gpxpy.gpx
 
-from models import Position
 import gpx
 import visualization
 import overpass
@@ -83,6 +82,12 @@ def main():
         help="Set logging level (default: INFO)",
     )
 
+    parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Don't automatically open the HTML file in browser",
+    )
+
     args = parser.parse_args()
 
     # Setup logging
@@ -99,11 +104,32 @@ def main():
         tunnels = [b for b in brunnels if b.brunnel_type == overpass.BrunnelType.TUNNEL]
         logger.info(f"Found {len(bridges)} bridges and {len(tunnels)} tunnels")
 
+        # TODO: Process the route for brunnel analysis (intersection detection)
+
         # Create visualization map
         visualization.create_route_map(route, args.output, brunnels)
         logger.info(f"Map saved to {args.output}")
 
-        # TODO: Process the route for brunnel analysis (intersection detection)
+        # Automatically open the HTML file in the default browser
+        if not args.no_open:
+            try:
+                system = platform.system()
+                if system == "Darwin":  # macOS
+                    subprocess.run(["open", args.output])
+                    logger.info(f"Opening {args.output} in your default browser...")
+                elif system == "Windows":
+                    subprocess.run(["start", args.output], shell=True)
+                    logger.info(f"Opening {args.output} in your default browser...")
+                elif system == "Linux":
+                    subprocess.run(["xdg-open", args.output])
+                    logger.info(f"Opening {args.output} in your default browser...")
+                else:
+                    logger.info(
+                        f"Please open {args.output} manually in your web browser"
+                    )
+            except Exception as e:
+                logger.warning(f"Could not automatically open browser: {e}")
+                logger.info(f"Please manually run: open {args.output}")
 
     except (FileNotFoundError, PermissionError) as e:
         logger.error(f"Failed to read file '{args.filename}': {e}")
