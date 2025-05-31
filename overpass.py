@@ -2,7 +2,7 @@ from typing import Dict, Any, Tuple, List
 import requests
 import logging
 
-from models import Position, BrunnelType, BrunnelWay
+from models import Position, BrunnelType, BrunnelWay, FilterReason
 from geometry import find_intersecting_brunnels
 from gpx import calculate_route_bbox
 
@@ -26,6 +26,40 @@ def determine_brunnel_type(metadata: Dict[str, Any]) -> BrunnelType:
     return BrunnelType.BRIDGE
 
 
+def should_filter_brunnel(metadata: Dict[str, Any]) -> FilterReason:
+    """
+    Determine if a brunnel should be filtered out based on cycling relevance.
+
+    Returns FilterReason.NONE if the brunnel should be kept, otherwise returns
+    the reason for filtering.
+    """
+    tags = metadata.get("tags", {})
+
+    # Check bicycle tag first - highest priority
+    if "bicycle" in tags:
+        if tags["bicycle"] == "no":
+            return FilterReason.BICYCLE_NO
+        else:
+            # bicycle=* (anything other than "no") - keep and skip other checks
+            return FilterReason.NONE
+
+    # Check for cycleway - keep and skip other checks
+    if tags.get("highway") == "cycleway":
+        return FilterReason.NONE
+
+    # Check for waterway - filter out
+    if "waterway" in tags:
+        return FilterReason.WATERWAY
+
+    # Check for railway - filter out unless abandoned
+    if "railway" in tags:
+        if tags["railway"] != "abandoned":
+            return FilterReason.RAILWAY
+
+    # Default: keep the brunnel
+    return FilterReason.NONE
+
+
 def parse_overpass_way(way_data: Dict[str, Any]) -> BrunnelWay:
     """Parse a single way from Overpass response into BrunnelWay object."""
     # Extract coordinates from geometry
@@ -35,8 +69,14 @@ def parse_overpass_way(way_data: Dict[str, Any]) -> BrunnelWay:
             coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
 
     brunnel_type = determine_brunnel_type(way_data)
+    filter_reason = should_filter_brunnel(way_data)
 
-    return BrunnelWay(coords=coords, metadata=way_data, brunnel_type=brunnel_type)
+    return BrunnelWay(
+        coords=coords,
+        metadata=way_data,
+        brunnel_type=brunnel_type,
+        filter_reason=filter_reason,
+    )
 
 
 def query_overpass_brunnels(
@@ -77,7 +117,10 @@ out geom qt;
 
 
 def find_route_brunnels(
-    route: List[Position], buffer_km: float = 1.0, route_buffer_m: float = 0.0
+    route: List[Position],
+    buffer_km: float = 1.0,
+    route_buffer_m: float = 0.0,
+    enable_tag_filtering: bool = True,
 ) -> List[BrunnelWay]:
     """
     Find all bridges and tunnels near the given route and check for intersections.
@@ -86,6 +129,7 @@ def find_route_brunnels(
         route: List of Position objects representing the route
         buffer_km: Buffer distance in kilometers to search around route
         route_buffer_m: Buffer distance in meters to apply around route for intersection detection
+        enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
 
     Returns:
         List of BrunnelWay objects found near the route, with intersection status set
@@ -98,13 +142,25 @@ def find_route_brunnels(
     raw_ways = query_overpass_brunnels(bbox)
 
     brunnels = []
+    filtered_count = 0
+
     for way_data in raw_ways:
         try:
             brunnel = parse_overpass_way(way_data)
+
+            # Count filtered brunnels but keep them for visualization
+            if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
+                filtered_count += 1
+
             brunnels.append(brunnel)
         except (KeyError, ValueError) as e:
             logger.warning(f"Failed to parse brunnel way: {e}")
             continue
+
+    if enable_tag_filtering and filtered_count > 0:
+        logger.info(
+            f"Found {filtered_count} brunnels filtered by cycling relevance tags (will show greyed out)"
+        )
 
     logger.info(f"Found {len(brunnels)} bridges/tunnels near route")
 

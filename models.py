@@ -29,9 +29,23 @@ class BrunnelType(Enum):
         return self.value.capitalize()
 
 
+class FilterReason(Enum):
+    """Enumeration for brunnel filtering reasons."""
+
+    NONE = "none"
+    BICYCLE_NO = "bicycle=no"
+    WATERWAY = "has waterway tag"
+    RAILWAY = "railway (not abandoned)"
+    NON_INTERSECTING = "does not intersect route"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 @dataclass
 class BrunnelWay:
     coords: List[Position]
     metadata: Dict[str, Any]
     brunnel_type: BrunnelType
     intersects_route: bool = False
+    filter_reason: FilterReason = FilterReason.NONE

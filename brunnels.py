@@ -97,6 +97,12 @@ def main():
         help="Don't automatically open the HTML file in browser",
     )
 
+    parser.add_argument(
+        "--no-tag-filtering",
+        action="store_true",
+        help="Disable tag-based filtering for cycling relevance",
+    )
+
     args = parser.parse_args()
 
     # Setup logging
@@ -108,7 +114,12 @@ def main():
         logger.info(f"Loaded GPX route with {len(route)} points")
 
         # Find bridges and tunnels near the route (intersection detection included)
-        brunnels = overpass.find_route_brunnels(route, args.buffer, args.route_buffer)
+        brunnels = overpass.find_route_brunnels(
+            route,
+            args.buffer,
+            args.route_buffer,
+            enable_tag_filtering=not args.no_tag_filtering,
+        )
 
         # Count intersecting vs total brunnels
         bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
@@ -119,8 +130,6 @@ def main():
         logger.info(
             f"Found {len(intersecting_bridges)}/{len(bridges)} intersecting bridges and {len(intersecting_tunnels)}/{len(tunnels)} intersecting tunnels"
         )
-
-        # TODO: Process the route for brunnel analysis (intersection detection)
 
         # Create visualization map
         visualization.create_route_map(route, args.output, brunnels)

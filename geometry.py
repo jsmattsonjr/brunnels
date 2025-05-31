@@ -8,7 +8,7 @@ import logging
 from math import cos, radians
 from shapely.geometry import LineString
 from tqdm import tqdm
-from models import Position, BrunnelWay
+from models import Position, BrunnelWay, FilterReason
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +79,17 @@ def find_intersecting_brunnels(
 
     # Add progress bar for intersection processing
     for brunnel in tqdm(brunnels, desc="Checking intersections", unit="brunnel"):
-        brunnel.intersects_route = route_intersects_brunnel(route_geometry, brunnel)
-        if brunnel.intersects_route:
-            intersecting_count += 1
+        # Only check intersections for brunnels that weren't filtered by tags
+        if brunnel.filter_reason == FilterReason.NONE:
+            brunnel.intersects_route = route_intersects_brunnel(route_geometry, brunnel)
+            if brunnel.intersects_route:
+                intersecting_count += 1
+            else:
+                # Set filter reason for non-intersecting brunnels
+                brunnel.filter_reason = FilterReason.NON_INTERSECTING
+        else:
+            # Keep existing filter reason, don't check intersection
+            brunnel.intersects_route = False
 
     buffer_info = f" (with {route_buffer_m}m buffer)" if route_buffer_m > 0 else ""
     logger.info(

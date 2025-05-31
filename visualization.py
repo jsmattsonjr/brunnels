@@ -6,7 +6,7 @@ Route visualization using folium maps.
 from typing import List, Optional, Dict, Any
 import logging
 import folium
-from models import Position, BrunnelWay, BrunnelType
+from models import Position, BrunnelWay, BrunnelType, FilterReason
 
 logger = logging.getLogger(__name__)
 
@@ -130,17 +130,17 @@ def create_route_map(
         # Convert brunnel coordinates for folium
         brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
 
-        # Determine color and opacity based on intersection status
+        # Determine color and opacity based on intersection status and filtering
         if brunnel.intersects_route:
             opacity = 0.7
             if brunnel.brunnel_type == BrunnelType.BRIDGE:
                 color = "blue"
                 intersecting_bridge_count += 1
             else:  # TUNNEL
-                color = "purple"
+                color = "brown"
                 intersecting_tunnel_count += 1
         else:
-            # Grey out non-intersecting brunnels
+            # Grey out filtered or non-intersecting brunnels
             opacity = 0.3
             color = "gray"
 
@@ -151,10 +151,16 @@ def create_route_map(
             tunnel_count += 1
 
         # Create popup text with full metadata
-        intersection_status = (
-            "intersects route" if brunnel.intersects_route else "nearby"
+        if brunnel.intersects_route:
+            status = "intersects route"
+        elif brunnel.filter_reason == FilterReason.NON_INTERSECTING:
+            status = "does not intersect route"
+        else:
+            status = f"filtered: {brunnel.filter_reason}"
+
+        popup_header = (
+            f"<b>{brunnel.brunnel_type.value.capitalize()}</b> ({status})<br>"
         )
-        popup_header = f"<b>{brunnel.brunnel_type.value.capitalize()}</b> ({intersection_status})<br>"
         metadata_html = _format_metadata_for_popup(brunnel.metadata)
         popup_text = popup_header + metadata_html
 
@@ -187,7 +193,7 @@ def create_route_map(
         <b>Legend</b><br>
         <span style='color: red; font-weight: bold;'>—</span> GPX Route<br>
         <span style='color: blue; font-weight: bold;'>—</span> Bridges ({intersecting_bridge_count}/{bridge_count})<br>
-        <span style='color: purple; font-weight: bold;'>- -</span> Tunnels ({intersecting_tunnel_count}/{tunnel_count})<br>
+        <span style='color: brown; font-weight: bold;'>- -</span> Tunnels ({intersecting_tunnel_count}/{tunnel_count})<br>
         <span style='color: gray; font-weight: bold;'>—</span> Nearby (non-intersecting)
     </div>
     """
