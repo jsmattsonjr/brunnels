@@ -55,34 +55,29 @@ def main():
         description="Brunnel (Bridge/Tunnel) visualization tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-
     parser.add_argument(
         "filename",
         type=str,
         help="GPX file to process (use '-' for stdin)",
     )
-
     parser.add_argument(
         "--output",
         type=str,
         default="brunnel_map.html",
         help="Output HTML map file (default: brunnel_map.html)",
     )
-
     parser.add_argument(
         "--buffer",
         type=float,
         default=0.1,
         help="Search buffer around route in kilometers (default: 0.1)",
     )
-
     parser.add_argument(
         "--route-buffer",
         type=float,
         default=3.0,
         help="Route buffer for containment detection in meters (default: 3.0)",
     )
-
     parser.add_argument(
         "--log-level",
         type=str,
@@ -90,19 +85,16 @@ def main():
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set logging level (default: INFO)",
     )
-
     parser.add_argument(
         "--no-open",
         action="store_true",
         help="Don't automatically open the HTML file in browser",
     )
-
     parser.add_argument(
         "--no-tag-filtering",
         action="store_true",
         help="Disable tag-based filtering for cycling relevance",
     )
-
     args = parser.parse_args()
 
     # Setup logging
