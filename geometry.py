@@ -8,9 +8,42 @@ import logging
 from math import cos, radians
 from shapely.geometry import LineString
 from tqdm import tqdm
-from models import Position, BrunnelWay, FilterReason
+from models import Position, BrunnelWay, FilterReason, RouteSpan
+from distance_utils import calculate_cumulative_distances, find_closest_point_on_route
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_brunnel_route_span(
+    brunnel: BrunnelWay, route: List[Position], cumulative_distances: List[float]
+) -> RouteSpan:
+    """
+    Calculate the span of a brunnel along the route.
+
+    Args:
+        brunnel: BrunnelWay object to calculate span for
+        route: List of Position objects representing the route
+        cumulative_distances: Pre-calculated cumulative distances along route
+
+    Returns:
+        RouteSpan object with start/end distances and length
+    """
+    if not brunnel.coords:
+        return RouteSpan(0.0, 0.0, 0.0)
+
+    min_distance = float("inf")
+    max_distance = -float("inf")
+
+    # Find the closest route point for each brunnel coordinate
+    for brunnel_point in brunnel.coords:
+        cumulative_dist, _ = find_closest_point_on_route(
+            brunnel_point, route, cumulative_distances
+        )
+
+        min_distance = min(min_distance, cumulative_dist)
+        max_distance = max(max_distance, cumulative_dist)
+
+    return RouteSpan(min_distance, max_distance, max_distance - min_distance)
 
 
 def route_contains_brunnel(route_geometry, brunnel: BrunnelWay) -> bool:
@@ -47,6 +80,7 @@ def find_contained_brunnels(
 ) -> None:
     """
     Check which brunnels are completely contained within the buffered route and update their containment status.
+    Also calculate route spans for contained brunnels.
 
     Args:
         route: List of Position objects representing the route
@@ -63,6 +97,12 @@ def find_contained_brunnels(
             f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer_m}m"
         )
         route_buffer_m = 1.0
+
+    # Pre-calculate cumulative distances for route span calculations
+    logger.info("Pre-calculating route distances...")
+    cumulative_distances = calculate_cumulative_distances(route)
+    total_route_distance = cumulative_distances[-1] if cumulative_distances else 0.0
+    logger.info(f"Total route distance: {total_route_distance:.2f} km")
 
     # Create route geometry once for all containment checks
     route_coords = [(pos.longitude, pos.latitude) for pos in route]
@@ -87,6 +127,16 @@ def find_contained_brunnels(
             brunnel.contained_in_route = route_contains_brunnel(route_geometry, brunnel)
             if brunnel.contained_in_route:
                 contained_count += 1
+                # Calculate route span for contained brunnels
+                try:
+                    brunnel.route_span = calculate_brunnel_route_span(
+                        brunnel, route, cumulative_distances
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to calculate route span for brunnel {brunnel.metadata.get('id', 'unknown')}: {e}"
+                    )
+                    brunnel.route_span = None
             else:
                 # Set filter reason for non-contained brunnels
                 brunnel.filter_reason = FilterReason.NOT_CONTAINED
