@@ -10,11 +10,11 @@ Requirements:
 """
 
 
-import subprocess
+import webbrowser
 import argparse
-import platform
 import logging
 import sys
+import os
 import gpxpy
 import gpxpy.gpx
 
@@ -177,22 +177,13 @@ def main():
 
     # Automatically open the HTML file in the default browser
     if not args.no_open:
+        abs_path = os.path.abspath(args.output)
         try:
-            system = platform.system()
-            if system == "Darwin":  # macOS
-                subprocess.run(["open", args.output])
-                logger.info(f"Opening {args.output} in your default browser...")
-            elif system == "Windows":
-                subprocess.run(["start", args.output], shell=True)
-                logger.info(f"Opening {args.output} in your default browser...")
-            elif system == "Linux":
-                subprocess.run(["xdg-open", args.output])
-                logger.info(f"Opening {args.output} in your default browser...")
-            else:
-                logger.info(f"Please open {args.output} manually in your web browser")
+            webbrowser.open(f"file://{abs_path}")
+            logger.info(f"Opening {abs_path} in your default browser...")
         except Exception as e:
             logger.warning(f"Could not automatically open browser: {e}")
-            logger.info(f"Please manually open {args.output}")
+            logger.info(f"Please manually open {abs_path}")
 
 
 if __name__ == "__main__":
