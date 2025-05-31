@@ -1,10 +1,10 @@
 from typing import Dict, Any, Tuple, List
-from dataclasses import dataclass
-from enum import Enum
 import requests
 import logging
 
-from models import Position
+from models import Position, BrunnelType, BrunnelWay
+from geometry import find_intersecting_brunnels
+from gpx import calculate_route_bbox
 
 
 DEFAULT_API_TIMEOUT = 30
@@ -12,23 +12,6 @@ OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
-
-class BrunnelType(Enum):
-    """Enumeration for brunnel (bridge/tunnel) types."""
-
-    BRIDGE = "bridge"
-    TUNNEL = "tunnel"
-
-    def __str__(self) -> str:
-        return self.value.capitalize()
-
-
-@dataclass
-class BrunnelWay:
-    coords: List[Position]
-    metadata: Dict[str, Any]
-    brunnel_type: BrunnelType
 
 
 def determine_brunnel_type(metadata: Dict[str, Any]) -> BrunnelType:
@@ -97,17 +80,15 @@ def find_route_brunnels(
     route: List[Position], buffer_km: float = 1.0
 ) -> List[BrunnelWay]:
     """
-    Find all bridges and tunnels near the given route.
+    Find all bridges and tunnels near the given route and check for intersections.
 
     Args:
         route: List of Position objects representing the route
         buffer_km: Buffer distance in kilometers to search around route
 
     Returns:
-        List of BrunnelWay objects found near the route
+        List of BrunnelWay objects found near the route, with intersection status set
     """
-    from gpx import calculate_route_bbox  # Import here to avoid circular imports
-
     if not route:
         logger.warning("Cannot find brunnels for empty route")
         return []
@@ -125,4 +106,8 @@ def find_route_brunnels(
             continue
 
     logger.info(f"Found {len(brunnels)} bridges/tunnels near route")
+
+    # Check for intersections with the route
+    find_intersecting_brunnels(route, brunnels)
+
     return brunnels

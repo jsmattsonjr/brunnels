@@ -6,8 +6,7 @@ Route visualization using folium maps.
 from typing import List, Optional
 import logging
 import folium
-from models import Position
-from overpass import BrunnelWay, BrunnelType
+from models import Position, BrunnelWay, BrunnelType
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +68,11 @@ def create_route_map(
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(route_map)
 
-    # Add bridges and tunnels
+    # Count brunnels by type and intersection status
     bridge_count = 0
     tunnel_count = 0
+    intersecting_bridge_count = 0
+    intersecting_tunnel_count = 0
 
     for brunnel in brunnels:
         if not brunnel.coords:
@@ -80,36 +81,63 @@ def create_route_map(
         # Convert brunnel coordinates for folium
         brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
 
-        # Style and add brunnel based on type
+        # Determine color and opacity based on intersection status
+        if brunnel.intersects_route:
+            opacity = 0.7
+            if brunnel.brunnel_type == BrunnelType.BRIDGE:
+                color = "blue"
+                intersecting_bridge_count += 1
+            else:  # TUNNEL
+                color = "purple"
+                intersecting_tunnel_count += 1
+        else:
+            # Grey out non-intersecting brunnels
+            opacity = 0.3
+            color = "gray"
+
+        # Count all brunnels
         if brunnel.brunnel_type == BrunnelType.BRIDGE:
             bridge_count += 1
-            folium.PolyLine(
-                brunnel_coords,
-                color="blue",
-                weight=2,
-                opacity=0.7,
-                popup=f"Bridge (OSM ID: {brunnel.metadata.get('id', 'unknown')})",
-            ).add_to(route_map)
-        else:  # TUNNEL
+        else:
             tunnel_count += 1
+
+        # Create popup text
+        intersection_status = (
+            "intersects route" if brunnel.intersects_route else "nearby"
+        )
+        popup_text = f"{brunnel.brunnel_type.value.capitalize()} ({intersection_status}) - OSM ID: {brunnel.metadata.get('id', 'unknown')}"
+
+        # Style and add brunnel based on type
+        if brunnel.brunnel_type == BrunnelType.TUNNEL and brunnel.intersects_route:
+            # Use dashed line for intersecting tunnels
             folium.PolyLine(
                 brunnel_coords,
-                color="purple",
+                color=color,
                 weight=2,
-                opacity=0.7,
+                opacity=opacity,
                 dash_array="5, 5",
-                popup=f"Tunnel (OSM ID: {brunnel.metadata.get('id', 'unknown')})",
+                popup=popup_text,
+            ).add_to(route_map)
+        else:
+            # Solid line for bridges and non-intersecting tunnels
+            folium.PolyLine(
+                brunnel_coords,
+                color=color,
+                weight=2,
+                opacity=opacity,
+                popup=popup_text,
             ).add_to(route_map)
 
     # Add legend as HTML overlay by post-processing the saved file
     legend_html = f"""
-    <div style='position: fixed; bottom: 50px; left: 50px; width: 150px; height: 110px; 
+    <div style='position: fixed; bottom: 50px; left: 50px; width: 200px; height: 150px; 
                 background-color: white; border: 2px solid grey; z-index: 9999; 
                 font-size: 14px; padding: 10px; font-family: Arial, sans-serif;'>
         <b>Legend</b><br>
         <span style='color: red; font-weight: bold;'>—</span> GPX Route<br>
-        <span style='color: blue; font-weight: bold;'>—</span> Bridges ({bridge_count})<br>
-        <span style='color: purple; font-weight: bold;'>- -</span> Tunnels ({tunnel_count})
+        <span style='color: blue; font-weight: bold;'>—</span> Bridges ({intersecting_bridge_count}/{bridge_count})<br>
+        <span style='color: purple; font-weight: bold;'>- -</span> Tunnels ({intersecting_tunnel_count}/{tunnel_count})<br>
+        <span style='color: gray; font-weight: bold;'>—</span> Nearby (non-intersecting)
     </div>
     """
 
@@ -127,5 +155,5 @@ def create_route_map(
     with open(output_filename, "w", encoding="utf-8") as f:
         f.write(html_content)
     logger.info(
-        f"Map saved to {output_filename} with {bridge_count} bridges and {tunnel_count} tunnels"
+        f"Map saved to {output_filename} with {intersecting_bridge_count}/{bridge_count} bridges and {intersecting_tunnel_count}/{tunnel_count} tunnels intersecting route"
     )

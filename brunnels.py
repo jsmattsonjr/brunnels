@@ -4,7 +4,7 @@ Brunnel (Bridge/Tunnel) Visualization Tool
 
 
 Requirements:
-    pip install gpxpy folium requests
+    pip install gpxpy folium requests shapely
 
 """
 
@@ -20,6 +20,7 @@ import gpxpy.gpx
 import gpx
 import visualization
 import overpass
+from models import BrunnelType
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -98,11 +99,18 @@ def main():
         route = gpx.load_gpx_route(args.filename)
         logger.info(f"Loaded GPX route with {len(route)} points")
 
-        # Find bridges and tunnels near the route
+        # Find bridges and tunnels near the route (intersection detection included)
         brunnels = overpass.find_route_brunnels(route, args.buffer)
-        bridges = [b for b in brunnels if b.brunnel_type == overpass.BrunnelType.BRIDGE]
-        tunnels = [b for b in brunnels if b.brunnel_type == overpass.BrunnelType.TUNNEL]
-        logger.info(f"Found {len(bridges)} bridges and {len(tunnels)} tunnels")
+
+        # Count intersecting vs total brunnels
+        bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
+        tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
+        intersecting_bridges = [b for b in bridges if b.intersects_route]
+        intersecting_tunnels = [b for b in tunnels if b.intersects_route]
+
+        logger.info(
+            f"Found {len(intersecting_bridges)}/{len(bridges)} intersecting bridges and {len(intersecting_tunnels)}/{len(tunnels)} intersecting tunnels"
+        )
 
         # TODO: Process the route for brunnel analysis (intersection detection)
 
