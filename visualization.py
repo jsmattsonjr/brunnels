@@ -212,10 +212,10 @@ def create_route_map(
                 font-size: 14px; padding: 10px; font-family: Arial, sans-serif;'>
         <b>Legend</b><br>
         <span style='color: red; font-weight: bold;'>—</span> GPX Route<br>
-        <span style='color: blue; font-weight: bold;'>—</span> Included Bridges ({contained_bridge_count}/{bridge_count})<br>
-        <span style='color: brown; font-weight: bold;'>- -</span> Included Tunnels ({contained_tunnel_count}/{tunnel_count})<br>
-        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Excluded Bridges<br>
-        <span style='color: rosybrown; font-weight: bold;'>- -</span> Excluded Tunnels
+        <span style='color: blue; font-weight: bold;'>—</span> Included Bridges ({contained_bridge_count})<br>
+        <span style='color: brown; font-weight: bold;'>- -</span> Included Tunnels ({contained_tunnel_count})<br>
+        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Excluded Bridges ({bridge_count - contained_bridge_count})<br>
+        <span style='color: rosybrown; font-weight: bold;'>- -</span> Excluded Tunnels ({tunnel_count - contained_tunnel_count})
     </div>
     """
 
