@@ -179,8 +179,8 @@ def create_route_map(
         popup_text = popup_header + metadata_html + span_info
 
         # Style and add brunnel based on type
-        if brunnel.brunnel_type == BrunnelType.TUNNEL and brunnel.contained_in_route:
-            # Use dashed line for contained tunnels
+        if brunnel.brunnel_type == BrunnelType.TUNNEL:
+            # Use dashed line for ALL tunnels (both contained and non-contained)
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
@@ -190,7 +190,7 @@ def create_route_map(
                 popup=folium.Popup(popup_text, max_width=300),
             ).add_to(route_map)
         else:
-            # Solid line for bridges and non-contained tunnels
+            # Solid line for all bridges
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
@@ -201,14 +201,15 @@ def create_route_map(
 
     # Add legend as HTML overlay by post-processing the saved file
     legend_html = f"""
-    <div style='position: fixed; bottom: 50px; left: 50px; width: 200px; height: 150px; 
+    <div style='position: fixed; bottom: 50px; left: 50px; width: 220px; height: 170px; 
                 background-color: white; border: 2px solid grey; z-index: 9999; 
                 font-size: 14px; padding: 10px; font-family: Arial, sans-serif;'>
         <b>Legend</b><br>
         <span style='color: red; font-weight: bold;'>—</span> GPX Route<br>
-        <span style='color: blue; font-weight: bold;'>—</span> Bridges ({contained_bridge_count}/{bridge_count})<br>
-        <span style='color: brown; font-weight: bold;'>- -</span> Tunnels ({contained_tunnel_count}/{tunnel_count})<br>
-        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Non-contained/filtered
+        <span style='color: blue; font-weight: bold;'>—</span> Included Bridges ({contained_bridge_count}/{bridge_count})<br>
+        <span style='color: brown; font-weight: bold;'>- -</span> Included Tunnels ({contained_tunnel_count}/{tunnel_count})<br>
+        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Excluded Bridges<br>
+        <span style='color: rosybrown; font-weight: bold;'>- -</span> Excluded Tunnels
     </div>
     """
 
