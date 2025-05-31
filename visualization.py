@@ -101,7 +101,7 @@ def create_route_map(
 
     # Add route as polyline
     folium.PolyLine(
-        coordinates, color="red", weight=3, opacity=0.8, popup="GPX Route"
+        coordinates, color="red", weight=2, opacity=0.6, popup="GPX Route"
     ).add_to(route_map)
 
     # Add start and end markers
@@ -132,7 +132,8 @@ def create_route_map(
 
         # Determine color and opacity based on containment status and filtering
         if brunnel.contained_in_route:
-            opacity = 0.7
+            opacity = 0.9
+            weight = 4
             if brunnel.brunnel_type == BrunnelType.BRIDGE:
                 color = "blue"
                 contained_bridge_count += 1
@@ -142,6 +143,7 @@ def create_route_map(
         else:
             # Use muted colors for filtered or non-contained brunnels
             opacity = 0.3
+            weight = 2
             if brunnel.brunnel_type == BrunnelType.BRIDGE:
                 color = "lightsteelblue"  # grey-blue for bridges
             else:  # TUNNEL
@@ -184,7 +186,7 @@ def create_route_map(
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
-                weight=2,
+                weight=weight,
                 opacity=opacity,
                 dash_array="5, 5",
                 popup=folium.Popup(popup_text, max_width=300),
@@ -194,7 +196,7 @@ def create_route_map(
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
-                weight=2,
+                weight=weight,
                 opacity=opacity,
                 popup=folium.Popup(popup_text, max_width=300),
             ).add_to(route_map)
