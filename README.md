@@ -4,7 +4,7 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 
 ## What is a Brunnel?
 
-"Brunnel" is a portmanteau of "bridge" and "tunnel" - a term commonly used in GIS and mapping to refer to both types of infrastructure collectively.
+"Brunnel" is a portmanteau of "bridge" and "tunnel" used in this tool to refer to both types of infrastructure collectively. This term is commonly used on the Biketerra Discord server.
 
 ## Features
 
