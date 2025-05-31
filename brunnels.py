@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 Brunnel (Bridge/Tunnel) Visualization Tool
-
+This script processes a GPX file to find bridges and tunnels along a route,
+and generates an interactive HTML map visualizing the route and the brunnels.
 
 Requirements:
-    pip install gpxpy folium requests shapely
+    pip install gpxpy folium requests shapely tqdm
 
 """
 
