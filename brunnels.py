@@ -108,75 +108,9 @@ def main():
     # Setup logging
     setup_logging(args.log_level)
 
+    # Load and parse the GPX file into a route
     try:
-        # Load and parse the GPX file into a route
         route = gpx.load_gpx_route(args.filename)
-        logger.info(f"Loaded GPX route with {len(route)} points")
-
-        # Find bridges and tunnels near the route (containment detection included)
-        brunnels = overpass.find_route_brunnels(
-            route,
-            args.buffer,
-            args.route_buffer,
-            enable_tag_filtering=not args.no_tag_filtering,
-        )
-
-        # Count contained vs total brunnels
-        bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
-        tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
-        contained_bridges = [b for b in bridges if b.contained_in_route]
-        contained_tunnels = [b for b in tunnels if b.contained_in_route]
-
-        logger.info(
-            f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
-        )
-
-        # Log included brunnels before visualization
-        included_brunnels = [b for b in brunnels if b.contained_in_route]
-        if included_brunnels:
-            # Sort by start km
-            included_brunnels.sort(
-                key=lambda b: b.route_span.start_distance_km if b.route_span else 0.0
-            )
-
-            logger.info("Included brunnels:")
-            for brunnel in included_brunnels:
-                brunnel_type = brunnel.brunnel_type.value.capitalize()
-                name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
-                osm_id = brunnel.metadata.get("id", "unknown")
-
-                if brunnel.route_span:
-                    span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
-                else:
-                    span_data = "no span data"
-
-                logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
-
-        # Create visualization map
-        visualization.create_route_map(route, args.output, brunnels, args.buffer)
-        logger.info(f"Map saved to {args.output}")
-
-        # Automatically open the HTML file in the default browser
-        if not args.no_open:
-            try:
-                system = platform.system()
-                if system == "Darwin":  # macOS
-                    subprocess.run(["open", args.output])
-                    logger.info(f"Opening {args.output} in your default browser...")
-                elif system == "Windows":
-                    subprocess.run(["start", args.output], shell=True)
-                    logger.info(f"Opening {args.output} in your default browser...")
-                elif system == "Linux":
-                    subprocess.run(["xdg-open", args.output])
-                    logger.info(f"Opening {args.output} in your default browser...")
-                else:
-                    logger.info(
-                        f"Please open {args.output} manually in your web browser"
-                    )
-            except Exception as e:
-                logger.warning(f"Could not automatically open browser: {e}")
-                logger.info(f"Please manually run: open {args.output}")
-
     except (FileNotFoundError, PermissionError) as e:
         logger.error(f"Failed to read file '{args.filename}': {e}")
         sys.exit(1)
@@ -186,9 +120,79 @@ def main():
     except gpx.RouteValidationError as e:
         logger.error(f"Route validation failed: {e}")
         sys.exit(1)
+
+    logger.info(f"Loaded GPX route with {len(route)} points")
+
+    # Find bridges and tunnels near the route (containment detection included)
+    try:
+        brunnels = overpass.find_route_brunnels(
+            route,
+            args.buffer,
+            args.route_buffer,
+            enable_tag_filtering=not args.no_tag_filtering,
+        )
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
+
+    # Count contained vs total brunnels
+    bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
+    tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
+    contained_bridges = [b for b in bridges if b.contained_in_route]
+    contained_tunnels = [b for b in tunnels if b.contained_in_route]
+
+    logger.info(
+        f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
+    )
+
+    # Log included brunnels before visualization
+    included_brunnels = [b for b in brunnels if b.contained_in_route]
+    if included_brunnels:
+        # Sort by start km
+        included_brunnels.sort(
+            key=lambda b: b.route_span.start_distance_km if b.route_span else 0.0
+        )
+
+        logger.info("Included brunnels:")
+        for brunnel in included_brunnels:
+            brunnel_type = brunnel.brunnel_type.value.capitalize()
+            name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
+            osm_id = brunnel.metadata.get("id", "unknown")
+
+            if brunnel.route_span:
+                span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
+            else:
+                span_data = "no span data"
+
+            logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
+
+    # Create visualization map
+    try:
+        visualization.create_route_map(route, args.output, brunnels, args.buffer)
+    except Exception as e:
+        logger.error(f"Failed to create map: {e}")
+        sys.exit(1)
+
+    logger.info(f"Map saved to {args.output}")
+
+    # Automatically open the HTML file in the default browser
+    if not args.no_open:
+        try:
+            system = platform.system()
+            if system == "Darwin":  # macOS
+                subprocess.run(["open", args.output])
+                logger.info(f"Opening {args.output} in your default browser...")
+            elif system == "Windows":
+                subprocess.run(["start", args.output], shell=True)
+                logger.info(f"Opening {args.output} in your default browser...")
+            elif system == "Linux":
+                subprocess.run(["xdg-open", args.output])
+                logger.info(f"Opening {args.output} in your default browser...")
+            else:
+                logger.info(f"Please open {args.output} manually in your web browser")
+        except Exception as e:
+            logger.warning(f"Could not automatically open browser: {e}")
+            logger.info(f"Please manually open {args.output}")
 
 
 if __name__ == "__main__":
