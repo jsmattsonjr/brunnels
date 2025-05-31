@@ -131,6 +131,27 @@ def main():
             f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
         )
 
+        # Log included brunnels before visualization
+        included_brunnels = [b for b in brunnels if b.contained_in_route]
+        if included_brunnels:
+            # Sort by start km
+            included_brunnels.sort(
+                key=lambda b: b.route_span.start_distance_km if b.route_span else 0.0
+            )
+
+            logger.info("Included brunnels:")
+            for brunnel in included_brunnels:
+                brunnel_type = brunnel.brunnel_type.value.capitalize()
+                name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
+                osm_id = brunnel.metadata.get("id", "unknown")
+
+                if brunnel.route_span:
+                    span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
+                else:
+                    span_data = "no span data"
+
+                logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
+
         # Create visualization map
         visualization.create_route_map(route, args.output, brunnels)
         logger.info(f"Map saved to {args.output}")
