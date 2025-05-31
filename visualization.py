@@ -140,9 +140,12 @@ def create_route_map(
                 color = "brown"
                 intersecting_tunnel_count += 1
         else:
-            # Grey out filtered or non-intersecting brunnels
+            # Use muted colors for filtered or non-intersecting brunnels
             opacity = 0.3
-            color = "gray"
+            if brunnel.brunnel_type == BrunnelType.BRIDGE:
+                color = "lightsteelblue"  # grey-blue for bridges
+            else:  # TUNNEL
+                color = "rosybrown"  # grey-brown for tunnels
 
         # Count all brunnels
         if brunnel.brunnel_type == BrunnelType.BRIDGE:
@@ -194,7 +197,7 @@ def create_route_map(
         <span style='color: red; font-weight: bold;'>—</span> GPX Route<br>
         <span style='color: blue; font-weight: bold;'>—</span> Bridges ({intersecting_bridge_count}/{bridge_count})<br>
         <span style='color: brown; font-weight: bold;'>- -</span> Tunnels ({intersecting_tunnel_count}/{tunnel_count})<br>
-        <span style='color: gray; font-weight: bold;'>—</span> Nearby (non-intersecting)
+        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Non-intersecting/filtered
     </div>
     """
 
