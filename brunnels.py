@@ -80,7 +80,7 @@ def main():
         "--route-buffer",
         type=float,
         default=3.0,
-        help="Route buffer for intersection detection in meters (default: 3.0)",
+        help="Route buffer for containment detection in meters (default: 3.0)",
     )
 
     parser.add_argument(
@@ -113,7 +113,7 @@ def main():
         route = gpx.load_gpx_route(args.filename)
         logger.info(f"Loaded GPX route with {len(route)} points")
 
-        # Find bridges and tunnels near the route (intersection detection included)
+        # Find bridges and tunnels near the route (containment detection included)
         brunnels = overpass.find_route_brunnels(
             route,
             args.buffer,
@@ -121,14 +121,14 @@ def main():
             enable_tag_filtering=not args.no_tag_filtering,
         )
 
-        # Count intersecting vs total brunnels
+        # Count contained vs total brunnels
         bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
         tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
-        intersecting_bridges = [b for b in bridges if b.intersects_route]
-        intersecting_tunnels = [b for b in tunnels if b.intersects_route]
+        contained_bridges = [b for b in bridges if b.contained_in_route]
+        contained_tunnels = [b for b in tunnels if b.contained_in_route]
 
         logger.info(
-            f"Found {len(intersecting_bridges)}/{len(bridges)} intersecting bridges and {len(intersecting_tunnels)}/{len(tunnels)} intersecting tunnels"
+            f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
         )
 
         # Create visualization map

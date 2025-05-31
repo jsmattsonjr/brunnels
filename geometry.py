@@ -13,16 +13,16 @@ from models import Position, BrunnelWay, FilterReason
 logger = logging.getLogger(__name__)
 
 
-def route_intersects_brunnel(route_geometry, brunnel: BrunnelWay) -> bool:
+def route_contains_brunnel(route_geometry, brunnel: BrunnelWay) -> bool:
     """
-    Check if a route geometry intersects with a brunnel (bridge or tunnel).
+    Check if a route geometry completely contains a brunnel (bridge or tunnel).
 
     Args:
-        route_geometry: Shapely geometry object representing the route (with buffer if applicable)
-        brunnel: BrunnelWay object to check for intersection
+        route_geometry: Shapely geometry object representing the buffered route polygon
+        brunnel: BrunnelWay object to check for containment
 
     Returns:
-        True if the route intersects the brunnel, False otherwise
+        True if the route geometry completely contains the brunnel, False otherwise
     """
     if not brunnel.coords or len(brunnel.coords) < 2:
         return False
@@ -32,66 +32,68 @@ def route_intersects_brunnel(route_geometry, brunnel: BrunnelWay) -> bool:
         brunnel_coords = [(pos.longitude, pos.latitude) for pos in brunnel.coords]
         brunnel_line = LineString(brunnel_coords)
 
-        # Check for intersection
-        return route_geometry.intersects(brunnel_line)
+        # Check if route geometry completely contains the brunnel
+        return route_geometry.contains(brunnel_line)
 
     except Exception as e:
         logger.warning(
-            f"Failed to check intersection for brunnel {brunnel.metadata.get('id', 'unknown')}: {e}"
+            f"Failed to check containment for brunnel {brunnel.metadata.get('id', 'unknown')}: {e}"
         )
         return False
 
 
-def find_intersecting_brunnels(
-    route: List[Position], brunnels: List[BrunnelWay], route_buffer_m: float = 0.0
+def find_contained_brunnels(
+    route: List[Position], brunnels: List[BrunnelWay], route_buffer_m: float = 10.0
 ) -> None:
     """
-    Check which brunnels intersect with the route and update their intersection status.
+    Check which brunnels are completely contained within the buffered route and update their containment status.
 
     Args:
         route: List of Position objects representing the route
         brunnels: List of BrunnelWay objects to check (modified in-place)
-        route_buffer_m: Buffer distance in meters to apply around the route (default: 0.0)
+        route_buffer_m: Buffer distance in meters to apply around the route (default: 10.0, minimum: 1.0)
     """
     if not route:
-        logger.warning("Cannot find intersections for empty route")
+        logger.warning("Cannot find contained brunnels for empty route")
         return
 
-    # Create route geometry once for all intersection checks
+    # Ensure minimum buffer for containment analysis (a LineString cannot contain another LineString)
+    if route_buffer_m < 1.0:
+        logger.info(
+            f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer_m}m"
+        )
+        route_buffer_m = 1.0
+
+    # Create route geometry once for all containment checks
     route_coords = [(pos.longitude, pos.latitude) for pos in route]
     route_line = LineString(route_coords)
 
-    # Apply buffer if specified
-    if route_buffer_m > 0.0:
-        # Convert buffer from meters to approximate degrees
-        # Use the first route point for latitude-based longitude conversion
-        avg_lat = route[0].latitude
-        lat_buffer = route_buffer_m / 111000.0  # 1 degree latitude ≈ 111 km
-        lon_buffer = route_buffer_m / (111000.0 * abs(cos(radians(avg_lat))))
+    # Convert buffer from meters to approximate degrees
+    # Use the first route point for latitude-based longitude conversion
+    avg_lat = route[0].latitude
+    lat_buffer = route_buffer_m / 111000.0  # 1 degree latitude ≈ 111 km
+    lon_buffer = route_buffer_m / (111000.0 * abs(cos(radians(avg_lat))))
 
-        # Use the smaller of the two buffers to be conservative
-        buffer_degrees = min(lat_buffer, lon_buffer)
-        route_geometry = route_line.buffer(buffer_degrees)
-    else:
-        route_geometry = route_line
+    # Use the smaller of the two buffers to be conservative
+    buffer_degrees = min(lat_buffer, lon_buffer)
+    route_geometry = route_line.buffer(buffer_degrees)
 
-    intersecting_count = 0
+    contained_count = 0
 
-    # Add progress bar for intersection processing
-    for brunnel in tqdm(brunnels, desc="Checking intersections", unit="brunnel"):
-        # Only check intersections for brunnels that weren't filtered by tags
+    # Add progress bar for containment processing
+    for brunnel in tqdm(brunnels, desc="Checking containment", unit="brunnel"):
+        # Only check containment for brunnels that weren't filtered by tags
         if brunnel.filter_reason == FilterReason.NONE:
-            brunnel.intersects_route = route_intersects_brunnel(route_geometry, brunnel)
-            if brunnel.intersects_route:
-                intersecting_count += 1
+            brunnel.contained_in_route = route_contains_brunnel(route_geometry, brunnel)
+            if brunnel.contained_in_route:
+                contained_count += 1
             else:
-                # Set filter reason for non-intersecting brunnels
-                brunnel.filter_reason = FilterReason.NON_INTERSECTING
+                # Set filter reason for non-contained brunnels
+                brunnel.filter_reason = FilterReason.NOT_CONTAINED
         else:
-            # Keep existing filter reason, don't check intersection
-            brunnel.intersects_route = False
+            # Keep existing filter reason, don't check containment
+            brunnel.contained_in_route = False
 
-    buffer_info = f" (with {route_buffer_m}m buffer)" if route_buffer_m > 0 else ""
     logger.info(
-        f"Found {intersecting_count} brunnels intersecting the route out of {len(brunnels)} total{buffer_info}"
+        f"Found {contained_count} brunnels completely contained within the route buffer out of {len(brunnels)} total (with {route_buffer_m}m buffer)"
     )

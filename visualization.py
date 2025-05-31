@@ -117,11 +117,11 @@ def create_route_map(
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(route_map)
 
-    # Count brunnels by type and intersection status
+    # Count brunnels by type and containment status
     bridge_count = 0
     tunnel_count = 0
-    intersecting_bridge_count = 0
-    intersecting_tunnel_count = 0
+    contained_bridge_count = 0
+    contained_tunnel_count = 0
 
     for brunnel in brunnels:
         if not brunnel.coords:
@@ -130,17 +130,17 @@ def create_route_map(
         # Convert brunnel coordinates for folium
         brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
 
-        # Determine color and opacity based on intersection status and filtering
-        if brunnel.intersects_route:
+        # Determine color and opacity based on containment status and filtering
+        if brunnel.contained_in_route:
             opacity = 0.7
             if brunnel.brunnel_type == BrunnelType.BRIDGE:
                 color = "blue"
-                intersecting_bridge_count += 1
+                contained_bridge_count += 1
             else:  # TUNNEL
                 color = "brown"
-                intersecting_tunnel_count += 1
+                contained_tunnel_count += 1
         else:
-            # Use muted colors for filtered or non-intersecting brunnels
+            # Use muted colors for filtered or non-contained brunnels
             opacity = 0.3
             if brunnel.brunnel_type == BrunnelType.BRIDGE:
                 color = "lightsteelblue"  # grey-blue for bridges
@@ -154,10 +154,10 @@ def create_route_map(
             tunnel_count += 1
 
         # Create popup text with full metadata
-        if brunnel.intersects_route:
-            status = "intersects route"
-        elif brunnel.filter_reason == FilterReason.NON_INTERSECTING:
-            status = "does not intersect route"
+        if brunnel.contained_in_route:
+            status = "contained in route buffer"
+        elif brunnel.filter_reason == FilterReason.NOT_CONTAINED:
+            status = "not contained in route buffer"
         else:
             status = f"filtered: {brunnel.filter_reason}"
 
@@ -168,8 +168,8 @@ def create_route_map(
         popup_text = popup_header + metadata_html
 
         # Style and add brunnel based on type
-        if brunnel.brunnel_type == BrunnelType.TUNNEL and brunnel.intersects_route:
-            # Use dashed line for intersecting tunnels
+        if brunnel.brunnel_type == BrunnelType.TUNNEL and brunnel.contained_in_route:
+            # Use dashed line for contained tunnels
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
@@ -179,7 +179,7 @@ def create_route_map(
                 popup=folium.Popup(popup_text, max_width=300),
             ).add_to(route_map)
         else:
-            # Solid line for bridges and non-intersecting tunnels
+            # Solid line for bridges and non-contained tunnels
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
@@ -195,9 +195,9 @@ def create_route_map(
                 font-size: 14px; padding: 10px; font-family: Arial, sans-serif;'>
         <b>Legend</b><br>
         <span style='color: red; font-weight: bold;'>—</span> GPX Route<br>
-        <span style='color: blue; font-weight: bold;'>—</span> Bridges ({intersecting_bridge_count}/{bridge_count})<br>
-        <span style='color: brown; font-weight: bold;'>- -</span> Tunnels ({intersecting_tunnel_count}/{tunnel_count})<br>
-        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Non-intersecting/filtered
+        <span style='color: blue; font-weight: bold;'>—</span> Bridges ({contained_bridge_count}/{bridge_count})<br>
+        <span style='color: brown; font-weight: bold;'>- -</span> Tunnels ({contained_tunnel_count}/{tunnel_count})<br>
+        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Non-contained/filtered
     </div>
     """
 
@@ -215,5 +215,5 @@ def create_route_map(
     with open(output_filename, "w", encoding="utf-8") as f:
         f.write(html_content)
     logger.info(
-        f"Map saved to {output_filename} with {intersecting_bridge_count}/{bridge_count} bridges and {intersecting_tunnel_count}/{tunnel_count} tunnels intersecting route"
+        f"Map saved to {output_filename} with {contained_bridge_count}/{bridge_count} bridges and {contained_tunnel_count}/{tunnel_count} tunnels contained in route buffer"
     )

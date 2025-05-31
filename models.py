@@ -36,7 +36,7 @@ class FilterReason(Enum):
     BICYCLE_NO = "bicycle=no"
     WATERWAY = "has waterway tag"
     RAILWAY = "railway (not abandoned)"
-    NON_INTERSECTING = "does not intersect route"
+    NOT_CONTAINED = "not contained within route buffer"
 
     def __str__(self) -> str:
         return self.value
@@ -47,5 +47,5 @@ class BrunnelWay:
     coords: List[Position]
     metadata: Dict[str, Any]
     brunnel_type: BrunnelType
-    intersects_route: bool = False
+    contained_in_route: bool = False
     filter_reason: FilterReason = FilterReason.NONE

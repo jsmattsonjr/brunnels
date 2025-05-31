@@ -3,7 +3,7 @@ import requests
 import logging
 
 from models import Position, BrunnelType, BrunnelWay, FilterReason
-from geometry import find_intersecting_brunnels
+from geometry import find_contained_brunnels
 from gpx import calculate_route_bbox
 
 
@@ -119,20 +119,20 @@ out geom qt;
 def find_route_brunnels(
     route: List[Position],
     buffer_km: float = 1.0,
-    route_buffer_m: float = 0.0,
+    route_buffer_m: float = 10.0,
     enable_tag_filtering: bool = True,
 ) -> List[BrunnelWay]:
     """
-    Find all bridges and tunnels near the given route and check for intersections.
+    Find all bridges and tunnels near the given route and check for containment within route buffer.
 
     Args:
         route: List of Position objects representing the route
         buffer_km: Buffer distance in kilometers to search around route
-        route_buffer_m: Buffer distance in meters to apply around route for intersection detection
+        route_buffer_m: Buffer distance in meters to apply around route for containment detection
         enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
 
     Returns:
-        List of BrunnelWay objects found near the route, with intersection status set
+        List of BrunnelWay objects found near the route, with containment status set
     """
     if not route:
         logger.warning("Cannot find brunnels for empty route")
@@ -164,7 +164,7 @@ def find_route_brunnels(
 
     logger.info(f"Found {len(brunnels)} bridges/tunnels near route")
 
-    # Check for intersections with the route
-    find_intersecting_brunnels(route, brunnels, route_buffer_m)
+    # Check for containment within the route buffer
+    find_contained_brunnels(route, brunnels, route_buffer_m)
 
     return brunnels
