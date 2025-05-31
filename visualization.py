@@ -3,12 +3,61 @@
 Route visualization using folium maps.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import logging
 import folium
 from models import Position, BrunnelWay, BrunnelType
 
 logger = logging.getLogger(__name__)
+
+
+def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
+    """
+    Format OSM metadata into HTML for popup display.
+
+    Args:
+        metadata: Dictionary containing OSM metadata
+
+    Returns:
+        HTML-formatted string with metadata
+    """
+    html_parts = []
+    tags = metadata.get("tags", {})
+
+    # Add name most prominently if present
+    if "name" in tags:
+        html_parts.append(f"<b>{tags['name']}</b>")
+
+    # Add alt_name next if present
+    if "alt_name" in tags:
+        html_parts.append(f"<br><b>AKA:</b> {tags['alt_name']}")
+
+    # Add OSM ID
+    osm_id = metadata.get("id", "unknown")
+    html_parts.append(f"<br><b>OSM ID:</b> {osm_id}")
+
+    # Add remaining OSM tags (excluding name and alt_name which we already showed)
+    remaining_tags = {k: v for k, v in tags.items() if k not in ["name", "alt_name"]}
+    if remaining_tags:
+        html_parts.append("<br><b>Tags:</b>")
+        for key, value in sorted(remaining_tags.items()):
+            html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value}")
+
+    # Add other metadata (excluding tags and id which we already handled)
+    other_data = {k: v for k, v in metadata.items() if k not in ["tags", "id"]}
+    if other_data:
+        html_parts.append("<br><b>Other:</b>")
+        for key, value in sorted(other_data.items()):
+            # Handle nested dictionaries or lists
+            if isinstance(value, (dict, list)):
+                value_str = str(value)
+                if len(value_str) > 50:  # Truncate very long values
+                    value_str = value_str[:47] + "..."
+            else:
+                value_str = str(value)
+            html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
+
+    return "".join(html_parts)
 
 
 def create_route_map(
@@ -101,11 +150,13 @@ def create_route_map(
         else:
             tunnel_count += 1
 
-        # Create popup text
+        # Create popup text with full metadata
         intersection_status = (
             "intersects route" if brunnel.intersects_route else "nearby"
         )
-        popup_text = f"{brunnel.brunnel_type.value.capitalize()} ({intersection_status}) - OSM ID: {brunnel.metadata.get('id', 'unknown')}"
+        popup_header = f"<b>{brunnel.brunnel_type.value.capitalize()}</b> ({intersection_status})<br>"
+        metadata_html = _format_metadata_for_popup(brunnel.metadata)
+        popup_text = popup_header + metadata_html
 
         # Style and add brunnel based on type
         if brunnel.brunnel_type == BrunnelType.TUNNEL and brunnel.intersects_route:
@@ -116,7 +167,7 @@ def create_route_map(
                 weight=2,
                 opacity=opacity,
                 dash_array="5, 5",
-                popup=popup_text,
+                popup=folium.Popup(popup_text, max_width=300),
             ).add_to(route_map)
         else:
             # Solid line for bridges and non-intersecting tunnels
@@ -125,7 +176,7 @@ def create_route_map(
                 color=color,
                 weight=2,
                 opacity=opacity,
-                popup=popup_text,
+                popup=folium.Popup(popup_text, max_width=300),
             ).add_to(route_map)
 
     # Add legend as HTML overlay by post-processing the saved file
