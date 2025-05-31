@@ -77,7 +77,7 @@ out geom qt;
 
 
 def find_route_brunnels(
-    route: List[Position], buffer_km: float = 1.0
+    route: List[Position], buffer_km: float = 1.0, route_buffer_m: float = 0.0
 ) -> List[BrunnelWay]:
     """
     Find all bridges and tunnels near the given route and check for intersections.
@@ -85,6 +85,7 @@ def find_route_brunnels(
     Args:
         route: List of Position objects representing the route
         buffer_km: Buffer distance in kilometers to search around route
+        route_buffer_m: Buffer distance in meters to apply around route for intersection detection
 
     Returns:
         List of BrunnelWay objects found near the route, with intersection status set
@@ -108,6 +109,6 @@ def find_route_brunnels(
     logger.info(f"Found {len(brunnels)} bridges/tunnels near route")
 
     # Check for intersections with the route
-    find_intersecting_brunnels(route, brunnels)
+    find_intersecting_brunnels(route, brunnels, route_buffer_m)
 
     return brunnels

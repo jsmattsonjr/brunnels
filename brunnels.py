@@ -76,6 +76,13 @@ def main():
     )
 
     parser.add_argument(
+        "--route-buffer",
+        type=float,
+        default=3.0,
+        help="Route buffer for intersection detection in meters (default: 3.0)",
+    )
+
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -100,7 +107,7 @@ def main():
         logger.info(f"Loaded GPX route with {len(route)} points")
 
         # Find bridges and tunnels near the route (intersection detection included)
-        brunnels = overpass.find_route_brunnels(route, args.buffer)
+        brunnels = overpass.find_route_brunnels(route, args.buffer, args.route_buffer)
 
         # Count intersecting vs total brunnels
         bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
