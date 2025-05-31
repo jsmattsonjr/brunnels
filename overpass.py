@@ -1,6 +1,7 @@
 from typing import Dict, Any, Tuple, List
 import requests
 import logging
+import math
 
 from models import Position, BrunnelType, BrunnelWay, FilterReason
 from geometry import find_contained_brunnels
@@ -98,7 +99,6 @@ out geom qt;
     url = OVERPASS_API_URL
 
     try:
-        logger.info("Querying Overpass API for bridges and tunnels...")
         response = requests.post(url, data=query.strip(), timeout=DEFAULT_API_TIMEOUT)
         response.raise_for_status()
         return response.json().get("elements", [])
@@ -139,6 +139,19 @@ def find_route_brunnels(
         return []
 
     bbox = calculate_route_bbox(route, buffer_km)
+
+    # Calculate and log query area before API call
+    south, west, north, east = bbox
+    lat_diff = north - south
+    lon_diff = east - west
+    avg_lat = (north + south) / 2
+    lat_km = lat_diff * 111.0
+    lon_km = lon_diff * 111.0 * abs(math.cos(math.radians(avg_lat)))
+    area_sq_km = lat_km * lon_km
+
+    logger.info(
+        f"Querying Overpass API for bridges and tunnels in {area_sq_km:.1f} sq km area..."
+    )
     raw_ways = query_overpass_brunnels(bbox)
 
     brunnels = []

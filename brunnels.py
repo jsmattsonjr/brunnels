@@ -5,7 +5,7 @@ This script processes a GPX file to find bridges and tunnels along a route,
 and generates an interactive HTML map visualizing the route and the brunnels.
 
 Requirements:
-    pip install gpxpy folium requests shapely tqdm
+    pip install gpxpy folium requests shapely
 
 """
 
@@ -24,7 +24,7 @@ import overpass
 from models import BrunnelType
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("brunnels")
 
 
 def setup_logging(log_level: str) -> None:
@@ -41,9 +41,10 @@ def setup_logging(log_level: str) -> None:
     console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
 
-    # Configure logger
-    logger.setLevel(level)
-    logger.addHandler(console_handler)
+    # Configure the root logger so all modules inherit the configuration
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    root_logger.addHandler(console_handler)
 
     # Suppress overly verbose third-party logging
     logging.getLogger("urllib3").setLevel(logging.WARNING)

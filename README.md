@@ -25,7 +25,7 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 ### Install Dependencies
 
 ```bash
-pip install gpxpy folium requests shapely tqdm
+pip install gpxpy folium requests shapely
 ```
 
 ### Download

@@ -7,7 +7,6 @@ from typing import List
 import logging
 from math import cos, radians
 from shapely.geometry import LineString
-from tqdm import tqdm
 from models import Position, BrunnelWay, FilterReason, RouteSpan
 from distance_utils import calculate_cumulative_distances, find_closest_point_on_route
 
@@ -120,8 +119,8 @@ def find_contained_brunnels(
 
     contained_count = 0
 
-    # Add progress bar for containment processing
-    for brunnel in tqdm(brunnels, desc="Checking containment", unit="brunnel"):
+    # Check containment for each brunnel
+    for brunnel in brunnels:
         # Only check containment for brunnels that weren't filtered by tags
         if brunnel.filter_reason == FilterReason.NONE:
             brunnel.contained_in_route = route_contains_brunnel(route_geometry, brunnel)
