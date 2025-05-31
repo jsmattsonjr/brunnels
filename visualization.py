@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any
 import logging
 import folium
 from models import Position, BrunnelWay, BrunnelType, FilterReason
+from gpx import calculate_route_bbox
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ def create_route_map(
     route: List[Position],
     output_filename: str,
     brunnels: Optional[List[BrunnelWay]] = None,
+    buffer_km: float = 1.0,
 ) -> None:
     """
     Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
@@ -72,6 +74,7 @@ def create_route_map(
         route: List of Position objects representing the route
         output_filename: Path where HTML map file should be saved
         brunnels: Optional list of BrunnelWay objects to display on map
+        buffer_km: Buffer distance in kilometers for map bounds (default: 1.0)
 
     Raises:
         ValueError: If route is empty
@@ -82,19 +85,16 @@ def create_route_map(
     if brunnels is None:
         brunnels = []
 
-    # Calculate map center from route bounds
-    latitudes = [pos.latitude for pos in route]
-    longitudes = [pos.longitude for pos in route]
+    # Calculate buffered bounding box using existing function
+    south, west, north, east = calculate_route_bbox(route, buffer_km)
 
-    center_lat = (min(latitudes) + max(latitudes)) / 2
-    center_lon = (min(longitudes) + max(longitudes)) / 2
+    center_lat = (south + north) / 2
+    center_lon = (west + east) / 2
 
     logger.info(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
 
-    # Create map with CartoDB Positron tiles
-    route_map = folium.Map(
-        location=[center_lat, center_lon], zoom_start=10, tiles="CartoDB positron"
-    )
+    # Create map with initial center (zoom will be set by fit_bounds)
+    route_map = folium.Map(location=[center_lat, center_lon], tiles="CartoDB positron")
 
     # Convert route to coordinate pairs for folium
     coordinates = [[pos.latitude, pos.longitude] for pos in route]
@@ -200,6 +200,10 @@ def create_route_map(
                 opacity=opacity,
                 popup=folium.Popup(popup_text, max_width=300),
             ).add_to(route_map)
+
+    # Fit map bounds to buffered route area
+    bounds = [[south, west], [north, east]]  # Southwest corner  # Northeast corner
+    route_map.fit_bounds(bounds)
 
     # Add legend as HTML overlay by post-processing the saved file
     legend_html = f"""

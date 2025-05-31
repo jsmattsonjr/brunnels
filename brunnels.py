@@ -153,7 +153,7 @@ def main():
                 logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
 
         # Create visualization map
-        visualization.create_route_map(route, args.output, brunnels)
+        visualization.create_route_map(route, args.output, brunnels, args.buffer)
         logger.info(f"Map saved to {args.output}")
 
         # Automatically open the HTML file in the default browser
