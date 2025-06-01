@@ -88,13 +88,13 @@ def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
         for key, value in sorted(remaining_tags.items()):
             html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value}")
 
-    # Add other metadata (excluding tags and id which we already handled)
-    other_data = {k: v for k, v in metadata.items() if k not in ["tags", "id"]}
+    # Add other metadata (excluding tags and id which we already handled, geometry, which is very long, and type, which is always "way")
+    other_data = {
+        k: v for k, v in metadata.items() if k not in ["tags", "id", "geometry", "type"]
+    }
     if other_data:
         html_parts.append("<br><b>Other:</b>")
         for key, value in sorted(other_data.items()):
-            if key == "geometry":
-                continue  # Skip geometry as it can be very long
             # Handle nested dictionaries or lists
             if isinstance(value, (dict, list)):
                 # Use structured formatting for nodes and bounds
