@@ -219,7 +219,7 @@ def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
     # Sort by start km
     included_brunnel_indices.sort(
         key=lambda i: (
-            brunnels[i].route_span.start_distance_km if brunnels[i].route_span else 0.0
+            brunnels[i].route_span.start_distance_km  # type: ignore[union-attr]
         )
     )
 
