@@ -180,4 +180,14 @@ def find_route_brunnels(
     # Check for containment within the route buffer
     find_contained_brunnels(route, brunnels, route_buffer_m)
 
+    # Count contained vs total brunnels
+    bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
+    tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
+    contained_bridges = [b for b in bridges if b.contained_in_route]
+    contained_tunnels = [b for b in tunnels if b.contained_in_route]
+
+    logger.info(
+        f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
+    )
+
     return brunnels

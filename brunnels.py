@@ -129,16 +129,6 @@ def main():
         logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
 
-    # Count contained vs total brunnels
-    bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
-    tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
-    contained_bridges = [b for b in bridges if b.contained_in_route]
-    contained_tunnels = [b for b in tunnels if b.contained_in_route]
-
-    logger.info(
-        f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
-    )
-
     # Check for node sharing and merge adjacent brunnels of the same type
     merge_adjacent_brunnels(brunnels)
 
