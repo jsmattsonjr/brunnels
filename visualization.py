@@ -149,7 +149,7 @@ def create_route_map(
     center_lat = (south + north) / 2
     center_lon = (west + east) / 2
 
-    logger.info(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
+    logger.debug(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
 
     # Create map with initial center (zoom will be set by fit_bounds)
     route_map = folium.Map(location=[center_lat, center_lon], tiles="CartoDB positron")
@@ -290,6 +290,6 @@ def create_route_map(
     # Write back the modified HTML
     with open(output_filename, "w", encoding="utf-8") as f:
         f.write(html_content)
-    logger.info(
+    logger.debug(
         f"Map saved to {output_filename} with {contained_bridge_count}/{bridge_count} bridges and {contained_tunnel_count}/{tunnel_count} tunnels contained in route buffer"
     )

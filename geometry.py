@@ -92,13 +92,13 @@ def find_contained_brunnels(
 
     # Ensure minimum buffer for containment analysis (a LineString cannot contain another LineString)
     if route_buffer_m < 1.0:
-        logger.info(
+        logger.warning(
             f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer_m}m"
         )
         route_buffer_m = 1.0
 
     # Pre-calculate cumulative distances for route span calculations
-    logger.info("Pre-calculating route distances...")
+    logger.debug("Pre-calculating route distances...")
     cumulative_distances = calculate_cumulative_distances(route)
     total_route_distance = cumulative_distances[-1] if cumulative_distances else 0.0
     logger.info(f"Total route distance: {total_route_distance:.2f} km")
@@ -143,6 +143,6 @@ def find_contained_brunnels(
             # Keep existing filter reason, don't check containment
             brunnel.contained_in_route = False
 
-    logger.info(
+    logger.debug(
         f"Found {contained_count} brunnels completely contained within the route buffer out of {len(brunnels)} total (with {route_buffer_m}m buffer)"
     )

@@ -149,17 +149,15 @@ def main():
         logger.error(f"Failed to create map: {e}")
         sys.exit(1)
 
-    logger.info(f"Map saved to {args.output}")
-
     # Automatically open the HTML file in the default browser
     if not args.no_open:
         abs_path = os.path.abspath(args.output)
         try:
             webbrowser.open(f"file://{abs_path}")
-            logger.info(f"Opening {abs_path} in your default browser...")
+            logger.debug(f"Opening {abs_path} in your default browser...")
         except Exception as e:
             logger.warning(f"Could not automatically open browser: {e}")
-            logger.info(f"Please manually open {abs_path}")
+            logger.warning(f"Please manually open {abs_path}")
 
 
 if __name__ == "__main__":

@@ -149,7 +149,7 @@ def find_route_brunnels(
     lon_km = lon_diff * 111.0 * abs(math.cos(math.radians(avg_lat)))
     area_sq_km = lat_km * lon_km
 
-    logger.info(
+    logger.debug(
         f"Querying Overpass API for bridges and tunnels in {area_sq_km:.1f} sq km area..."
     )
     raw_ways = query_overpass_brunnels(bbox)
@@ -170,12 +170,12 @@ def find_route_brunnels(
             logger.warning(f"Failed to parse brunnel way: {e}")
             continue
 
-    if enable_tag_filtering and filtered_count > 0:
-        logger.info(
-            f"Found {filtered_count} brunnels filtered by cycling relevance tags (will show greyed out)"
-        )
+    logger.info(f"Found {len(brunnels)} brunnels near route")
 
-    logger.info(f"Found {len(brunnels)} bridges/tunnels near route")
+    if enable_tag_filtering and filtered_count > 0:
+        logger.debug(
+            f"{filtered_count} brunnels filtered by cycling relevance tags (will show greyed out)"
+        )
 
     # Check for containment within the route buffer
     find_contained_brunnels(route, brunnels, route_buffer_m)

@@ -58,7 +58,7 @@ def parse_gpx_to_route(file_input: TextIO) -> List[Position]:
         logger.warning("No track points found in GPX file")
         return route
 
-    logger.info(f"Parsed {len(route)} track points from GPX file")
+    logger.debug(f"Parsed {len(route)} track points from GPX file")
 
     # Validate the route
     _validate_route(route)
@@ -104,7 +104,7 @@ def calculate_route_bbox(
     west = max(-180.0, min_lon - lon_buffer)
     east = min(180.0, max_lon + lon_buffer)
 
-    logger.info(
+    logger.debug(
         f"Route bounding box: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {buffer_km}km buffer"
     )
 
@@ -158,9 +158,9 @@ def load_gpx_route(filename: str) -> List[Position]:
         PermissionError: If file can't be read
     """
     if filename == "-":
-        logger.info("Reading GPX data from stdin")
+        logger.debug("Reading GPX data from stdin")
         return parse_gpx_to_route(sys.stdin)
     else:
-        logger.info(f"Reading GPX file: {filename}")
+        logger.debug(f"Reading GPX file: {filename}")
         with open(filename, "r", encoding="utf-8") as f:
             return parse_gpx_to_route(f)

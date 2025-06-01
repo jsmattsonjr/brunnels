@@ -79,7 +79,7 @@ def merge_brunnels(
         elif merged_tags[key] != value2:
             # Tag exists in both but with different values, warn and keep brunnel1's value
             logger.warning(
-                f"Tag conflict during merge: {key}='{merged_tags[key]}' vs '{value2}', keeping first value"
+                f"Tag conflict during merge: {key}='{merged_tags[key]}' vs '{value2}'; keeping first value"
             )
 
     # Merge nodes with correct ordering (not as sets)
@@ -239,7 +239,7 @@ def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
             shared_result = detect_shared_node(brunnel1, brunnel2)
             if shared_result:
                 dir1, dir2 = shared_result
-                logger.info(
+                logger.debug(
                     f"Merging {brunnel1.brunnel_type.value} {brunnel2.metadata.get('id', 'unknown')} "
                     f"into {brunnel1.metadata.get('id', 'unknown')}"
                 )
@@ -258,7 +258,7 @@ def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
         i += 1
 
     if merge_count > 0:
-        logger.info(f"Merged {merge_count} adjacent brunnels")
+        logger.debug(f"Merged {merge_count} adjacent brunnels")
 
     # Log included brunnels (post-merge)
     logger.info("Included brunnels (post-merge):")
