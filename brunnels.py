@@ -21,7 +21,7 @@ import gpxpy.gpx
 import gpx
 import visualization
 import overpass
-from merge import detect_shared_node, merge_brunnels
+from merge import merge_adjacent_brunnels
 from models import BrunnelType, FilterReason
 
 # Configure logging
@@ -139,75 +139,8 @@ def main():
         f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
     )
 
-    # Log included brunnels before visualization
-    included_brunnel_indices = [
-        i for i, b in enumerate(brunnels) if b.contained_in_route
-    ]
-    if included_brunnel_indices:
-        # Sort by start km
-        included_brunnel_indices.sort(
-            key=lambda i: (
-                brunnels[i].route_span.start_distance_km
-                if brunnels[i].route_span
-                else 0.0
-            )
-        )
-
-        # Check for node sharing and merge adjacent brunnels of the same type
-        merge_count = 0
-        i = 0
-        while i < len(included_brunnel_indices) - 1:
-            idx1 = included_brunnel_indices[i]
-            idx2 = included_brunnel_indices[i + 1]
-            brunnel1 = brunnels[idx1]
-            brunnel2 = brunnels[idx2]
-
-            # Only check same-type brunnels
-            if brunnel1.brunnel_type == brunnel2.brunnel_type:
-                shared_result = detect_shared_node(brunnel1, brunnel2)
-                if shared_result:
-                    dir1, dir2 = shared_result
-                    logger.info(
-                        f"Merging {brunnel1.brunnel_type.value} {brunnel2.metadata.get('id', 'unknown')} "
-                        f"into {brunnel1.metadata.get('id', 'unknown')}"
-                    )
-
-                    # Perform the merge
-                    merge_brunnels(brunnel1, brunnel2, shared_result)
-                    merge_count += 1
-
-                    # Remove the merged brunnel from included_brunnel_indices
-                    included_brunnel_indices.pop(i + 1)
-
-                    # Don't increment i, check if the next brunnel can also be merged
-                    continue
-
-            # Move to next brunnel
-            i += 1
-
-        if merge_count > 0:
-            logger.info(f"Merged {merge_count} adjacent brunnels")
-
-        logger.info("Included brunnels:")
-        for i in included_brunnel_indices:
-            brunnel = brunnels[i]
-            brunnel_type = brunnel.brunnel_type.value.capitalize()
-            name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
-            osm_id = brunnel.metadata.get("id", "unknown")
-
-            if brunnel.route_span:
-                span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
-            else:
-                span_data = "no span data"
-
-            logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
-
-        # Remove merged brunnels from the full list before visualization
-        original_count = len(brunnels)
-        brunnels[:] = [b for b in brunnels if b.filter_reason != FilterReason.MERGED]
-        removed_count = original_count - len(brunnels)
-        if removed_count > 0:
-            logger.debug(f"Removed {removed_count} merged brunnels from full list")
+    # Check for node sharing and merge adjacent brunnels of the same type
+    merge_adjacent_brunnels(brunnels)
 
     # Create visualization map
     try:

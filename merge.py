@@ -195,3 +195,91 @@ def merge_brunnels(
 
     # Mark brunnel2 as merged
     brunnel2.filter_reason = FilterReason.MERGED
+
+
+def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
+    """
+    Merge adjacent brunnels that share nodes and are of the same type.
+    Also handles logging of included brunnels and removal of merged brunnels from the list.
+
+    Args:
+        brunnels: List of all brunnels (modified in-place)
+
+    Returns:
+        Number of merges performed
+    """
+    # Find included brunnel indices
+    included_brunnel_indices = [
+        i for i, b in enumerate(brunnels) if b.contained_in_route
+    ]
+
+    if not included_brunnel_indices:
+        return 0
+
+    # Sort by start km
+    included_brunnel_indices.sort(
+        key=lambda i: (
+            brunnels[i].route_span.start_distance_km if brunnels[i].route_span else 0.0
+        )
+    )
+
+    # Perform merging
+    merge_count = 0
+    updated_indices = included_brunnel_indices[:]
+
+    i = 0
+    while i < len(updated_indices) - 1:
+        idx1 = updated_indices[i]
+        idx2 = updated_indices[i + 1]
+        brunnel1 = brunnels[idx1]
+        brunnel2 = brunnels[idx2]
+
+        # Only check same-type brunnels
+        if brunnel1.brunnel_type == brunnel2.brunnel_type:
+            shared_result = detect_shared_node(brunnel1, brunnel2)
+            if shared_result:
+                dir1, dir2 = shared_result
+                logger.info(
+                    f"Merging {brunnel1.brunnel_type.value} {brunnel2.metadata.get('id', 'unknown')} "
+                    f"into {brunnel1.metadata.get('id', 'unknown')}"
+                )
+
+                # Perform the merge
+                merge_brunnels(brunnel1, brunnel2, shared_result)
+                merge_count += 1
+
+                # Remove the merged brunnel from updated_indices
+                updated_indices.pop(i + 1)
+
+                # Don't increment i, check if the next brunnel can also be merged
+                continue
+
+        # Move to next brunnel
+        i += 1
+
+    if merge_count > 0:
+        logger.info(f"Merged {merge_count} adjacent brunnels")
+
+    # Log included brunnels (post-merge)
+    logger.info("Included brunnels (post-merge):")
+    for i in updated_indices:
+        brunnel = brunnels[i]
+        brunnel_type = brunnel.brunnel_type.value.capitalize()
+        name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
+        osm_id = brunnel.metadata.get("id", "unknown")
+
+        if brunnel.route_span:
+            span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
+        else:
+            span_data = "no span data"
+
+        logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
+
+    # Remove merged brunnels from the full list
+    original_count = len(brunnels)
+    brunnels[:] = [b for b in brunnels if b.filter_reason != FilterReason.MERGED]
+    removed_count = original_count - len(brunnels)
+    if removed_count > 0:
+        logger.debug(f"Removed {removed_count} merged brunnels from full list")
+
+    return merge_count
