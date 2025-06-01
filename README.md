@@ -90,7 +90,7 @@ The generated HTML map includes:
 
 ### Legend
 
-- Numbers in parentheses show contained/total counts (e.g., "Bridges (3/7)" means 3 bridges crossed out of 7 nearby)
+- Numbers in parentheses show counts
 - Click on any bridge/tunnel for detailed OpenStreetMap metadata
 - Contained brunnels show route span information (start/end distances, length)
 
@@ -98,7 +98,7 @@ The generated HTML map includes:
 
 The tool applies smart filtering for cycling routes:
 
-- **Keeps**: Bridges/tunnels with `bicycle=yes` or `highway=cycleway`
+- **Keeps**: Bridges/tunnels with bicycle access allowed or `highway=cycleway`
 - **Filters out**: Infrastructure marked `bicycle=no`, pure waterways, active railways
 - **Grays out**: Non-contained or filtered brunnels for context
 
@@ -130,11 +130,24 @@ The tool applies smart filtering for cycling routes:
 ## Example Output
 
 ```
-14:23:15 - brunnels - INFO - Loaded GPX route with 1247 points
-14:23:15 - brunnels - INFO - Querying Overpass API for bridges and tunnels...
-14:23:17 - brunnels - INFO - Found 12 bridges/tunnels near route
-14:23:17 - brunnels - INFO - Found 2/5 contained bridges and 1/7 contained tunnels
-14:23:18 - brunnels - INFO - Map saved to brunnel_map.html
+18:38:19 - gpx - INFO - Parsed 3626 track points from GPX file
+18:38:19 - brunnels - INFO - Loaded GPX route with 3626 points
+18:38:19 - gpx - INFO - Route bounding box: (37.1666, -121.9950, 37.2024, -121.9773) with 0.1km buffer
+18:38:19 - overpass - INFO - Querying Overpass API for bridges and tunnels in 6.2 sq km area...
+18:38:19 - overpass - INFO - Found 11 brunnels filtered by cycling relevance tags (will show greyed out)
+18:38:19 - overpass - INFO - Found 20 bridges/tunnels near route
+18:38:19 - geometry - INFO - Pre-calculating route distances...
+18:38:19 - geometry - INFO - Total route distance: 12.38 km
+18:38:19 - geometry - INFO - Found 2 brunnels completely contained within the route buffer out of 20 total (with 3.0m buffer)
+18:38:19 - brunnels - INFO - Found 2/7 contained bridges and 0/13 contained tunnels
+18:38:19 - brunnels - INFO - Included brunnels:
+18:38:19 - brunnels - INFO - Bridge: Aldercroft Heights Road (390865319) 6.72-6.77 km (length: 0.05 km)
+18:38:19 - brunnels - INFO - Bridge: Alma Bridge Road (31361896) 12.04-12.12 km (length: 0.08 km)
+18:38:19 - gpx - INFO - Route bounding box: (37.1666, -121.9950, 37.2024, -121.9773) with 0.1km buffer
+18:38:19 - visualization - INFO - Creating map centered at (37.1845, -121.9861)
+18:38:19 - visualization - INFO - Map saved to brunnel_map.html with 2/7 bridges and 0/13 tunnels contained in route buffer
+18:38:19 - brunnels - INFO - Map saved to brunnel_map.html
+
 ```
 
 ## Contributing
