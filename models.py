@@ -36,6 +36,7 @@ class FilterReason(Enum):
     BICYCLE_NO = "bicycle=no"
     WATERWAY = "has waterway tag"
     RAILWAY = "railway (not abandoned)"
+    POLYGON = "closed way (first node equals last node)"
     NOT_CONTAINED = "not contained within route buffer"
     NO_ROUTE_SPAN = "failed to calculate route span"
     MERGED = "merged into adjacent brunnel"

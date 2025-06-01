@@ -27,13 +27,25 @@ def determine_brunnel_type(metadata: Dict[str, Any]) -> BrunnelType:
     return BrunnelType.BRIDGE
 
 
-def should_filter_brunnel(metadata: Dict[str, Any]) -> FilterReason:
+def should_filter_brunnel(
+    metadata: Dict[str, Any], keep_polygons: bool = False
+) -> FilterReason:
     """
-    Determine if a brunnel should be filtered out based on cycling relevance.
+    Determine if a brunnel should be filtered out based on cycling relevance and geometry.
+
+    Args:
+        metadata: OSM metadata for the brunnel
+        keep_polygons: If False, filter out closed ways (first node == last node)
 
     Returns FilterReason.NONE if the brunnel should be kept, otherwise returns
     the reason for filtering.
     """
+    # Check for polygon (closed way) if keep_polygons is False
+    if not keep_polygons:
+        nodes = metadata.get("nodes", [])
+        if len(nodes) >= 2 and nodes[0] == nodes[-1]:
+            return FilterReason.POLYGON
+
     tags = metadata.get("tags", {})
 
     # Check bicycle tag first - highest priority
@@ -61,7 +73,9 @@ def should_filter_brunnel(metadata: Dict[str, Any]) -> FilterReason:
     return FilterReason.NONE
 
 
-def parse_overpass_way(way_data: Dict[str, Any]) -> BrunnelWay:
+def parse_overpass_way(
+    way_data: Dict[str, Any], keep_polygons: bool = False
+) -> BrunnelWay:
     """Parse a single way from Overpass response into BrunnelWay object."""
     # Extract coordinates from geometry
     coords = []
@@ -70,7 +84,7 @@ def parse_overpass_way(way_data: Dict[str, Any]) -> BrunnelWay:
             coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
 
     brunnel_type = determine_brunnel_type(way_data)
-    filter_reason = should_filter_brunnel(way_data)
+    filter_reason = should_filter_brunnel(way_data, keep_polygons)
 
     return BrunnelWay(
         coords=coords,
@@ -121,6 +135,7 @@ def find_route_brunnels(
     buffer_km: float = 1.0,
     route_buffer_m: float = 10.0,
     enable_tag_filtering: bool = True,
+    keep_polygons: bool = False,
 ) -> List[BrunnelWay]:
     """
     Find all bridges and tunnels near the given route and check for containment within route buffer.
@@ -130,6 +145,7 @@ def find_route_brunnels(
         buffer_km: Buffer distance in kilometers to search around route
         route_buffer_m: Buffer distance in meters to apply around route for containment detection
         enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
+        keep_polygons: Whether to keep closed ways (polygons) where first node equals last node
 
     Returns:
         List of BrunnelWay objects found near the route, with containment status set
@@ -159,7 +175,7 @@ def find_route_brunnels(
 
     for way_data in raw_ways:
         try:
-            brunnel = parse_overpass_way(way_data)
+            brunnel = parse_overpass_way(way_data, keep_polygons)
 
             # Count filtered brunnels but keep them for visualization
             if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:

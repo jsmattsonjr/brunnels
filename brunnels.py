@@ -79,6 +79,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable tag-based filtering for cycling relevance",
     )
+    parser.add_argument(
+        "--keep-polygons",
+        action="store_true",
+        help="Keep closed ways (polygons) where first node equals last node",
+    )
     return parser
 
 
@@ -151,6 +156,7 @@ def main():
             args.buffer,
             args.route_buffer,
             enable_tag_filtering=not args.no_tag_filtering,
+            keep_polygons=args.keep_polygons,
         )
     except Exception as e:
         logger.error(f"Failed to query bridges and tunnels: {e}")
