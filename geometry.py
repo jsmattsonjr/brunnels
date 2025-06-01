@@ -117,6 +117,23 @@ def find_contained_brunnels(
     buffer_degrees = min(lat_buffer, lon_buffer)
     route_geometry = route_line.buffer(buffer_degrees)
 
+    # Check if buffered geometry is valid (can be invalid with self-intersecting routes)
+    if not route_geometry.is_valid:
+        logger.warning(
+            f"Buffered route geometry is invalid (likely due to self-intersecting route). "
+            f"Attempting to fix with buffer(0)"
+        )
+        try:
+            route_geometry = route_geometry.buffer(0)
+            if route_geometry.is_valid:
+                logger.info("Successfully fixed invalid geometry")
+            else:
+                logger.warning(
+                    "Could not fix invalid geometry - containment results may be unreliable"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to fix invalid geometry: {e}")
+
     contained_count = 0
 
     # Check containment for each brunnel
