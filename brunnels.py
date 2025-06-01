@@ -139,15 +139,22 @@ def main():
     )
 
     # Log included brunnels before visualization
-    included_brunnels = [b for b in brunnels if b.contained_in_route]
-    if included_brunnels:
+    included_brunnel_indices = [
+        i for i, b in enumerate(brunnels) if b.contained_in_route
+    ]
+    if included_brunnel_indices:
         # Sort by start km
-        included_brunnels.sort(
-            key=lambda b: b.route_span.start_distance_km if b.route_span else 0.0
+        included_brunnel_indices.sort(
+            key=lambda i: (
+                brunnels[i].route_span.start_distance_km
+                if brunnels[i].route_span
+                else 0.0
+            )
         )
 
         logger.info("Included brunnels:")
-        for brunnel in included_brunnels:
+        for i in included_brunnel_indices:
+            brunnel = brunnels[i]
             brunnel_type = brunnel.brunnel_type.value.capitalize()
             name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
             osm_id = brunnel.metadata.get("id", "unknown")
