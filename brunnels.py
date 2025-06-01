@@ -21,6 +21,7 @@ import gpxpy.gpx
 import gpx
 import visualization
 import overpass
+from merge import detect_shared_node
 from models import BrunnelType
 
 # Configure logging
@@ -143,14 +144,34 @@ def main():
         i for i, b in enumerate(brunnels) if b.contained_in_route
     ]
     if included_brunnel_indices:
-        # Sort by start km
+        # Sort by start km - for included brunnels, route_span is always not None
         included_brunnel_indices.sort(
-            key=lambda i: (
-                brunnels[i].route_span.start_distance_km
-                if brunnels[i].route_span
-                else 0.0
-            )
+            key=lambda i: brunnels[i].route_span.start_distance_km
         )
+
+        # Check for node sharing between adjacent brunnels of the same type
+        for j in range(len(included_brunnel_indices) - 1):
+            idx1 = included_brunnel_indices[j]
+            idx2 = included_brunnel_indices[j + 1]
+            brunnel1 = brunnels[idx1]
+            brunnel2 = brunnels[idx2]
+
+            # Only check same-type brunnels
+            if brunnel1.brunnel_type == brunnel2.brunnel_type:
+                shared_result = detect_shared_node(brunnel1, brunnel2)
+                if shared_result:
+                    dir1, dir2 = shared_result
+                    logger.debug(
+                        f"Adjacent {brunnel1.brunnel_type.value}s share node: "
+                        f"{brunnel1.metadata.get('id', 'unknown')} ({dir1}) -> "
+                        f"{brunnel2.metadata.get('id', 'unknown')} ({dir2})"
+                    )
+                else:
+                    logger.debug(
+                        f"Adjacent {brunnel1.brunnel_type.value}s do not share nodes: "
+                        f"{brunnel1.metadata.get('id', 'unknown')} -> "
+                        f"{brunnel2.metadata.get('id', 'unknown')}"
+                    )
 
         logger.info("Included brunnels:")
         for i in included_brunnel_indices:

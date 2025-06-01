@@ -42,6 +42,16 @@ class FilterReason(Enum):
         return self.value
 
 
+class Direction(Enum):
+    """Enumeration for brunnel direction relative to route."""
+
+    FORWARD = "forward"
+    REVERSE = "reverse"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 @dataclass
 class RouteSpan:
     """Information about where a brunnel spans along a route."""
