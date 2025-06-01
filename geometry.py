@@ -125,16 +125,19 @@ def find_contained_brunnels(
         if brunnel.filter_reason == FilterReason.NONE:
             brunnel.contained_in_route = route_contains_brunnel(route_geometry, brunnel)
             if brunnel.contained_in_route:
-                contained_count += 1
                 # Calculate route span for contained brunnels
                 try:
                     brunnel.route_span = calculate_brunnel_route_span(
                         brunnel, route, cumulative_distances
                     )
+                    contained_count += 1
                 except Exception as e:
                     logger.warning(
                         f"Failed to calculate route span for brunnel {brunnel.metadata.get('id', 'unknown')}: {e}"
                     )
+                    logger.warning(f"Evicting brunnel from contained set")
+                    brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
+                    brunnel.contained_in_route = False
                     brunnel.route_span = None
             else:
                 # Set filter reason for non-contained brunnels
