@@ -215,7 +215,14 @@ def create_route_map(
 
         # Create popup text with full metadata
         if brunnel.contained_in_route:
-            status = "contained in route buffer"
+            if brunnel.route_span:
+                span = brunnel.route_span
+                status = (
+                    f"{span.start_distance_km:.2f} - {span.end_distance_km:.2f} km; "
+                    f"length: {span.length_km:.2f} km"
+                )
+            else:
+                status = "contained in route buffer"
         elif brunnel.filter_reason == FilterReason.NOT_CONTAINED:
             status = "not contained in route buffer"
         else:
@@ -225,18 +232,8 @@ def create_route_map(
             f"<b>{brunnel.brunnel_type.value.capitalize()}</b> ({status})<br>"
         )
 
-        # Add route span information for contained brunnels
-        span_info = ""
-        if brunnel.contained_in_route and brunnel.route_span:
-            span = brunnel.route_span
-            span_info = (
-                f"<br><b>Route Span:</b> "
-                f"{span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
-                f"(length: {span.length_km:.2f} km)"
-            )
-
         metadata_html = _format_metadata_for_popup(brunnel.metadata)
-        popup_text = popup_header + metadata_html + span_info
+        popup_text = popup_header + metadata_html
 
         # Style and add brunnel based on type
         if brunnel.brunnel_type == BrunnelType.TUNNEL:
