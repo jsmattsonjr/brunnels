@@ -28,47 +28,13 @@ from models import BrunnelType, FilterReason
 logger = logging.getLogger("brunnels")
 
 
-def open_file_in_browser(filename: str) -> None:
+def create_argument_parser() -> argparse.ArgumentParser:
     """
-    Open the specified file in the default browser.
+    Create and configure the command-line argument parser.
 
-    Args:
-        filename: Path to the file to open
+    Returns:
+        Configured ArgumentParser instance
     """
-    abs_path = os.path.abspath(filename)
-    try:
-        webbrowser.open(f"file://{abs_path}")
-        logger.debug(f"Opening {abs_path} in your default browser...")
-    except Exception as e:
-        logger.warning(f"Could not automatically open browser: {e}")
-        logger.warning(f"Please manually open {abs_path}")
-
-
-def setup_logging(log_level: str) -> None:
-    """Setup logging configuration."""
-    level = getattr(logging, log_level)
-
-    # Create formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
-    )
-
-    # Create console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-
-    # Configure the root logger so all modules inherit the configuration
-    root_logger = logging.getLogger()
-    root_logger.setLevel(level)
-    root_logger.addHandler(console_handler)
-
-    # Suppress overly verbose third-party logging
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("requests").setLevel(logging.WARNING)
-
-
-def main():
     parser = argparse.ArgumentParser(
         description="Brunnel (Bridge/Tunnel) visualization tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -113,6 +79,51 @@ def main():
         action="store_true",
         help="Disable tag-based filtering for cycling relevance",
     )
+    return parser
+
+
+def open_file_in_browser(filename: str) -> None:
+    """
+    Open the specified file in the default browser.
+
+    Args:
+        filename: Path to the file to open
+    """
+    abs_path = os.path.abspath(filename)
+    try:
+        webbrowser.open(f"file://{abs_path}")
+        logger.debug(f"Opening {abs_path} in your default browser...")
+    except Exception as e:
+        logger.warning(f"Could not automatically open browser: {e}")
+        logger.warning(f"Please manually open {abs_path}")
+
+
+def setup_logging(log_level: str) -> None:
+    """Setup logging configuration."""
+    level = getattr(logging, log_level)
+
+    # Create formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
+    )
+
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    console_handler.setFormatter(formatter)
+
+    # Configure the root logger so all modules inherit the configuration
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    root_logger.addHandler(console_handler)
+
+    # Suppress overly verbose third-party logging
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+
+
+def main():
+    parser = create_argument_parser()
     args = parser.parse_args()
 
     # Setup logging
