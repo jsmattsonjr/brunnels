@@ -238,7 +238,6 @@ def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
         if brunnel1.brunnel_type == brunnel2.brunnel_type:
             shared_result = detect_shared_node(brunnel1, brunnel2)
             if shared_result:
-                dir1, dir2 = shared_result
                 logger.debug(
                     f"Merging {brunnel1.brunnel_type.value} {brunnel2.metadata.get('id', 'unknown')} "
                     f"into {brunnel1.metadata.get('id', 'unknown')}"
