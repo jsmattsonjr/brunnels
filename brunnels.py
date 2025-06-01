@@ -28,6 +28,22 @@ from models import BrunnelType, FilterReason
 logger = logging.getLogger("brunnels")
 
 
+def open_file_in_browser(filename: str) -> None:
+    """
+    Open the specified file in the default browser.
+
+    Args:
+        filename: Path to the file to open
+    """
+    abs_path = os.path.abspath(filename)
+    try:
+        webbrowser.open(f"file://{abs_path}")
+        logger.debug(f"Opening {abs_path} in your default browser...")
+    except Exception as e:
+        logger.warning(f"Could not automatically open browser: {e}")
+        logger.warning(f"Please manually open {abs_path}")
+
+
 def setup_logging(log_level: str) -> None:
     """Setup logging configuration."""
     level = getattr(logging, log_level)
@@ -141,13 +157,7 @@ def main():
 
     # Automatically open the HTML file in the default browser
     if not args.no_open:
-        abs_path = os.path.abspath(args.output)
-        try:
-            webbrowser.open(f"file://{abs_path}")
-            logger.debug(f"Opening {abs_path} in your default browser...")
-        except Exception as e:
-            logger.warning(f"Could not automatically open browser: {e}")
-            logger.warning(f"Please manually open {abs_path}")
+        open_file_in_browser(args.output)
 
 
 if __name__ == "__main__":
