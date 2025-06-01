@@ -12,6 +12,50 @@ from gpx import calculate_route_bbox
 logger = logging.getLogger(__name__)
 
 
+def _format_complex_value(key: str, value: Any, indent_level: int = 0) -> str:
+    """
+    Format complex values (dicts, lists) into readable HTML with proper indentation.
+
+    Args:
+        key: The key name
+        value: The value to format
+        indent_level: Current indentation level
+
+    Returns:
+        Formatted HTML string
+    """
+    indent = "&nbsp;" * (indent_level * 4)
+
+    if isinstance(value, dict):
+        if not value:
+            return f"{indent}<i>{key}:</i> {{}}"
+
+        parts = [f"{indent}<i>{key}:</i>"]
+        for k, v in value.items():
+            if isinstance(v, (dict, list)):
+                parts.append(_format_complex_value(k, v, indent_level + 1))
+            else:
+                nested_indent = "&nbsp;" * ((indent_level + 1) * 4)
+                parts.append(f"{nested_indent}<i>{k}:</i> {v}")
+        return "<br>".join(parts)
+
+    elif isinstance(value, list):
+        if not value:
+            return f"{indent}<i>{key}:</i> []"
+
+        parts = [f"{indent}<i>{key}:</i>"]
+        for i, item in enumerate(value):
+            if isinstance(item, (dict, list)):
+                parts.append(_format_complex_value(f"[{i}]", item, indent_level + 1))
+            else:
+                nested_indent = "&nbsp;" * ((indent_level + 1) * 4)
+                parts.append(f"{nested_indent}[{i}]: {item}")
+        return "<br>".join(parts)
+
+    else:
+        return f"{indent}<i>{key}:</i> {value}"
+
+
 def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
     """
     Format OSM metadata into HTML for popup display.
@@ -49,14 +93,28 @@ def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
     if other_data:
         html_parts.append("<br><b>Other:</b>")
         for key, value in sorted(other_data.items()):
+            if key == "geometry":
+                continue  # Skip geometry as it can be very long
             # Handle nested dictionaries or lists
             if isinstance(value, (dict, list)):
-                value_str = str(value)
-                if len(value_str) > 50:  # Truncate very long values
-                    value_str = value_str[:47] + "..."
+                # Use structured formatting for nodes and bounds
+                if key in ["nodes", "bounds"]:
+                    formatted_value = _format_complex_value(key, value, 0)
+                    # Add proper indentation for the "Other:" section
+                    indented_lines = []
+                    for line in formatted_value.split("<br>"):
+                        if line.strip():  # Skip empty lines
+                            indented_lines.append(f"&nbsp;&nbsp;{line}")
+                    html_parts.append("<br>" + "<br>".join(indented_lines))
+                else:
+                    # Keep truncation for other long nested data
+                    value_str = str(value)
+                    if len(value_str) > 50:
+                        value_str = value_str[:47] + "..."
+                    html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
             else:
                 value_str = str(value)
-            html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
+                html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
 
     return "".join(html_parts)
 
