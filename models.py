@@ -37,6 +37,7 @@ class FilterReason(Enum):
     WATERWAY = "has waterway tag"
     RAILWAY = "railway (not abandoned)"
     NOT_CONTAINED = "not contained within route buffer"
+    MERGED = "merged into adjacent brunnel"
 
     def __str__(self) -> str:
         return self.value

@@ -21,8 +21,8 @@ import gpxpy.gpx
 import gpx
 import visualization
 import overpass
-from merge import detect_shared_node
-from models import BrunnelType
+from merge import detect_shared_node, merge_brunnels
+from models import BrunnelType, FilterReason
 
 # Configure logging
 logger = logging.getLogger("brunnels")
@@ -144,15 +144,21 @@ def main():
         i for i, b in enumerate(brunnels) if b.contained_in_route
     ]
     if included_brunnel_indices:
-        # Sort by start km - for included brunnels, route_span is always not None
+        # Sort by start km
         included_brunnel_indices.sort(
-            key=lambda i: brunnels[i].route_span.start_distance_km
+            key=lambda i: (
+                brunnels[i].route_span.start_distance_km
+                if brunnels[i].route_span
+                else 0.0
+            )
         )
 
-        # Check for node sharing between adjacent brunnels of the same type
-        for j in range(len(included_brunnel_indices) - 1):
-            idx1 = included_brunnel_indices[j]
-            idx2 = included_brunnel_indices[j + 1]
+        # Check for node sharing and merge adjacent brunnels of the same type
+        merge_count = 0
+        i = 0
+        while i < len(included_brunnel_indices) - 1:
+            idx1 = included_brunnel_indices[i]
+            idx2 = included_brunnel_indices[i + 1]
             brunnel1 = brunnels[idx1]
             brunnel2 = brunnels[idx2]
 
@@ -161,17 +167,26 @@ def main():
                 shared_result = detect_shared_node(brunnel1, brunnel2)
                 if shared_result:
                     dir1, dir2 = shared_result
-                    logger.debug(
-                        f"Adjacent {brunnel1.brunnel_type.value}s share node: "
-                        f"{brunnel1.metadata.get('id', 'unknown')} ({dir1}) -> "
-                        f"{brunnel2.metadata.get('id', 'unknown')} ({dir2})"
+                    logger.info(
+                        f"Merging {brunnel1.brunnel_type.value} {brunnel2.metadata.get('id', 'unknown')} "
+                        f"into {brunnel1.metadata.get('id', 'unknown')}"
                     )
-                else:
-                    logger.debug(
-                        f"Adjacent {brunnel1.brunnel_type.value}s do not share nodes: "
-                        f"{brunnel1.metadata.get('id', 'unknown')} -> "
-                        f"{brunnel2.metadata.get('id', 'unknown')}"
-                    )
+
+                    # Perform the merge
+                    merge_brunnels(brunnel1, brunnel2, shared_result)
+                    merge_count += 1
+
+                    # Remove the merged brunnel from included_brunnel_indices
+                    included_brunnel_indices.pop(i + 1)
+
+                    # Don't increment i, check if the next brunnel can also be merged
+                    continue
+
+            # Move to next brunnel
+            i += 1
+
+        if merge_count > 0:
+            logger.info(f"Merged {merge_count} adjacent brunnels")
 
         logger.info("Included brunnels:")
         for i in included_brunnel_indices:
@@ -186,6 +201,13 @@ def main():
                 span_data = "no span data"
 
             logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
+
+        # Remove merged brunnels from the full list before visualization
+        original_count = len(brunnels)
+        brunnels[:] = [b for b in brunnels if b.filter_reason != FilterReason.MERGED]
+        removed_count = original_count - len(brunnels)
+        if removed_count > 0:
+            logger.debug(f"Removed {removed_count} merged brunnels from full list")
 
     # Create visualization map
     try:
