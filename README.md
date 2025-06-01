@@ -13,7 +13,8 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 - **Smart Filtering**: Filter bridges/tunnels based on cycling relevance (bicycle access, infrastructure type)
 - **Containment Analysis**: Identify which bridges/tunnels your route actually crosses vs. those merely nearby
 - **Interactive Visualization**: Generate beautiful HTML maps with route and brunnel overlay
-- **Detailed Metadata**: View comprehensive OpenStreetMap tags and properties for each bridge/tunnel
+- **Detailed Metadata**: View comprehensive OpenStreetMap tags and properties for each brunnel
+- **Adjacent Way Merging**: Automatically combines adjacent bridge/tunnel ways that share OSM nodes into single continuous brunnels
 
 ## Installation
 
@@ -91,7 +92,7 @@ The generated HTML map includes:
 ### Legend
 
 - Numbers in parentheses show counts
-- Click on any bridge/tunnel for detailed OpenStreetMap metadata
+- Click on any brunnel for detailed OpenStreetMap metadata
 - Contained brunnels show route span information (start/end distances, length)
 
 ### Filtering
@@ -102,6 +103,16 @@ The tool applies smart filtering for cycling routes:
 - **Filters out**: Infrastructure marked `bicycle=no`, pure waterways, active railways
 - **Grays out**: Non-contained or filtered brunnels for context
 
+### Merging
+
+The tool automatically merges adjacent brunnels of the same type (bridge or tunnel) that share OpenStreetMap nodes. This combines fragmented infrastructure into continuous segments for cleaner visualization. The merging process:
+
+- Detects shared nodes between adjacent segments along your route
+- Handles directional concatenation of coordinates and metadata
+- Resolves tag conflicts by keeping the first brunnel's values
+- Updates route spans to cover the full merged length
+- Removes duplicate segments from the final output
+
 ## Technical Details
 
 ### Coordinate System
@@ -110,7 +121,7 @@ The tool applies smart filtering for cycling routes:
 - Handles routes worldwide (excludes polar regions and antimeridian crossings)
 
 ### Data Sources
-- Bridge/tunnel data from OpenStreetMap via Overpass API
+- Brunnel data from OpenStreetMap via Overpass API
 - Respects OSM usage policies with reasonable request timeouts
 - Processes OSM tags for cycling relevance and infrastructure type
 
@@ -118,6 +129,14 @@ The tool applies smart filtering for cycling routes:
 - Uses Shapely for precise geometric containment checking
 - Route buffering accounts for GPS accuracy and path width
 - Projects coordinates for local distance calculations
+
+### Brunnel Merging
+- Detects adjacent brunnels of the same type sharing OSM nodes
+- Performs directional concatenation based on node connectivity patterns
+- Merges OSM tags, coordinates, geometry, and bounding boxes
+- Handles four connection patterns: forward-forward, forward-reverse, reverse-forward, reverse-reverse
+- Updates route spans to reflect the full merged segment length
+- Logs conflicts when tags differ between merged segments
 
 ## Limitations
 
@@ -130,23 +149,19 @@ The tool applies smart filtering for cycling routes:
 ## Example Output
 
 ```
-18:38:19 - gpx - INFO - Parsed 3626 track points from GPX file
-18:38:19 - brunnels - INFO - Loaded GPX route with 3626 points
-18:38:19 - gpx - INFO - Route bounding box: (37.1666, -121.9950, 37.2024, -121.9773) with 0.1km buffer
-18:38:19 - overpass - INFO - Querying Overpass API for bridges and tunnels in 6.2 sq km area...
-18:38:19 - overpass - INFO - Found 11 brunnels filtered by cycling relevance tags (will show greyed out)
-18:38:19 - overpass - INFO - Found 20 bridges/tunnels near route
-18:38:19 - geometry - INFO - Pre-calculating route distances...
-18:38:19 - geometry - INFO - Total route distance: 12.38 km
-18:38:19 - geometry - INFO - Found 2 brunnels completely contained within the route buffer out of 20 total (with 3.0m buffer)
-18:38:19 - brunnels - INFO - Found 2/7 contained bridges and 0/13 contained tunnels
-18:38:19 - brunnels - INFO - Included brunnels:
-18:38:19 - brunnels - INFO - Bridge: Aldercroft Heights Road (390865319) 6.72-6.77 km (length: 0.05 km)
-18:38:19 - brunnels - INFO - Bridge: Alma Bridge Road (31361896) 12.04-12.12 km (length: 0.08 km)
-18:38:19 - gpx - INFO - Route bounding box: (37.1666, -121.9950, 37.2024, -121.9773) with 0.1km buffer
-18:38:19 - visualization - INFO - Creating map centered at (37.1845, -121.9861)
-18:38:19 - visualization - INFO - Map saved to brunnel_map.html with 2/7 bridges and 0/13 tunnels contained in route buffer
-18:38:19 - brunnels - INFO - Map saved to brunnel_map.html
+06:53:46 - brunnels - INFO - Loaded GPX route with 4183 points
+06:53:47 - overpass - INFO - Found 1556 brunnels near route
+06:53:47 - geometry - INFO - Total route distance: 22.39 km
+06:53:47 - overpass - INFO - Found 11/680 contained bridges and 0/876 contained tunnels
+06:53:47 - merge - WARNING - Tag conflict during merge: surface='asphalt' vs 'metal_grid'; keeping first value
+06:53:47 - merge - INFO - Included brunnels (post-merge):
+06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (222183028) 5.38-5.41 km (length: 0.03 km)
+06:53:47 - merge - INFO - Bridge: Cherry Street (24382063;1330056252;1330056251) 7.73-7.85 km (length: 0.12 km)
+06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (1101486832;1352972087;1352972086) 8.14-8.25 km (length: 0.11 km)
+06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (1352972070) 8.61-8.67 km (length: 0.06 km)
+06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (146154648) 11.82-11.84 km (length: 0.02 km)
+06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (33398082) 19.30-19.43 km (length: 0.13 km)
+06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (33539707) 20.87-20.91 km (length: 0.05 km)
 
 ```
 
