@@ -155,7 +155,7 @@ def create_route_map(
 
     # Add route as polyline
     folium.PolyLine(
-        coordinates, color="red", weight=2, opacity=0.6, popup="GPX Route"
+        coordinates, color="red", weight=2, opacity=0.6, popup="GPX Route", z_index=1
     ).add_to(route_map)
 
     # Add start and end markers
@@ -241,6 +241,7 @@ def create_route_map(
                 opacity=opacity,
                 dash_array="5, 5",
                 popup=folium.Popup(popup_text, max_width=300),
+                z_index=2,  # Ensure tunnels are above route
             ).add_to(route_map)
         else:
             # Solid line for all bridges
@@ -250,6 +251,7 @@ def create_route_map(
                 weight=weight,
                 opacity=opacity,
                 popup=folium.Popup(popup_text, max_width=300),
+                z_index=2,  # Ensure bridges are above route
             ).add_to(route_map)
 
     # Fit map bounds to buffered route area
