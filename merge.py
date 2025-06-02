@@ -263,7 +263,7 @@ def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
         logger.debug(f"Merged {merge_count} adjacent brunnels")
 
     # Log included brunnels (post-merge)
-    logger.info("Included brunnels (post-merge):")
+    logger.info(f"{len(updated_indices)} included brunnels (post-merge):")
     for i in updated_indices:
         brunnel = brunnels[i]
         brunnel_type = brunnel.brunnel_type.value.capitalize()
