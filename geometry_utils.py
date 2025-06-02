@@ -7,7 +7,8 @@ from typing import List, Optional
 import logging
 from math import cos, radians
 from shapely.geometry import LineString
-from models import Position, BrunnelWay, FilterReason, RouteSpan, Route
+from geometry import Position, Geometry
+from models import BrunnelWay, FilterReason, RouteSpan, Route
 from distance_utils import (
     calculate_cumulative_distances,
     find_closest_point_on_route,
@@ -23,17 +24,15 @@ def positions_to_linestring(positions: List[Position]) -> Optional[LineString]:
     """
     Convert a list of Position objects to a Shapely LineString.
 
+    Note: This function now delegates to the Geometry base class method.
+
     Args:
         positions: List of Position objects
 
     Returns:
         LineString object, or None if positions is empty or has less than 2 points
     """
-    if not positions or len(positions) < 2:
-        return None
-
-    coords = [(pos.longitude, pos.latitude) for pos in positions]
-    return LineString(coords)
+    return Geometry._positions_to_linestring(positions)
 
 
 def calculate_brunnel_route_span(

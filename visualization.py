@@ -6,7 +6,8 @@ Route visualization using folium maps.
 from typing import List, Optional, Dict, Any
 import logging
 import folium
-from models import Position, BrunnelWay, BrunnelType, FilterReason, Route
+from geometry import Position
+from models import BrunnelWay, BrunnelType, FilterReason, Route
 
 logger = logging.getLogger(__name__)
 

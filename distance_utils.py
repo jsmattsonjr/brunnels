@@ -6,7 +6,7 @@ Distance calculation utilities for route analysis.
 from typing import List, Tuple, Optional
 import math
 import logging
-from models import Position
+from geometry import Position
 
 logger = logging.getLogger(__name__)
 

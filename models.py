@@ -5,27 +5,15 @@ Data models for brunnel analysis.
 
 from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass, field
-from shapely.geometry import LineString
 from enum import Enum
+from geometry import Position, Geometry
 
 
 @dataclass
-class Position:
-    latitude: float
-    longitude: float
-    elevation: Optional[float] = None
-
-    def has_elevation(self) -> bool:
-        """Check if position has elevation data."""
-        return self.elevation is not None
-
-
-@dataclass
-class Route:
+class Route(Geometry):
     """Represents a GPX route with memoized geometric operations."""
 
     positions: List[Position]
-    _linestring: Optional[LineString] = field(default=None, init=False, repr=False)
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
@@ -33,6 +21,11 @@ class Route:
     _cumulative_distances: Optional[List[float]] = field(
         default=None, init=False, repr=False
     )
+
+    @property
+    def coordinate_list(self) -> List[Position]:
+        """Return the list of Position objects for this geometry."""
+        return self.positions
 
     def get_bbox(self, buffer_km: float = 1.0) -> Tuple[float, float, float, float]:
         """
@@ -85,20 +78,6 @@ class Route:
     def __iter__(self):
         """Allow iteration over positions."""
         return iter(self.positions)
-
-    def get_linestring(self) -> Optional[LineString]:
-        """
-        Get memoized LineString representation of this route's positions.
-
-        Returns:
-            LineString object, or None if positions is empty or has less than 2 points
-        """
-        if self._linestring is None:
-            # Import here to avoid circular imports
-            from geometry_utils import positions_to_linestring
-
-            self._linestring = positions_to_linestring(self.positions)
-        return self._linestring
 
 
 class BrunnelType(Enum):
@@ -153,25 +132,15 @@ class RouteSpan:
 
 
 @dataclass
-class BrunnelWay:
+class BrunnelWay(Geometry):
     coords: List[Position]
     metadata: Dict[str, Any]
     brunnel_type: BrunnelType
     contained_in_route: bool = False
     filter_reason: FilterReason = FilterReason.NONE
     route_span: Optional[RouteSpan] = None
-    _linestring: Optional[LineString] = field(default=None, init=False, repr=False)
 
-    def get_linestring(self) -> Optional[LineString]:
-        """
-        Get memoized LineString representation of this brunnel's coordinates.
-
-        Returns:
-            LineString object, or None if coords is empty or has less than 2 points
-        """
-        if self._linestring is None:
-            # Import here to avoid circular imports
-            from geometry_utils import positions_to_linestring
-
-            self._linestring = positions_to_linestring(self.coords)
-        return self._linestring
+    @property
+    def coordinate_list(self) -> List[Position]:
+        """Return the list of Position objects for this geometry."""
+        return self.coords

@@ -10,7 +10,8 @@ import logging
 from math import cos, radians
 import gpxpy
 import gpxpy.gpx
-from models import Position, Route
+from geometry import Position
+from models import Route
 
 logger = logging.getLogger(__name__)
 

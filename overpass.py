@@ -3,7 +3,8 @@ import requests
 import logging
 import math
 
-from models import Position, BrunnelType, BrunnelWay, FilterReason, Route
+from geometry import Position
+from models import BrunnelType, BrunnelWay, FilterReason, Route
 from geometry_utils import find_contained_brunnels
 
 
