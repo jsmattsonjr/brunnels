@@ -175,6 +175,9 @@ def main():
         logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
 
+    # Check for node sharing and merge adjacent brunnels of the same type
+    merge_adjacent_brunnels(brunnels)
+
     # Filter overlapping brunnels (keep only nearest in each overlapping group)
     if not args.no_overlap_filtering:
         try:
@@ -183,9 +186,6 @@ def main():
         except Exception as e:
             logger.error(f"Failed to filter overlapping brunnels: {e}")
             sys.exit(1)
-
-    # Check for node sharing and merge adjacent brunnels of the same type
-    merge_adjacent_brunnels(brunnels)
 
     # Create visualization map
     try:
