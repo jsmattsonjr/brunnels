@@ -1,10 +1,8 @@
 from typing import Dict, Any, Tuple, List
 import requests
 import logging
-import math
 
-from geometry import Position
-from brunnel_way import BrunnelType, BrunnelWay, FilterReason
+from brunnel_way import BrunnelWay
 
 
 DEFAULT_API_TIMEOUT = 30
@@ -12,85 +10,6 @@ OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
-
-def determine_brunnel_type(metadata: Dict[str, Any]) -> BrunnelType:
-    """Determine brunnel type from OSM metadata."""
-    tags = metadata.get("tags", {})
-
-    # Check for tunnel first (tunnels are often more specific)
-    if "tunnel" in tags and tags["tunnel"] not in ["no", "false"]:
-        return BrunnelType.TUNNEL
-
-    # Otherwise, assume it's a bridge
-    return BrunnelType.BRIDGE
-
-
-def should_filter_brunnel(
-    metadata: Dict[str, Any], keep_polygons: bool = False
-) -> FilterReason:
-    """
-    Determine if a brunnel should be filtered out based on cycling relevance and geometry.
-
-    Args:
-        metadata: OSM metadata for the brunnel
-        keep_polygons: If False, filter out closed ways (first node == last node)
-
-    Returns FilterReason.NONE if the brunnel should be kept, otherwise returns
-    the reason for filtering.
-    """
-    # Check for polygon (closed way) if keep_polygons is False
-    if not keep_polygons:
-        nodes = metadata.get("nodes", [])
-        if len(nodes) >= 2 and nodes[0] == nodes[-1]:
-            return FilterReason.POLYGON
-
-    tags = metadata.get("tags", {})
-
-    # Check bicycle tag first - highest priority
-    if "bicycle" in tags:
-        if tags["bicycle"] == "no":
-            return FilterReason.BICYCLE_NO
-        else:
-            # bicycle=* (anything other than "no") - keep and skip other checks
-            return FilterReason.NONE
-
-    # Check for cycleway - keep and skip other checks
-    if tags.get("highway") == "cycleway":
-        return FilterReason.NONE
-
-    # Check for waterway - filter out
-    if "waterway" in tags:
-        return FilterReason.WATERWAY
-
-    # Check for railway - filter out unless abandoned
-    if "railway" in tags:
-        if tags["railway"] != "abandoned":
-            return FilterReason.RAILWAY
-
-    # Default: keep the brunnel
-    return FilterReason.NONE
-
-
-def parse_overpass_way(
-    way_data: Dict[str, Any], keep_polygons: bool = False
-) -> BrunnelWay:
-    """Parse a single way from Overpass response into BrunnelWay object."""
-    # Extract coordinates from geometry
-    coords = []
-    if "geometry" in way_data:
-        for node in way_data["geometry"]:
-            coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
-
-    brunnel_type = determine_brunnel_type(way_data)
-    filter_reason = should_filter_brunnel(way_data, keep_polygons)
-
-    return BrunnelWay(
-        coords=coords,
-        metadata=way_data,
-        brunnel_type=brunnel_type,
-        filter_reason=filter_reason,
-    )
 
 
 def query_overpass_brunnels(
@@ -127,3 +46,56 @@ out geom qt;
     except ValueError as e:  # JSON decode error
         logger.error(f"Invalid response format: {e}")
         return []
+
+
+# Backwards compatibility functions with deprecation warnings
+def determine_brunnel_type(metadata: Dict[str, Any]):
+    """
+    Backwards compatibility wrapper for BrunnelWay.determine_type().
+
+    Args:
+        metadata: OSM metadata for the brunnel
+
+    Returns:
+        BrunnelType enum value
+    """
+    logger.warning(
+        "determine_brunnel_type() is deprecated. Use BrunnelWay.determine_type() instead."
+    )
+    return BrunnelWay.determine_type(metadata)
+
+
+def should_filter_brunnel(metadata: Dict[str, Any], keep_polygons: bool = False):
+    """
+    Backwards compatibility wrapper for BrunnelWay.should_filter().
+
+    Args:
+        metadata: OSM metadata for the brunnel
+        keep_polygons: If False, filter out closed ways
+
+    Returns:
+        FilterReason enum value
+    """
+    logger.warning(
+        "should_filter_brunnel() is deprecated. Use BrunnelWay.should_filter() instead."
+    )
+    return BrunnelWay.should_filter(metadata, keep_polygons)
+
+
+def parse_overpass_way(
+    way_data: Dict[str, Any], keep_polygons: bool = False
+) -> BrunnelWay:
+    """
+    Backwards compatibility wrapper for BrunnelWay.from_overpass_data().
+
+    Args:
+        way_data: Raw way data from Overpass API
+        keep_polygons: Whether to keep closed ways
+
+    Returns:
+        BrunnelWay object
+    """
+    logger.warning(
+        "parse_overpass_way() is deprecated. Use BrunnelWay.from_overpass_data() instead."
+    )
+    return BrunnelWay.from_overpass_data(way_data, keep_polygons)

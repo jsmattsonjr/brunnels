@@ -140,11 +140,6 @@ class Route(Geometry):
 
         # Import here to avoid circular imports
         from brunnel_way import FilterReason
-        from geometry_utils import (
-            route_contains_brunnel,
-            check_bearing_alignment,
-            calculate_brunnel_route_span,
-        )
 
         # Pre-calculate cumulative distances for route span calculations
         logger.debug("Pre-calculating route distances...")
@@ -191,18 +186,14 @@ class Route(Geometry):
         for brunnel in brunnels:
             # Only check containment for brunnels that weren't filtered by tags
             if brunnel.filter_reason == FilterReason.NONE:
-                brunnel.contained_in_route = route_contains_brunnel(
-                    route_geometry, brunnel
-                )
+                brunnel.contained_in_route = brunnel.is_contained_by(route_geometry)
                 if brunnel.contained_in_route:
                     # Check bearing alignment for contained brunnels
-                    if check_bearing_alignment(
-                        brunnel, self, bearing_tolerance_degrees
-                    ):
+                    if brunnel.is_aligned_with_route(self, bearing_tolerance_degrees):
                         # Calculate route span for aligned, contained brunnels
                         try:
-                            brunnel.route_span = calculate_brunnel_route_span(
-                                brunnel, self, cumulative_distances
+                            brunnel.route_span = brunnel.calculate_route_span(
+                                self, cumulative_distances
                             )
                             contained_count += 1
                         except Exception as e:
@@ -254,10 +245,7 @@ class Route(Geometry):
 
         # Import here to avoid circular imports
         from brunnel_way import FilterReason
-        from geometry_utils import (
-            route_spans_overlap,
-            calculate_brunnel_average_distance_to_route,
-        )
+        from geometry_utils import route_spans_overlap
 
         # Use provided cumulative distances or calculate them
         if cumulative_distances is None:
@@ -322,8 +310,8 @@ class Route(Geometry):
             # Calculate average distance to route for each brunnel in the group
             brunnel_distances = []
             for brunnel in group:
-                avg_distance = calculate_brunnel_average_distance_to_route(
-                    brunnel, self, cumulative_distances
+                avg_distance = brunnel.average_distance_to_route(
+                    self, cumulative_distances
                 )
                 brunnel_distances.append((brunnel, avg_distance))
 
@@ -414,8 +402,8 @@ class Route(Geometry):
             return []
 
         # Import here to avoid circular imports
-        from overpass import query_overpass_brunnels, parse_overpass_way
-        from brunnel_way import BrunnelType, FilterReason
+        from overpass import query_overpass_brunnels
+        from brunnel_way import BrunnelWay, BrunnelType, FilterReason
         import math
 
         bbox = self.get_bbox(buffer_km)
@@ -439,7 +427,7 @@ class Route(Geometry):
 
         for way_data in raw_ways:
             try:
-                brunnel = parse_overpass_way(way_data, keep_polygons)
+                brunnel = BrunnelWay.from_overpass_data(way_data, keep_polygons)
 
                 # Count filtered brunnels but keep them for visualization
                 if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:

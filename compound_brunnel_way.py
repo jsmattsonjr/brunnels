@@ -166,6 +166,48 @@ class CompoundBrunnelWay(Geometry):
                 return name
         return "unnamed"
 
+    def average_distance_to_route(
+        self, route, cumulative_distances: List[float]
+    ) -> float:
+        """
+        Calculate the average distance from all points in this compound brunnel to the route.
+
+        Args:
+            route: Route object representing the route
+            cumulative_distances: Pre-calculated cumulative distances along route
+
+        Returns:
+            Average distance in kilometers, or float('inf') if calculation fails
+        """
+        brunnel_coords = self.coordinate_list
+
+        if not brunnel_coords or not route.positions:
+            return float("inf")
+
+        # Import here to avoid circular imports
+        from distance_utils import find_closest_point_on_route, haversine_distance
+
+        total_distance = 0.0
+        valid_points = 0
+
+        for brunnel_point in brunnel_coords:
+            try:
+                _, closest_route_point = find_closest_point_on_route(
+                    brunnel_point, route.positions, cumulative_distances
+                )
+                # Calculate direct distance between brunnel point and closest route point
+                distance = haversine_distance(brunnel_point, closest_route_point)
+                total_distance += distance
+                valid_points += 1
+            except Exception as e:
+                logger.warning(f"Failed to calculate distance for brunnel point: {e}")
+                continue
+
+        if valid_points == 0:
+            return float("inf")
+
+        return total_distance / valid_points
+
     def __len__(self) -> int:
         """Return the number of components in this compound brunnel."""
         return len(self.components)
@@ -303,8 +345,8 @@ def detect_adjacent_brunnels(brunnels: List[BrunnelWay]) -> List[List[int]]:
             curr_brunnel = brunnels[curr_idx]
             prev_brunnel = brunnels[prev_idx]
 
-            # Check if they share a node
-            if _brunnels_share_node(prev_brunnel, curr_brunnel):
+            # Check if they share a node using the new method
+            if prev_brunnel.shares_node_with(curr_brunnel):
                 # Add to current group
                 current_group.append(curr_idx)
             else:
@@ -318,30 +360,6 @@ def detect_adjacent_brunnels(brunnels: List[BrunnelWay]) -> List[List[int]]:
             adjacent_groups.append(current_group)
 
     return adjacent_groups
-
-
-def _brunnels_share_node(brunnel1: BrunnelWay, brunnel2: BrunnelWay) -> bool:
-    """
-    Check if two brunnels share a node.
-
-    Args:
-        brunnel1: First brunnel
-        brunnel2: Second brunnel
-
-    Returns:
-        True if they share a node, False otherwise
-    """
-    nodes1 = brunnel1.metadata.get("nodes", [])
-    nodes2 = brunnel2.metadata.get("nodes", [])
-
-    if not nodes1 or not nodes2:
-        return False
-
-    # Check if any node from brunnel1 appears in brunnel2
-    nodes1_set = set(nodes1)
-    nodes2_set = set(nodes2)
-
-    return bool(nodes1_set & nodes2_set)
 
 
 def create_compound_brunnels(brunnels: List[BrunnelWay]) -> List[BrunnelWay]:
@@ -430,3 +448,21 @@ def create_compound_brunnels(brunnels: List[BrunnelWay]) -> List[BrunnelWay]:
         )
 
     return result
+
+
+# Backwards compatibility function with deprecation warning
+def _brunnels_share_node(brunnel1: BrunnelWay, brunnel2: BrunnelWay) -> bool:
+    """
+    Backwards compatibility wrapper for BrunnelWay.shares_node_with().
+
+    Args:
+        brunnel1: First brunnel
+        brunnel2: Second brunnel
+
+    Returns:
+        True if they share a node, False otherwise
+    """
+    logger.warning(
+        "_brunnels_share_node() is deprecated. Use brunnel1.shares_node_with(brunnel2) instead."
+    )
+    return brunnel1.shares_node_with(brunnel2)
