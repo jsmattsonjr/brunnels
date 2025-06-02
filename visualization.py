@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
-Route visualization using folium maps.
+Route visualization using folium maps with support for compound brunnels.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import logging
 import folium
 from brunnel_way import BrunnelWay, BrunnelType, FilterReason
+from compound_brunnel_way import CompoundBrunnelWay
 from route import Route
 
 logger = logging.getLogger(__name__)
+
+# Type alias for brunnel objects
+BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
 
 
 def _format_complex_value(key: str, value: Any, indent_level: int = 0) -> str:
@@ -56,18 +60,92 @@ def _format_complex_value(key: str, value: Any, indent_level: int = 0) -> str:
         return f"{indent}<i>{key}:</i> {value}"
 
 
-def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
+def _format_compound_brunnel_popup(compound: CompoundBrunnelWay) -> str:
     """
-    Format OSM metadata into HTML for popup display.
+    Format a compound brunnel's metadata into HTML for popup display.
 
     Args:
-        metadata: Dictionary containing OSM metadata
+        compound: CompoundBrunnelWay object
+
+    Returns:
+        HTML-formatted string with compound brunnel information
+    """
+    html_parts = []
+
+    # Header with compound information
+    brunnel_type = compound.brunnel_type.value.capitalize()
+    component_count = len(compound.components)
+    primary_name = compound.get_primary_name()
+
+    html_parts.append(f"<b>Compound {brunnel_type}</b> ({component_count} segments)")
+
+    if primary_name != "unnamed":
+        html_parts.append(f"<br><b>Name:</b> {primary_name}")
+
+    # Route span information
+    if compound.route_span:
+        span = compound.route_span
+        html_parts.append(
+            f"<br><b>Route Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
+            f"(length: {span.length_km:.2f} km)"
+        )
+
+    # Combined OSM ID
+    combined_metadata = compound.get_combined_metadata()
+    html_parts.append(f"<br><b>Combined OSM ID:</b> {combined_metadata['id']}")
+
+    # Tag conflicts if any
+    if "tag_conflicts" in combined_metadata:
+        html_parts.append("<br><b>Tag Conflicts:</b>")
+        for key, values in combined_metadata["tag_conflicts"].items():
+            values_str = " vs ".join(f"'{v}'" for v in values)
+            html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {values_str}")
+
+    # Component details
+    html_parts.append("<br><br><b>Component Segments:</b>")
+
+    for i, component in enumerate(compound.components):
+        html_parts.append(f"<br><br><b>Segment {i+1}:</b>")
+
+        # Component name
+        comp_tags = component.metadata.get("tags", {})
+        if "name" in comp_tags:
+            html_parts.append(f"<br>&nbsp;&nbsp;<b>Name:</b> {comp_tags['name']}")
+
+        # Component OSM ID
+        comp_id = component.metadata.get("id", "unknown")
+        html_parts.append(f"<br>&nbsp;&nbsp;<b>OSM ID:</b> {comp_id}")
+
+        # Component route span
+        if component.route_span:
+            span = component.route_span
+            html_parts.append(
+                f"<br>&nbsp;&nbsp;<b>Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
+                f"({span.length_km:.2f} km)"
+            )
+
+        # Component tags (excluding name which we already showed)
+        remaining_tags = {k: v for k, v in comp_tags.items() if k != "name"}
+        if remaining_tags:
+            html_parts.append("<br>&nbsp;&nbsp;<b>Tags:</b>")
+            for key, value in sorted(remaining_tags.items()):
+                html_parts.append(f"<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>{key}:</i> {value}")
+
+    return "".join(html_parts)
+
+
+def _format_regular_brunnel_popup(brunnel: BrunnelWay) -> str:
+    """
+    Format a regular brunnel's metadata into HTML for popup display.
+
+    Args:
+        brunnel: BrunnelWay object
 
     Returns:
         HTML-formatted string with metadata
     """
     html_parts = []
-    tags = metadata.get("tags", {})
+    tags = brunnel.metadata.get("tags", {})
 
     # Add name most prominently if present
     if "name" in tags:
@@ -78,7 +156,7 @@ def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
         html_parts.append(f"<br><b>AKA:</b> {tags['alt_name']}")
 
     # Add OSM ID
-    osm_id = metadata.get("id", "unknown")
+    osm_id = brunnel.metadata.get("id", "unknown")
     html_parts.append(f"<br><b>OSM ID:</b> {osm_id}")
 
     # Add remaining OSM tags (excluding name and alt_name which we already showed)
@@ -90,7 +168,9 @@ def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
 
     # Add other metadata (excluding tags and id which we already handled, geometry, which is very long, and type, which is always "way")
     other_data = {
-        k: v for k, v in metadata.items() if k not in ["tags", "id", "geometry", "type"]
+        k: v
+        for k, v in brunnel.metadata.items()
+        if k not in ["tags", "id", "geometry", "type"]
     }
     if other_data:
         html_parts.append("<br><b>Other:</b>")
@@ -119,10 +199,48 @@ def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
     return "".join(html_parts)
 
 
+def _get_brunnel_coordinates(brunnel: BrunnelLike) -> List[List[float]]:
+    """
+    Get coordinates from a brunnel (regular or compound).
+
+    Args:
+        brunnel: BrunnelWay or CompoundBrunnelWay object
+
+    Returns:
+        List of [latitude, longitude] pairs
+    """
+    if isinstance(brunnel, CompoundBrunnelWay):
+        coords = brunnel.coordinate_list
+    else:
+        coords = brunnel.coords
+
+    return [[pos.latitude, pos.longitude] for pos in coords]
+
+
+def _get_brunnel_type(brunnel: BrunnelLike) -> BrunnelType:
+    """Get the brunnel type from a brunnel object."""
+    return brunnel.brunnel_type
+
+
+def _is_brunnel_contained(brunnel: BrunnelLike) -> bool:
+    """Check if a brunnel is contained in the route."""
+    return brunnel.contained_in_route
+
+
+def _get_brunnel_filter_reason(brunnel: BrunnelLike) -> FilterReason:
+    """Get the filter reason from a brunnel object."""
+    return brunnel.filter_reason
+
+
+def _get_brunnel_route_span(brunnel: BrunnelLike):
+    """Get the route span from a brunnel object."""
+    return brunnel.route_span
+
+
 def create_route_map(
     route: Route,
     output_filename: str,
-    brunnels: List[BrunnelWay],
+    brunnels: List[BrunnelLike],
     buffer_km: float,
 ) -> None:
     """
@@ -131,7 +249,7 @@ def create_route_map(
     Args:
         route: Route object representing the route
         output_filename: Path where HTML map file should be saved
-        brunnels: Optional list of BrunnelWay objects to display on map
+        brunnels: List of BrunnelWay or CompoundBrunnelWay objects to display on map
         buffer_km: Buffer distance in kilometers for map bounds (default: 1.0)
 
     Raises:
@@ -179,17 +297,20 @@ def create_route_map(
     contained_tunnel_count = 0
 
     for brunnel in brunnels:
-        if not brunnel.coords:
+        brunnel_coords = _get_brunnel_coordinates(brunnel)
+        if not brunnel_coords:
             continue
 
-        # Convert brunnel coordinates for folium
-        brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
+        brunnel_type = _get_brunnel_type(brunnel)
+        contained = _is_brunnel_contained(brunnel)
+        filter_reason = _get_brunnel_filter_reason(brunnel)
+        route_span = _get_brunnel_route_span(brunnel)
 
         # Determine color and opacity based on containment status and filtering
-        if brunnel.contained_in_route:
+        if contained:
             opacity = 0.9
             weight = 4
-            if brunnel.brunnel_type == BrunnelType.BRIDGE:
+            if brunnel_type == BrunnelType.BRIDGE:
                 color = "blue"
                 contained_bridge_count += 1
             else:  # TUNNEL
@@ -199,41 +320,43 @@ def create_route_map(
             # Use muted colors for filtered or non-contained brunnels
             opacity = 0.3
             weight = 2
-            if brunnel.brunnel_type == BrunnelType.BRIDGE:
+            if brunnel_type == BrunnelType.BRIDGE:
                 color = "lightsteelblue"  # grey-blue for bridges
             else:  # TUNNEL
                 color = "rosybrown"  # grey-brown for tunnels
 
         # Count all brunnels
-        if brunnel.brunnel_type == BrunnelType.BRIDGE:
+        if brunnel_type == BrunnelType.BRIDGE:
             bridge_count += 1
         else:
             tunnel_count += 1
 
         # Create popup text with full metadata
-        if brunnel.contained_in_route:
-            if brunnel.route_span:
-                span = brunnel.route_span
+        if contained:
+            if route_span:
                 status = (
-                    f"{span.start_distance_km:.2f} - {span.end_distance_km:.2f} km; "
-                    f"length: {span.length_km:.2f} km"
+                    f"{route_span.start_distance_km:.2f} - {route_span.end_distance_km:.2f} km; "
+                    f"length: {route_span.length_km:.2f} km"
                 )
             else:
                 status = "contained in route buffer"
-        elif brunnel.filter_reason == FilterReason.NOT_CONTAINED:
+        elif filter_reason == FilterReason.NOT_CONTAINED:
             status = "not contained in route buffer"
         else:
-            status = f"filtered: {brunnel.filter_reason}"
+            status = f"filtered: {filter_reason}"
 
-        popup_header = (
-            f"<b>{brunnel.brunnel_type.value.capitalize()}</b> ({status})<br>"
-        )
+        popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
 
-        metadata_html = _format_metadata_for_popup(brunnel.metadata)
+        # Format metadata based on brunnel type
+        if isinstance(brunnel, CompoundBrunnelWay):
+            metadata_html = _format_compound_brunnel_popup(brunnel)
+        else:
+            metadata_html = _format_regular_brunnel_popup(brunnel)
+
         popup_text = popup_header + metadata_html
 
         # Style and add brunnel based on type
-        if brunnel.brunnel_type == BrunnelType.TUNNEL:
+        if brunnel_type == BrunnelType.TUNNEL:
             # Use dashed line for ALL tunnels (both contained and non-contained)
             folium.PolyLine(
                 brunnel_coords,
@@ -241,7 +364,9 @@ def create_route_map(
                 weight=weight,
                 opacity=opacity,
                 dash_array="5, 5",
-                popup=folium.Popup(popup_text, max_width=300),
+                popup=folium.Popup(
+                    popup_text, max_width=400
+                ),  # Wider for compound brunnels
                 z_index=2,  # Ensure tunnels are above route
             ).add_to(route_map)
         else:
@@ -251,7 +376,9 @@ def create_route_map(
                 color=color,
                 weight=weight,
                 opacity=opacity,
-                popup=folium.Popup(popup_text, max_width=300),
+                popup=folium.Popup(
+                    popup_text, max_width=400
+                ),  # Wider for compound brunnels
                 z_index=2,  # Ensure bridges are above route
             ).add_to(route_map)
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Geometric operations for brunnel analysis.
+Updated geometry_utils.py functions to handle compound brunnels.
+This shows the updated functions that need to be added/modified in geometry_utils.py
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 import logging
 from math import cos, radians
 from shapely.geometry import LineString
@@ -16,9 +17,19 @@ from distance_utils import (
     find_closest_segments,
     calculate_bearing,
     bearings_aligned,
+    haversine_distance,
 )
 
 logger = logging.getLogger(__name__)
+
+# Import compound brunnel way with fallback for backwards compatibility
+try:
+    from compound_brunnel_way import CompoundBrunnelWay
+
+    BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
+except ImportError:
+    CompoundBrunnelWay = None
+    BrunnelLike = BrunnelWay
 
 
 def positions_to_linestring(positions: List[Position]) -> Optional[LineString]:
@@ -281,33 +292,38 @@ def route_spans_overlap(span1: RouteSpan, span2: RouteSpan) -> bool:
 
 
 def calculate_brunnel_average_distance_to_route(
-    brunnel: BrunnelWay, route: Route, cumulative_distances: List[float]
+    brunnel: BrunnelLike, route: Route, cumulative_distances: List[float]
 ) -> float:
     """
     Calculate the average distance from all points in a brunnel to the route.
+    Now supports both regular and compound brunnels.
 
     Args:
-        brunnel: BrunnelWay object to calculate distance for
+        brunnel: BrunnelWay or CompoundBrunnelWay object to calculate distance for
         route: Route object representing the route
         cumulative_distances: Pre-calculated cumulative distances along route
 
     Returns:
         Average distance in kilometers, or float('inf') if calculation fails
     """
-    if not brunnel.coords or not route.positions:
+    # Get coordinates based on brunnel type
+    if CompoundBrunnelWay and isinstance(brunnel, CompoundBrunnelWay):
+        brunnel_coords = brunnel.coordinate_list
+    else:
+        brunnel_coords = brunnel.coords
+
+    if not brunnel_coords or not route.positions:
         return float("inf")
 
     total_distance = 0.0
     valid_points = 0
 
-    for brunnel_point in brunnel.coords:
+    for brunnel_point in brunnel_coords:
         try:
             _, closest_route_point = find_closest_point_on_route(
                 brunnel_point, route.positions, cumulative_distances
             )
             # Calculate direct distance between brunnel point and closest route point
-            from distance_utils import haversine_distance
-
             distance = haversine_distance(brunnel_point, closest_route_point)
             total_distance += distance
             valid_points += 1
@@ -322,14 +338,15 @@ def calculate_brunnel_average_distance_to_route(
 
 
 def filter_overlapping_brunnels(
-    route: Route, brunnels: List[BrunnelWay], cumulative_distances: List[float]
+    route: Route, brunnels: List[BrunnelLike], cumulative_distances: List[float]
 ) -> None:
     """
     Filter overlapping brunnels, keeping only the nearest one for each overlapping group.
+    Now supports both regular and compound brunnels.
 
     Args:
         route: Route object representing the route
-        brunnels: List of BrunnelWay objects to filter (modified in-place)
+        brunnels: List of BrunnelWay or CompoundBrunnelWay objects to filter (modified in-place)
         cumulative_distances: Pre-calculated cumulative distances along route
     """
     if not route or not brunnels:
@@ -399,30 +416,64 @@ def filter_overlapping_brunnels(
                 brunnel, route, cumulative_distances
             )
             brunnel_distances.append((brunnel, avg_distance))
-            logger.debug(
-                f"  Brunnel {brunnel.metadata.get('id', 'unknown')}: avg distance = {avg_distance:.3f}km"
-            )
+
+            # Get brunnel identifier for logging
+            if CompoundBrunnelWay and isinstance(brunnel, CompoundBrunnelWay):
+                brunnel_id = brunnel.get_combined_metadata()["id"]
+            else:
+                brunnel_id = brunnel.metadata.get("id", "unknown")
+
+            logger.debug(f"  Brunnel {brunnel_id}: avg distance = {avg_distance:.3f}km")
 
         # Sort by distance (closest first)
         brunnel_distances.sort(key=lambda x: x[1])
 
         # Keep the closest, filter the rest
         closest_brunnel, closest_distance = brunnel_distances[0]
+
+        # Get closest brunnel identifier for logging
+        if CompoundBrunnelWay and isinstance(closest_brunnel, CompoundBrunnelWay):
+            closest_id = closest_brunnel.get_combined_metadata()["id"]
+        else:
+            closest_id = closest_brunnel.metadata.get("id", "unknown")
+
         logger.debug(
-            f"  Keeping closest: {closest_brunnel.metadata.get('id', 'unknown')} "
-            f"(distance: {closest_distance:.3f}km)"
+            f"  Keeping closest: {closest_id} (distance: {closest_distance:.3f}km)"
         )
 
         for brunnel, distance in brunnel_distances[1:]:
             brunnel.filter_reason = FilterReason.NOT_NEAREST
             brunnel.contained_in_route = False
             total_filtered += 1
+
+            # Get filtered brunnel identifier for logging
+            if CompoundBrunnelWay and isinstance(brunnel, CompoundBrunnelWay):
+                brunnel_id = brunnel.get_combined_metadata()["id"]
+            else:
+                brunnel_id = brunnel.metadata.get("id", "unknown")
+
             logger.debug(
-                f"  Filtered: {brunnel.metadata.get('id', 'unknown')} "
-                f"(distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
+                f"  Filtered: {brunnel_id} (distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
             )
 
     if total_filtered > 0:
         logger.info(
             f"Filtered {total_filtered} overlapping brunnels, keeping nearest in each group"
         )
+
+
+def route_spans_overlap(span1: RouteSpan, span2: RouteSpan) -> bool:
+    """
+    Check if two route spans overlap.
+
+    Args:
+        span1: First route span
+        span2: Second route span
+
+    Returns:
+        True if the spans overlap, False otherwise
+    """
+    return (
+        span1.start_distance_km <= span2.end_distance_km
+        and span2.start_distance_km <= span1.end_distance_km
+    )

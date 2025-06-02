@@ -9,7 +9,7 @@ Requirements:
 
 """
 
-
+from typing import List, Union
 import webbrowser
 import argparse
 import logging
@@ -21,9 +21,13 @@ import gpxpy.gpx
 import gpx
 import visualization
 import overpass
-from merge import merge_adjacent_brunnels, log_final_included_brunnels
+from brunnel_way import BrunnelWay
+from compound_brunnel_way import CompoundBrunnelWay, create_compound_brunnels
 from geometry_utils import filter_overlapping_brunnels
 from distance_utils import calculate_cumulative_distances
+
+# Type alias for brunnel objects
+BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
 
 # Configure logging
 logger = logging.getLogger("brunnels")
@@ -96,6 +100,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable filtering of overlapping brunnels (keep all overlapping brunnels)",
     )
+    parser.add_argument(
+        "--no-compound-brunnels",
+        action="store_true",
+        help="Disable creation of compound brunnels from adjacent segments",
+    )
     return parser
 
 
@@ -139,6 +148,58 @@ def setup_logging(log_level: str) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
+def log_final_included_brunnels(brunnels: List[BrunnelLike]) -> None:
+    """
+    Log the final list of brunnels that are included in the route (after all processing).
+    This shows the actual brunnels that will appear on the map.
+
+    Args:
+        brunnels: List of all brunnels to check (including compound brunnels)
+    """
+    # Find final included brunnels (those that are contained and not filtered)
+    included_brunnels = [b for b in brunnels if b.contained_in_route]
+
+    if not included_brunnels:
+        logger.info("No brunnels included in final map")
+        return
+
+    # Sort by start distance along route
+    included_brunnels.sort(
+        key=lambda b: (b.route_span.start_distance_km if b.route_span else 0.0)
+    )
+
+    logger.info(f"Included brunnels (final):")
+    for brunnel in included_brunnels:
+        brunnel_type = brunnel.brunnel_type.value.capitalize()
+
+        if isinstance(brunnel, CompoundBrunnelWay):
+            # Compound brunnel
+            primary_name = brunnel.get_primary_name()
+            combined_metadata = brunnel.get_combined_metadata()
+            osm_id = combined_metadata["id"]
+            component_count = len(brunnel.components)
+
+            if brunnel.route_span:
+                span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
+            else:
+                span_data = "no span data"
+
+            logger.info(
+                f"  Compound {brunnel_type}: {primary_name} ({osm_id}) {span_data} [{component_count} segments]"
+            )
+        else:
+            # Regular brunnel
+            name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
+            osm_id = brunnel.metadata.get("id", "unknown")
+
+            if brunnel.route_span:
+                span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
+            else:
+                span_data = "no span data"
+
+            logger.info(f"  {brunnel_type}: {name} ({osm_id}) {span_data}")
+
+
 def main():
     parser = create_argument_parser()
     args = parser.parse_args()
@@ -175,8 +236,13 @@ def main():
         logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
 
-    # Check for node sharing and merge adjacent brunnels of the same type
-    merge_adjacent_brunnels(brunnels)
+    # Create compound brunnels from adjacent segments
+    if not args.no_compound_brunnels:
+        try:
+            brunnels = create_compound_brunnels(brunnels)
+        except Exception as e:
+            logger.error(f"Failed to create compound brunnels: {e}")
+            sys.exit(1)
 
     # Filter overlapping brunnels (keep only nearest in each overlapping group)
     if not args.no_overlap_filtering:
