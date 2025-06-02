@@ -11,7 +11,7 @@ from math import cos, radians
 import gpxpy
 import gpxpy.gpx
 from geometry import Position
-from models import Route
+from route import Route
 
 logger = logging.getLogger(__name__)
 

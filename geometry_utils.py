@@ -8,7 +8,8 @@ import logging
 from math import cos, radians
 from shapely.geometry import LineString
 from geometry import Position, Geometry
-from models import BrunnelWay, FilterReason, RouteSpan, Route
+from models import BrunnelWay, FilterReason, RouteSpan
+from route import Route
 from distance_utils import (
     calculate_cumulative_distances,
     find_closest_point_on_route,

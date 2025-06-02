@@ -4,7 +4,8 @@ import logging
 import math
 
 from geometry import Position
-from models import BrunnelType, BrunnelWay, FilterReason, Route
+from models import BrunnelType, BrunnelWay, FilterReason
+from route import Route
 from geometry_utils import find_contained_brunnels
 
 

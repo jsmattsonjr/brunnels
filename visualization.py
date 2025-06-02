@@ -3,11 +3,11 @@
 Route visualization using folium maps.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 import logging
 import folium
-from geometry import Position
-from models import BrunnelWay, BrunnelType, FilterReason, Route
+from models import BrunnelWay, BrunnelType, FilterReason
+from route import Route
 
 logger = logging.getLogger(__name__)
 
