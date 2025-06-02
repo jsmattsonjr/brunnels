@@ -29,6 +29,7 @@ class Route:
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
+    _bbox_buffer_km: Optional[float] = field(default=None, init=False, repr=False)
 
     def get_bbox(self, buffer_km: float = 1.0) -> Tuple[float, float, float, float]:
         """
@@ -46,11 +47,12 @@ class Route:
         if not self.positions:
             raise ValueError("Cannot calculate bounding box for empty route")
 
-        if self._bbox is None:
+        if self._bbox is None or self._bbox_buffer_km != buffer_km:
             # Import here to avoid circular imports
             from gpx import _calculate_route_bbox
 
             self._bbox = _calculate_route_bbox(self, buffer_km)
+            self._bbox_buffer_km = buffer_km
 
         return self._bbox
 
