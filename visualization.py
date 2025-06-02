@@ -121,8 +121,8 @@ def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
 def create_route_map(
     route: Route,
     output_filename: str,
-    brunnels: Optional[List[BrunnelWay]] = None,
-    buffer_km: float = 1.0,
+    brunnels: List[BrunnelWay],
+    buffer_km: float,
 ) -> None:
     """
     Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
@@ -138,9 +138,6 @@ def create_route_map(
     """
     if not route:
         raise ValueError("Cannot create map for empty route")
-
-    if brunnels is None:
-        brunnels = []
 
     # Calculate buffered bounding box using existing function
     south, west, north, east = route.get_bbox(buffer_km)

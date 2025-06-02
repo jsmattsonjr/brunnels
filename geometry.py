@@ -153,8 +153,8 @@ def check_bearing_alignment(
 def find_contained_brunnels(
     route: Route,
     brunnels: List[BrunnelWay],
-    route_buffer_m: float = 10.0,
-    bearing_tolerance_degrees: float = 20.0,
+    route_buffer_m: float,
+    bearing_tolerance_degrees: float,
 ) -> None:
     """
     Check which brunnels are completely contained within the buffered route and aligned with route bearing.

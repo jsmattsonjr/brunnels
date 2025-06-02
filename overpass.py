@@ -131,11 +131,11 @@ out geom qt;
 
 def find_route_brunnels(
     route: Route,
-    buffer_km: float = 1.0,
-    route_buffer_m: float = 10.0,
-    bearing_tolerance_degrees: float = 20.0,
-    enable_tag_filtering: bool = True,
-    keep_polygons: bool = False,
+    buffer_km: float,
+    route_buffer_m: float,
+    bearing_tolerance_degrees: float,
+    enable_tag_filtering: bool,
+    keep_polygons: bool,
 ) -> List[BrunnelWay]:
     """
     Find all bridges and tunnels near the given route and check for containment within route buffer.
