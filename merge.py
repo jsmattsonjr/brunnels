@@ -5,7 +5,7 @@ Brunnel merging operations for combining adjacent segments.
 
 from typing import Optional, Tuple, List, Dict, Any
 import logging
-from models import BrunnelWay, Direction, FilterReason, RouteSpan
+from brunnel_way import BrunnelWay, Direction, FilterReason, RouteSpan
 
 logger = logging.getLogger(__name__)
 
