@@ -178,6 +178,80 @@ class CompoundBrunnelWay(Geometry):
         """Allow iteration over components."""
         return iter(self.components)
 
+    def to_html(self) -> str:
+        """
+        Format this compound brunnel's metadata into HTML for popup display.
+
+        Returns:
+            HTML-formatted string with compound brunnel information
+        """
+        html_parts = []
+
+        # Header with compound information
+        brunnel_type = self.brunnel_type.value.capitalize()
+        component_count = len(self.components)
+        primary_name = self.get_primary_name()
+
+        html_parts.append(
+            f"<b>Compound {brunnel_type}</b> ({component_count} segments)"
+        )
+
+        if primary_name != "unnamed":
+            html_parts.append(f"<br><b>Name:</b> {primary_name}")
+
+        # Route span information
+        if self.route_span:
+            span = self.route_span
+            html_parts.append(
+                f"<br><b>Route Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
+                f"(length: {span.length_km:.2f} km)"
+            )
+
+        # Combined OSM ID
+        combined_metadata = self.get_combined_metadata()
+        html_parts.append(f"<br><b>Combined OSM ID:</b> {combined_metadata['id']}")
+
+        # Tag conflicts if any
+        if "tag_conflicts" in combined_metadata:
+            html_parts.append("<br><b>Tag Conflicts:</b>")
+            for key, values in combined_metadata["tag_conflicts"].items():
+                values_str = " vs ".join(f"'{v}'" for v in values)
+                html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {values_str}")
+
+        # Component details
+        html_parts.append("<br><br><b>Component Segments:</b>")
+
+        for i, component in enumerate(self.components):
+            html_parts.append(f"<br><br><b>Segment {i+1}:</b>")
+
+            # Component name
+            comp_tags = component.metadata.get("tags", {})
+            if "name" in comp_tags:
+                html_parts.append(f"<br>&nbsp;&nbsp;<b>Name:</b> {comp_tags['name']}")
+
+            # Component OSM ID
+            comp_id = component.metadata.get("id", "unknown")
+            html_parts.append(f"<br>&nbsp;&nbsp;<b>OSM ID:</b> {comp_id}")
+
+            # Component route span
+            if component.route_span:
+                span = component.route_span
+                html_parts.append(
+                    f"<br>&nbsp;&nbsp;<b>Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
+                    f"({span.length_km:.2f} km)"
+                )
+
+            # Component tags (excluding name which we already showed)
+            remaining_tags = {k: v for k, v in comp_tags.items() if k != "name"}
+            if remaining_tags:
+                html_parts.append("<br>&nbsp;&nbsp;<b>Tags:</b>")
+                for key, value in sorted(remaining_tags.items()):
+                    html_parts.append(
+                        f"<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>{key}:</i> {value}"
+                    )
+
+        return "".join(html_parts)
+
 
 def detect_adjacent_brunnels(brunnels: List[BrunnelWay]) -> List[List[int]]:
     """
