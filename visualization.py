@@ -3,7 +3,7 @@
 Route visualization using folium maps with support for compound brunnels.
 """
 
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Sequence
 import logging
 import folium
 from brunnel_way import BrunnelWay, BrunnelType, FilterReason
@@ -57,7 +57,7 @@ def _get_brunnel_route_span(brunnel: BrunnelLike):
 def create_route_map(
     route: Route,
     output_filename: str,
-    brunnels: List[BrunnelLike],
+    brunnels: Sequence[BrunnelLike],
     buffer_km: float,
 ) -> None:
     """
@@ -66,7 +66,7 @@ def create_route_map(
     Args:
         route: Route object representing the route
         output_filename: Path where HTML map file should be saved
-        brunnels: List of BrunnelWay or CompoundBrunnelWay objects to display on map
+        brunnels: Sequence of BrunnelWay or CompoundBrunnelWay objects to display on map
         buffer_km: Buffer distance in kilometers for map bounds (default: 1.0)
 
     Raises:

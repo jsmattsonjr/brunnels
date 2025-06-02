@@ -9,7 +9,7 @@ Requirements:
 
 """
 
-from typing import List, Union
+from typing import List, Union, Sequence
 import webbrowser
 import argparse
 import logging
@@ -145,13 +145,13 @@ def setup_logging(log_level: str) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def log_final_included_brunnels(brunnels: List[BrunnelLike]) -> None:
+def log_final_included_brunnels(brunnels: Sequence[BrunnelLike]) -> None:
     """
     Log the final list of brunnels that are included in the route (after all processing).
     This shows the actual brunnels that will appear on the map.
 
     Args:
-        brunnels: List of all brunnels to check (including compound brunnels)
+        brunnels: Sequence of all brunnels to check (including compound brunnels)
     """
     # Find final included brunnels (those that are contained and not filtered)
     included_brunnels = [b for b in brunnels if b.contained_in_route]
