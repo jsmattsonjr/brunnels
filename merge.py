@@ -177,6 +177,9 @@ def merge_brunnels(
     brunnel1.coords = merged_coords
     brunnel1.route_span = merged_route_span
 
+    # Clear memoized LineString since coords changed
+    brunnel1._linestring = None
+
     # Update metadata
     merged_metadata = brunnel1.metadata.copy()
     merged_metadata["tags"] = merged_tags

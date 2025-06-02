@@ -3,7 +3,7 @@
 Geometric operations for brunnel analysis.
 """
 
-from typing import List
+from typing import List, Optional
 import logging
 from math import cos, radians
 from shapely.geometry import LineString
@@ -11,6 +11,23 @@ from models import Position, BrunnelWay, FilterReason, RouteSpan
 from distance_utils import calculate_cumulative_distances, find_closest_point_on_route
 
 logger = logging.getLogger(__name__)
+
+
+def positions_to_linestring(positions: List[Position]) -> Optional[LineString]:
+    """
+    Convert a list of Position objects to a Shapely LineString.
+
+    Args:
+        positions: List of Position objects
+
+    Returns:
+        LineString object, or None if positions is empty or has less than 2 points
+    """
+    if not positions or len(positions) < 2:
+        return None
+
+    coords = [(pos.longitude, pos.latitude) for pos in positions]
+    return LineString(coords)
 
 
 def calculate_brunnel_route_span(
@@ -56,13 +73,11 @@ def route_contains_brunnel(route_geometry, brunnel: BrunnelWay) -> bool:
     Returns:
         True if the route geometry completely contains the brunnel, False otherwise
     """
-    if not brunnel.coords or len(brunnel.coords) < 2:
-        return False
-
     try:
-        # Convert brunnel to LineString
-        brunnel_coords = [(pos.longitude, pos.latitude) for pos in brunnel.coords]
-        brunnel_line = LineString(brunnel_coords)
+        # Get cached LineString from brunnel
+        brunnel_line = brunnel.get_linestring()
+        if brunnel_line is None:
+            return False
 
         # Check if route geometry completely contains the brunnel
         return route_geometry.contains(brunnel_line)

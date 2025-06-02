@@ -4,7 +4,8 @@ Data models for brunnel analysis.
 """
 
 from typing import Optional, List, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from shapely.geometry import LineString
 from enum import Enum
 
 
@@ -76,3 +77,18 @@ class BrunnelWay:
     contained_in_route: bool = False
     filter_reason: FilterReason = FilterReason.NONE
     route_span: Optional[RouteSpan] = None
+    _linestring: Optional[LineString] = field(default=None, init=False, repr=False)
+
+    def get_linestring(self) -> Optional[LineString]:
+        """
+        Get memoized LineString representation of this brunnel's coordinates.
+
+        Returns:
+            LineString object, or None if coords is empty or has less than 2 points
+        """
+        if self._linestring is None:
+            # Import here to avoid circular imports
+            from geometry import positions_to_linestring
+
+            self._linestring = positions_to_linestring(self.coords)
+        return self._linestring
