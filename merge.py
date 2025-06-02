@@ -203,7 +203,7 @@ def merge_brunnels(
 def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
     """
     Merge adjacent brunnels that share nodes and are of the same type.
-    Also handles logging of included brunnels and removal of merged brunnels from the list.
+    Also handles removal of merged brunnels from the list.
 
     Args:
         brunnels: List of all brunnels (modified in-place)
@@ -262,10 +262,38 @@ def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
     if merge_count > 0:
         logger.debug(f"Merged {merge_count} adjacent brunnels")
 
-    # Log included brunnels (post-merge)
-    logger.info(f"{len(updated_indices)} included brunnels (post-merge):")
-    for i in updated_indices:
-        brunnel = brunnels[i]
+    # Remove merged brunnels from the full list
+    original_count = len(brunnels)
+    brunnels[:] = [b for b in brunnels if b.filter_reason != FilterReason.MERGED]
+    removed_count = original_count - len(brunnels)
+    if removed_count > 0:
+        logger.debug(f"Removed {removed_count} merged brunnels from full list")
+
+    return merge_count
+
+
+def log_final_included_brunnels(brunnels: List[BrunnelWay]) -> None:
+    """
+    Log the final list of brunnels that are included in the route (after all filtering).
+    This shows the actual brunnels that will appear on the map.
+
+    Args:
+        brunnels: List of all brunnels to check
+    """
+    # Find final included brunnels (those that are contained and not filtered)
+    included_brunnels = [b for b in brunnels if b.contained_in_route]
+
+    if not included_brunnels:
+        logger.info("No brunnels included in final map")
+        return
+
+    # Sort by start distance along route
+    included_brunnels.sort(
+        key=lambda b: (b.route_span.start_distance_km if b.route_span else 0.0)
+    )
+
+    logger.info(f"Included brunnels (final):")
+    for brunnel in included_brunnels:
         brunnel_type = brunnel.brunnel_type.value.capitalize()
         name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
         osm_id = brunnel.metadata.get("id", "unknown")
@@ -275,13 +303,4 @@ def merge_adjacent_brunnels(brunnels: List[BrunnelWay]) -> int:
         else:
             span_data = "no span data"
 
-        logger.info(f"{brunnel_type}: {name} ({osm_id}) {span_data}")
-
-    # Remove merged brunnels from the full list
-    original_count = len(brunnels)
-    brunnels[:] = [b for b in brunnels if b.filter_reason != FilterReason.MERGED]
-    removed_count = original_count - len(brunnels)
-    if removed_count > 0:
-        logger.debug(f"Removed {removed_count} merged brunnels from full list")
-
-    return merge_count
+        logger.info(f"  {brunnel_type}: {name} ({osm_id}) {span_data}")

@@ -21,7 +21,7 @@ import gpxpy.gpx
 import gpx
 import visualization
 import overpass
-from merge import merge_adjacent_brunnels
+from merge import merge_adjacent_brunnels, log_final_included_brunnels
 from geometry_utils import filter_overlapping_brunnels
 from distance_utils import calculate_cumulative_distances
 
@@ -186,6 +186,9 @@ def main():
         except Exception as e:
             logger.error(f"Failed to filter overlapping brunnels: {e}")
             sys.exit(1)
+
+    # Log the final list of included brunnels (what will actually appear on the map)
+    log_final_included_brunnels(brunnels)
 
     # Create visualization map
     try:
