@@ -3,7 +3,7 @@ import requests
 import logging
 import math
 
-from models import Position, BrunnelType, BrunnelWay, FilterReason
+from models import Position, BrunnelType, BrunnelWay, FilterReason, Route
 from geometry import find_contained_brunnels
 from gpx import calculate_route_bbox
 
@@ -131,7 +131,7 @@ out geom qt;
 
 
 def find_route_brunnels(
-    route: List[Position],
+    route: Route,
     buffer_km: float = 1.0,
     route_buffer_m: float = 10.0,
     enable_tag_filtering: bool = True,
@@ -141,7 +141,7 @@ def find_route_brunnels(
     Find all bridges and tunnels near the given route and check for containment within route buffer.
 
     Args:
-        route: List of Position objects representing the route
+        route: Route object representing the route
         buffer_km: Buffer distance in kilometers to search around route
         route_buffer_m: Buffer distance in meters to apply around route for containment detection
         enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance

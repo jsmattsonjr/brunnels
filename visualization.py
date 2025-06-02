@@ -6,7 +6,7 @@ Route visualization using folium maps.
 from typing import List, Optional, Dict, Any
 import logging
 import folium
-from models import Position, BrunnelWay, BrunnelType, FilterReason
+from models import Position, BrunnelWay, BrunnelType, FilterReason, Route
 from gpx import calculate_route_bbox
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ def _format_metadata_for_popup(metadata: Dict[str, Any]) -> str:
 
 
 def create_route_map(
-    route: List[Position],
+    route: Route,
     output_filename: str,
     brunnels: Optional[List[BrunnelWay]] = None,
     buffer_km: float = 1.0,
@@ -129,7 +129,7 @@ def create_route_map(
     Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
 
     Args:
-        route: List of Position objects representing the route
+        route: Route object representing the route
         output_filename: Path where HTML map file should be saved
         brunnels: Optional list of BrunnelWay objects to display on map
         buffer_km: Buffer distance in kilometers for map bounds (default: 1.0)

@@ -20,6 +20,40 @@ class Position:
         return self.elevation is not None
 
 
+@dataclass
+class Route:
+    """Represents a GPX route with memoized geometric operations."""
+
+    positions: List[Position]
+    _linestring: Optional[LineString] = field(default=None, init=False, repr=False)
+
+    def __len__(self) -> int:
+        """Return number of positions in route."""
+        return len(self.positions)
+
+    def __getitem__(self, index):
+        """Allow indexing into positions."""
+        return self.positions[index]
+
+    def __iter__(self):
+        """Allow iteration over positions."""
+        return iter(self.positions)
+
+    def get_linestring(self) -> Optional[LineString]:
+        """
+        Get memoized LineString representation of this route's positions.
+
+        Returns:
+            LineString object, or None if positions is empty or has less than 2 points
+        """
+        if self._linestring is None:
+            # Import here to avoid circular imports
+            from geometry import positions_to_linestring
+
+            self._linestring = positions_to_linestring(self.positions)
+        return self._linestring
+
+
 class BrunnelType(Enum):
     """Enumeration for brunnel (bridge/tunnel) types."""
 

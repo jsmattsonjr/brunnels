@@ -10,7 +10,7 @@ import logging
 from math import cos, radians
 import gpxpy
 import gpxpy.gpx
-from models import Position
+from models import Position, Route
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class RouteValidationError(Exception):
     pass
 
 
-def parse_gpx_to_route(file_input: TextIO) -> List[Position]:
+def parse_gpx_to_route(file_input: TextIO) -> Route:
     """
     Parse GPX file and concatenate all tracks/segments into a single route.
 
@@ -29,7 +29,7 @@ def parse_gpx_to_route(file_input: TextIO) -> List[Position]:
         file_input: File-like object containing GPX data
 
     Returns:
-        List of Position objects representing the concatenated route
+        Route object representing the concatenated route
 
     Raises:
         RouteValidationError: If route crosses antimeridian or approaches poles
@@ -40,19 +40,21 @@ def parse_gpx_to_route(file_input: TextIO) -> List[Position]:
     except gpxpy.gpx.GPXException as e:
         raise gpxpy.gpx.GPXException(e)
 
-    route = []
+    positions = []
 
     # Extract all track points from all tracks and segments
     for track in gpx_data.tracks:
         for segment in track.segments:
             for point in segment.points:
-                route.append(
+                positions.append(
                     Position(
                         latitude=point.latitude,
                         longitude=point.longitude,
                         elevation=point.elevation,
                     )
                 )
+
+    route = Route(positions)
 
     if not route:
         logger.warning("No track points found in GPX file")
@@ -61,19 +63,19 @@ def parse_gpx_to_route(file_input: TextIO) -> List[Position]:
     logger.debug(f"Parsed {len(route)} track points from GPX file")
 
     # Validate the route
-    _validate_route(route)
+    _validate_route(route.positions)
 
     return route
 
 
 def calculate_route_bbox(
-    route: List[Position], buffer_km: float = 1.0
+    route: Route, buffer_km: float = 1.0
 ) -> Tuple[float, float, float, float]:
     """
     Calculate bounding box for route with optional buffer.
 
     Args:
-        route: List of Position objects
+        route: Route object
         buffer_km: Buffer distance in kilometers (default: 1.0)
 
     Returns:
@@ -111,21 +113,21 @@ def calculate_route_bbox(
     return (south, west, north, east)
 
 
-def _validate_route(route: List[Position]) -> None:
+def _validate_route(positions: List[Position]) -> None:
     """
     Validate route for antimeridian crossing and polar proximity.
 
     Args:
-        route: List of Position objects to validate
+        positions: List of Position objects to validate
 
     Raises:
         RouteValidationError: If validation fails
     """
-    if not route:
+    if not positions:
         return
 
     # Check for polar proximity (within 5 degrees of poles)
-    for i, pos in enumerate(route):
+    for i, pos in enumerate(positions):
         if abs(pos.latitude) > 85.0:
             raise RouteValidationError(
                 f"Route point {i} at latitude {pos.latitude:.3f}° is within "
@@ -133,8 +135,8 @@ def _validate_route(route: List[Position]) -> None:
             )
 
     # Check for antimeridian crossing
-    for i in range(1, len(route)):
-        lon_diff = abs(route[i].longitude - route[i - 1].longitude)
+    for i in range(1, len(positions)):
+        lon_diff = abs(positions[i].longitude - positions[i - 1].longitude)
         if lon_diff > 180.0:
             raise RouteValidationError(
                 f"Route crosses antimeridian between points {i-1} and {i} "
@@ -142,7 +144,7 @@ def _validate_route(route: List[Position]) -> None:
             )
 
 
-def load_gpx_route(filename: str) -> List[Position]:
+def load_gpx_route(filename: str) -> Route:
     """
     Load and parse a GPX file into a route.
 
@@ -150,7 +152,7 @@ def load_gpx_route(filename: str) -> List[Position]:
         filename: Path to GPX file, or "-" for stdin
 
     Returns:
-        List of Position objects representing the route
+        Route object representing the route
 
     Raises:
         RouteValidationError: If route fails validation
