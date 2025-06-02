@@ -133,6 +133,7 @@ def find_route_brunnels(
     route: Route,
     buffer_km: float = 1.0,
     route_buffer_m: float = 10.0,
+    bearing_tolerance_degrees: float = 20.0,
     enable_tag_filtering: bool = True,
     keep_polygons: bool = False,
 ) -> List[BrunnelWay]:
@@ -143,6 +144,7 @@ def find_route_brunnels(
         route: Route object representing the route
         buffer_km: Buffer distance in kilometers to search around route
         route_buffer_m: Buffer distance in meters to apply around route for containment detection
+        bearing_tolerance_degrees: Bearing alignment tolerance in degrees
         enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
         keep_polygons: Whether to keep closed ways (polygons) where first node equals last node
 
@@ -192,8 +194,8 @@ def find_route_brunnels(
             f"{filtered_count} brunnels filtered by cycling relevance tags (will show greyed out)"
         )
 
-    # Check for containment within the route buffer
-    find_contained_brunnels(route, brunnels, route_buffer_m)
+    # Check for containment within the route buffer and bearing alignment
+    find_contained_brunnels(route, brunnels, route_buffer_m, bearing_tolerance_degrees)
 
     # Count contained vs total brunnels
     bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]

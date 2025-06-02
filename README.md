@@ -12,6 +12,7 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 - **OpenStreetMap Integration**: Query real bridge and tunnel data from OpenStreetMap via the Overpass API
 - **Smart Filtering**: Filter bridges/tunnels based on cycling relevance (bicycle access, infrastructure type)
 - **Containment Analysis**: Identify which bridges/tunnels your route actually crosses vs. those merely nearby
+- **Bearing Alignment**: Filter out bridges/tunnels that aren't aligned with your route direction (configurable tolerance)
 - **Interactive Visualization**: Generate beautiful HTML maps with route and brunnel overlay
 - **Detailed Metadata**: View comprehensive OpenStreetMap tags and properties for each brunnel
 - **Adjacent Way Merging**: Automatically combines adjacent bridge/tunnel ways that share OSM nodes into single continuous brunnels
@@ -47,8 +48,9 @@ python brunnels.py your_route.gpx
 This will:
 1. Parse your GPX file
 2. Find all bridges and tunnels in an area extending 100m beyond your route's bounding box
-3. Generate an interactive map at `brunnel_map.html`
-4. Automatically open the map in your default browser
+3. Filter brunnels based on cycling relevance and bearing alignment with your route
+4. Generate an interactive map at `brunnel_map.html`
+5. Automatically open the map in your default browser
 
 ### Advanced Options
 
@@ -57,6 +59,7 @@ python brunnels.py route.gpx \
   --output my_map.html \
   --buffer 0.5 \
   --route-buffer 5.0 \
+  --bearing-tolerance 15.0 \
   --no-tag-filtering \
   --log-level DEBUG
 ```
@@ -66,6 +69,7 @@ python brunnels.py route.gpx \
 - `--output FILE`: Specify output HTML filename (default: `brunnel_map.html`)
 - `--buffer DISTANCE`: Search radius around route in kilometers (default: 0.1km)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
+- `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
 - `--no-tag-filtering`: Disable filtering based on cycling relevance
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `--no-open`: Don't automatically open the map in browser
@@ -101,7 +105,19 @@ The tool applies smart filtering for cycling routes:
 
 - **Keeps**: Bridges/tunnels with bicycle access allowed or `highway=cycleway`
 - **Filters out**: Infrastructure marked `bicycle=no`, pure waterways, active railways
+- **Bearing alignment**: Filters out brunnels whose direction doesn't align with your route (±20° tolerance by default)
 - **Grays out**: Non-contained or filtered brunnels for context
+
+### Bearing Alignment
+
+The tool checks if bridges and tunnels are aligned with your route direction by:
+
+1. Finding the closest segments between the brunnel and your route
+2. Calculating bearing (compass direction) for both segments
+3. Checking if they're aligned within tolerance (same or opposite direction)
+4. Filtering out perpendicular or oddly-angled infrastructure that you don't actually cross
+
+This prevents including nearby infrastructure that intersects your route buffer but runs perpendicular to your actual path.
 
 ### Merging
 
@@ -129,6 +145,14 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 - Uses Shapely for precise geometric containment checking
 - Route buffering accounts for GPS accuracy and path width
 - Projects coordinates for local distance calculations
+- Bearing calculations use great circle geometry for accuracy
+
+### Bearing Alignment Analysis
+- Calculates true bearing (compass direction) for route and brunnel segments
+- Finds closest segments between polylines using point-to-line projections
+- Checks alignment within configurable tolerance (default 20°)
+- Handles both same-direction and opposite-direction alignment
+- Filters out perpendicular crossings that don't represent actual route usage
 
 ### Brunnel Merging
 - Detects adjacent brunnels of the same type sharing OSM nodes
@@ -145,6 +169,7 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 - Cannot process routes crossing the antimeridian (±180° longitude)
 - Dependent on OpenStreetMap data quality and completeness
 - Limited to ways tagged as bridges/tunnels in OSM
+- Bearing alignment works best for linear infrastructure; complex intersections may be filtered unexpectedly
 
 ## Example Output
 
@@ -152,6 +177,7 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 06:53:46 - brunnels - INFO - Loaded GPX route with 4183 points
 06:53:47 - overpass - INFO - Found 1556 brunnels near route
 06:53:47 - geometry - INFO - Total route distance: 22.39 km
+06:53:47 - geometry - DEBUG - Filtered 3 brunnels due to bearing misalignment
 06:53:47 - overpass - INFO - Found 11/680 contained bridges and 0/876 contained tunnels
 06:53:47 - merge - WARNING - Tag conflict during merge: surface='asphalt' vs 'metal_grid'; keeping first value
 06:53:47 - merge - INFO - Included brunnels (post-merge):

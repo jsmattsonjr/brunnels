@@ -8,7 +8,13 @@ import logging
 from math import cos, radians
 from shapely.geometry import LineString
 from models import Position, BrunnelWay, FilterReason, RouteSpan, Route
-from distance_utils import calculate_cumulative_distances, find_closest_point_on_route
+from distance_utils import (
+    calculate_cumulative_distances,
+    find_closest_point_on_route,
+    find_closest_segments,
+    calculate_bearing,
+    bearings_aligned,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,17 +95,76 @@ def route_contains_brunnel(route_geometry, brunnel: BrunnelWay) -> bool:
         return False
 
 
+def check_bearing_alignment(
+    brunnel: BrunnelWay, route: Route, tolerance_degrees: float
+) -> bool:
+    """
+    Check if a brunnel's bearing is aligned with the route at their closest point.
+
+    Args:
+        brunnel: BrunnelWay object to check alignment for
+        route: Route object representing the route
+        tolerance_degrees: Allowed bearing deviation in degrees
+
+    Returns:
+        True if brunnel is aligned with route within tolerance, False otherwise
+    """
+    if not brunnel.coords or len(brunnel.coords) < 2:
+        logger.debug(
+            f"Brunnel {brunnel.metadata.get('id', 'unknown')} has insufficient coordinates for bearing calculation"
+        )
+        return False
+
+    if not route.positions or len(route.positions) < 2:
+        logger.debug("Route has insufficient coordinates for bearing calculation")
+        return False
+
+    # Find closest segments between brunnel and route
+    brunnel_segment, route_segment = find_closest_segments(
+        brunnel.coords, route.positions
+    )
+
+    if brunnel_segment is None or route_segment is None:
+        logger.debug(
+            f"Could not find closest segments for brunnel {brunnel.metadata.get('id', 'unknown')}"
+        )
+        return False
+
+    # Extract segment coordinates
+    _, brunnel_start, brunnel_end = brunnel_segment
+    _, route_start, route_end = route_segment
+
+    # Calculate bearings for both segments
+    brunnel_bearing = calculate_bearing(brunnel_start, brunnel_end)
+    route_bearing = calculate_bearing(route_start, route_end)
+
+    # Check if bearings are aligned
+    aligned = bearings_aligned(brunnel_bearing, route_bearing, tolerance_degrees)
+
+    logger.debug(
+        f"Brunnel {brunnel.metadata.get('id', 'unknown')}: "
+        f"brunnel_bearing={brunnel_bearing:.1f}°, route_bearing={route_bearing:.1f}°, "
+        f"aligned={aligned} (tolerance={tolerance_degrees}°)"
+    )
+
+    return aligned
+
+
 def find_contained_brunnels(
-    route: Route, brunnels: List[BrunnelWay], route_buffer_m: float = 10.0
+    route: Route,
+    brunnels: List[BrunnelWay],
+    route_buffer_m: float = 10.0,
+    bearing_tolerance_degrees: float = 20.0,
 ) -> None:
     """
-    Check which brunnels are completely contained within the buffered route and update their containment status.
-    Also calculate route spans for contained brunnels.
+    Check which brunnels are completely contained within the buffered route and aligned with route bearing.
+    Updates their containment status and calculates route spans for contained brunnels.
 
     Args:
         route: Route object representing the route
         brunnels: List of BrunnelWay objects to check (modified in-place)
         route_buffer_m: Buffer distance in meters to apply around the route (default: 10.0, minimum: 1.0)
+        bearing_tolerance_degrees: Bearing alignment tolerance in degrees (default: 20.0)
     """
     if not route:
         logger.warning("Cannot find contained brunnels for empty route")
@@ -152,6 +217,7 @@ def find_contained_brunnels(
             logger.warning(f"Failed to fix invalid geometry: {e}")
 
     contained_count = 0
+    unaligned_count = 0
 
     # Check containment for each brunnel
     for brunnel in brunnels:
@@ -159,20 +225,28 @@ def find_contained_brunnels(
         if brunnel.filter_reason == FilterReason.NONE:
             brunnel.contained_in_route = route_contains_brunnel(route_geometry, brunnel)
             if brunnel.contained_in_route:
-                # Calculate route span for contained brunnels
-                try:
-                    brunnel.route_span = calculate_brunnel_route_span(
-                        brunnel, route, cumulative_distances
-                    )
-                    contained_count += 1
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to calculate route span for brunnel {brunnel.metadata.get('id', 'unknown')}: {e}"
-                    )
-                    logger.warning(f"Evicting brunnel from contained set")
-                    brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
+                # Check bearing alignment for contained brunnels
+                if check_bearing_alignment(brunnel, route, bearing_tolerance_degrees):
+                    # Calculate route span for aligned, contained brunnels
+                    try:
+                        brunnel.route_span = calculate_brunnel_route_span(
+                            brunnel, route, cumulative_distances
+                        )
+                        contained_count += 1
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to calculate route span for brunnel {brunnel.metadata.get('id', 'unknown')}: {e}"
+                        )
+                        logger.warning(f"Evicting brunnel from contained set")
+                        brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
+                        brunnel.contained_in_route = False
+                        brunnel.route_span = None
+                else:
+                    # Mark as unaligned and remove from contained set
+                    brunnel.filter_reason = FilterReason.UNALIGNED
                     brunnel.contained_in_route = False
                     brunnel.route_span = None
+                    unaligned_count += 1
             else:
                 # Set filter reason for non-contained brunnels
                 brunnel.filter_reason = FilterReason.NOT_CONTAINED
@@ -181,5 +255,9 @@ def find_contained_brunnels(
             brunnel.contained_in_route = False
 
     logger.debug(
-        f"Found {contained_count} brunnels completely contained within the route buffer out of {len(brunnels)} total (with {route_buffer_m}m buffer)"
+        f"Found {contained_count} brunnels completely contained and aligned within the route buffer "
+        f"out of {len(brunnels)} total (with {route_buffer_m}m buffer, {bearing_tolerance_degrees}° tolerance)"
     )
+
+    if unaligned_count > 0:
+        logger.debug(f"Filtered {unaligned_count} brunnels due to bearing misalignment")

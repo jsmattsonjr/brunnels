@@ -103,6 +103,7 @@ class FilterReason(Enum):
     POLYGON = "closed way (first node equals last node)"
     NOT_CONTAINED = "not contained within route buffer"
     NO_ROUTE_SPAN = "failed to calculate route span"
+    UNALIGNED = "bearing not aligned with route"
     MERGED = "merged into adjacent brunnel"
 
     def __str__(self) -> str:

@@ -63,6 +63,12 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Route buffer for containment detection in meters (default: 3.0)",
     )
     parser.add_argument(
+        "--bearing-tolerance",
+        type=float,
+        default=20.0,
+        help="Bearing alignment tolerance in degrees (default: 20.0)",
+    )
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -155,6 +161,7 @@ def main():
             route,
             args.buffer,
             args.route_buffer,
+            bearing_tolerance_degrees=args.bearing_tolerance,
             enable_tag_filtering=not args.no_tag_filtering,
             keep_polygons=args.keep_polygons,
         )
