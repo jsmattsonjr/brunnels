@@ -9,7 +9,7 @@ Requirements:
 
 """
 
-from typing import List, Union, Sequence
+from typing import List, Sequence
 import webbrowser
 import argparse
 import logging
@@ -20,11 +20,9 @@ import gpxpy.gpx
 
 import visualization
 from route import Route, RouteValidationError
+from brunnel import Brunnel
 from brunnel_way import BrunnelWay
 from compound_brunnel_way import CompoundBrunnelWay
-
-# Type alias for brunnel objects
-BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
 
 # Configure logging
 logger = logging.getLogger("brunnels")
@@ -145,7 +143,7 @@ def setup_logging(log_level: str) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def log_final_included_brunnels(brunnels: Sequence[BrunnelLike]) -> None:
+def log_final_included_brunnels(brunnels: Sequence[Brunnel]) -> None:
     """
     Log the final list of brunnels that are included in the route (after all processing).
     This shows the actual brunnels that will appear on the map.
@@ -172,8 +170,6 @@ def log_final_included_brunnels(brunnels: Sequence[BrunnelLike]) -> None:
         if isinstance(brunnel, CompoundBrunnelWay):
             # Compound brunnel - use its specialized methods
             primary_name = brunnel.get_primary_name()
-            combined_metadata = brunnel.get_combined_metadata()
-            osm_id = combined_metadata["id"]
             component_count = len(brunnel.components)
 
             if brunnel.route_span:
@@ -182,19 +178,21 @@ def log_final_included_brunnels(brunnels: Sequence[BrunnelLike]) -> None:
                 span_data = "no span data"
 
             logger.info(
-                f"  Compound {brunnel_type}: {primary_name} ({osm_id}) {span_data} [{component_count} segments]"
+                f"  Compound {brunnel_type}: {primary_name} ({brunnel.get_id()}) {span_data} [{component_count} segments]"
             )
         else:
             # Regular brunnel - use standard metadata access
-            name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
-            osm_id = brunnel.metadata.get("id", "unknown")
+            if isinstance(brunnel, BrunnelWay):
+                name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
+            else:
+                name = "unnamed"
 
             if brunnel.route_span:
                 span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
             else:
                 span_data = "no span data"
 
-            logger.info(f"  {brunnel_type}: {name} ({osm_id}) {span_data}")
+            logger.info(f"  {brunnel_type}: {name} ({brunnel.get_id()}) {span_data}")
 
 
 def main():
@@ -221,7 +219,7 @@ def main():
 
     # Find bridges and tunnels near the route (containment detection included)
     try:
-        brunnels = route.find_brunnels(
+        brunnels: Sequence[Brunnel] = route.find_brunnels(
             args.buffer,
             args.route_buffer,
             bearing_tolerance_degrees=args.bearing_tolerance,

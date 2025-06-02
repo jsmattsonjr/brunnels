@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """
-Simplified geometry_utils.py functions with better polymorphism.
+Simplified geometry_utils.py functions with clean polymorphism.
 """
 
-from typing import List, Optional, Union
+from typing import List, Optional
 import logging
 from shapely.geometry import LineString
 from geometry import Position, Geometry
-from brunnel_way import BrunnelWay, FilterReason, RouteSpan
-from compound_brunnel_way import CompoundBrunnelWay
+from brunnel import RouteSpan
 
 logger = logging.getLogger(__name__)
-
-# Clean type alias without fallback
-BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
 
 
 def positions_to_linestring(positions: List[Position]) -> Optional[LineString]:

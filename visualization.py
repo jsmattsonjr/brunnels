@@ -3,23 +3,19 @@
 Route visualization using folium maps with polymorphic brunnel handling.
 """
 
-from typing import List, Dict, Any, Union, Sequence
+from typing import Sequence
 import logging
 import folium
-from brunnel_way import BrunnelWay, BrunnelType, FilterReason
-from compound_brunnel_way import CompoundBrunnelWay
+from brunnel import Brunnel, BrunnelType, FilterReason
 from route import Route
 
 logger = logging.getLogger(__name__)
-
-# Type alias for brunnel objects
-BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
 
 
 def create_route_map(
     route: Route,
     output_filename: str,
-    brunnels: Sequence[BrunnelLike],
+    brunnels: Sequence[Brunnel],
     buffer_km: float,
 ) -> None:
     """
@@ -28,7 +24,7 @@ def create_route_map(
     Args:
         route: Route object representing the route
         output_filename: Path where HTML map file should be saved
-        brunnels: Sequence of BrunnelWay or CompoundBrunnelWay objects to display on map
+        brunnels: Sequence of Brunnel objects to display on map
         buffer_km: Buffer distance in kilometers for map bounds (default: 1.0)
 
     Raises:

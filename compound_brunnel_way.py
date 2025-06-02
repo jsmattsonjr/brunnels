@@ -7,14 +7,15 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 import logging
 
-from brunnel_way import BrunnelWay, BrunnelType, FilterReason, RouteSpan, Direction
-from geometry import Position, Geometry
+from geometry import Position
+from brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
+from brunnel_way import BrunnelWay
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CompoundBrunnelWay(Geometry):
+class CompoundBrunnelWay(Brunnel):
     """
     A compound brunnel way consisting of multiple adjacent BrunnelWay segments.
 
@@ -23,10 +24,6 @@ class CompoundBrunnelWay(Geometry):
     """
 
     components: List[BrunnelWay]
-    brunnel_type: BrunnelType
-    contained_in_route: bool = False
-    filter_reason: FilterReason = FilterReason.NONE
-    route_span: Optional[RouteSpan] = None
 
     # Memoized properties
     _coordinates: Optional[List[Position]] = field(default=None, init=False, repr=False)
@@ -34,7 +31,21 @@ class CompoundBrunnelWay(Geometry):
         default=None, init=False, repr=False
     )
 
-    def __post_init__(self):
+    def __init__(
+        self,
+        components: List[BrunnelWay],
+        brunnel_type: BrunnelType,
+        contained_in_route: bool = False,
+        filter_reason: FilterReason = FilterReason.NONE,
+        route_span: Optional[RouteSpan] = None,
+    ):
+        super().__init__(brunnel_type, contained_in_route, filter_reason, route_span)
+        self.components = components
+        self._coordinates = None
+        self._combined_metadata = None
+        self._validate_components()
+
+    def _validate_components(self):
         """Validate and normalize the compound brunnel way."""
         if not self.components:
             raise ValueError("CompoundBrunnelWay must have at least one component")
@@ -43,6 +54,12 @@ class CompoundBrunnelWay(Geometry):
         first_type = self.components[0].brunnel_type
         if not all(comp.brunnel_type == first_type for comp in self.components):
             raise ValueError("All components must be the same brunnel type")
+
+        # Verify all components have FilterReason.NONE (they're being combined)
+        if not all(comp.filter_reason == FilterReason.NONE for comp in self.components):
+            raise ValueError(
+                "All components must have FilterReason.NONE to be combined"
+            )
 
         # Ensure brunnel_type matches components
         if self.brunnel_type != first_type:
@@ -54,6 +71,10 @@ class CompoundBrunnelWay(Geometry):
         if self._coordinates is None:
             self._coordinates = self._compute_combined_coordinates()
         return self._coordinates
+
+    def get_id(self) -> str:
+        """Get a string identifier for this compound brunnel."""
+        return self.get_combined_metadata()["id"]
 
     def _compute_combined_coordinates(self) -> List[Position]:
         """
@@ -113,7 +134,7 @@ class CompoundBrunnelWay(Geometry):
         for i, component in enumerate(self.components):
             comp_info = {
                 "index": i,
-                "id": component.metadata.get("id", "unknown"),
+                "id": component.get_id(),
                 "tags": component.metadata.get("tags", {}),
                 "metadata": component.metadata,
             }
@@ -128,7 +149,7 @@ class CompoundBrunnelWay(Geometry):
                 total_length += component.route_span.length_km
 
             combined["components"].append(comp_info)
-            osm_ids.append(str(component.metadata.get("id", "unknown")))
+            osm_ids.append(component.get_id())
 
         # Add summary information
         combined["id"] = ";".join(osm_ids)
@@ -166,32 +187,6 @@ class CompoundBrunnelWay(Geometry):
                 return name
         return "unnamed"
 
-    def is_contained_by(self, route_geometry) -> bool:
-        """
-        Check if this compound brunnel is completely contained within a route geometry.
-
-        Args:
-            route_geometry: Shapely geometry object representing the buffered route polygon
-
-        Returns:
-            True if the route geometry completely contains this compound brunnel, False otherwise
-        """
-        try:
-            # Get cached LineString from compound brunnel
-            brunnel_line = self.get_linestring()
-            if brunnel_line is None:
-                return False
-
-            # Check if route geometry completely contains the compound brunnel
-            return route_geometry.contains(brunnel_line)
-
-        except Exception as e:
-            combined_metadata = self.get_combined_metadata()
-            logger.warning(
-                f"Failed to check containment for compound brunnel {combined_metadata.get('id', 'unknown')}: {e}"
-            )
-            return False
-
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """
         Check if this compound brunnel's bearing is aligned with the route at their closest point.
@@ -209,37 +204,6 @@ class CompoundBrunnelWay(Geometry):
 
         # Use the first component as representative for alignment checking
         return self.components[0].is_aligned_with_route(route, tolerance_degrees)
-
-    def calculate_route_span(
-        self, route, cumulative_distances: List[float]
-    ) -> RouteSpan:
-        """
-        Calculate the span of this compound brunnel along the route.
-
-        Args:
-            route: Route object representing the route
-            cumulative_distances: Pre-calculated cumulative distances along route
-
-        Returns:
-            RouteSpan object with start/end distances and length covering all components
-        """
-        if not self.components:
-            return RouteSpan(0.0, 0.0, 0.0)
-
-        min_distance = float("inf")
-        max_distance = -float("inf")
-
-        # Find the closest route point for each coordinate in all components
-        for component in self.components:
-            for brunnel_point in component.coords:
-                cumulative_dist, _ = find_closest_point_on_route(
-                    brunnel_point, route.positions, cumulative_distances
-                )
-
-                min_distance = min(min_distance, cumulative_dist)
-                max_distance = max(max_distance, cumulative_dist)
-
-        return RouteSpan(min_distance, max_distance, max_distance - min_distance)
 
     def to_html(self) -> str:
         """
@@ -293,8 +257,7 @@ class CompoundBrunnelWay(Geometry):
                 html_parts.append(f"<br>&nbsp;&nbsp;<b>Name:</b> {comp_tags['name']}")
 
             # Component OSM ID
-            comp_id = component.metadata.get("id", "unknown")
-            html_parts.append(f"<br>&nbsp;&nbsp;<b>OSM ID:</b> {comp_id}")
+            html_parts.append(f"<br>&nbsp;&nbsp;<b>OSM ID:</b> {component.get_id()}")
 
             # Component route span
             if component.route_span:
@@ -383,7 +346,7 @@ class CompoundBrunnelWay(Geometry):
         return adjacent_groups
 
     @classmethod
-    def create_from_brunnels(cls, brunnels: List[BrunnelWay]) -> List[BrunnelWay]:
+    def create_from_brunnels(cls, brunnels: List[BrunnelWay]) -> List[Brunnel]:
         """
         Create compound brunnels from adjacent segments and return the modified list.
 
@@ -398,7 +361,7 @@ class CompoundBrunnelWay(Geometry):
 
         if not adjacent_groups:
             logger.debug("No adjacent brunnels found for compounding")
-            return brunnels[:]  # Return copy of original list
+            return list(brunnels)  # Return new list typed as List[Brunnel]
 
         logger.debug(
             f"Found {len(adjacent_groups)} groups of adjacent brunnels to compound"
@@ -443,11 +406,9 @@ class CompoundBrunnelWay(Geometry):
                 compound_count += 1
 
                 # Log the compound creation
-                component_ids = [
-                    comp.metadata.get("id", "unknown") for comp in components
-                ]
+                component_ids = [comp.get_id() for comp in components]
                 logger.debug(
-                    f"Created compound {components[0].brunnel_type.value}: {';'.join(map(str, component_ids))}"
+                    f"Created compound {components[0].brunnel_type.value}: {';'.join(component_ids)}"
                 )
 
             except Exception as e:
@@ -483,77 +444,3 @@ class CompoundBrunnelWay(Geometry):
     def __iter__(self):
         """Allow iteration over components."""
         return iter(self.components)
-
-    def to_html(self) -> str:
-        """
-        Format this compound brunnel's metadata into HTML for popup display.
-
-        Returns:
-            HTML-formatted string with compound brunnel information
-        """
-        html_parts = []
-
-        # Header with compound information
-        brunnel_type = self.brunnel_type.value.capitalize()
-        component_count = len(self.components)
-        primary_name = self.get_primary_name()
-
-        html_parts.append(
-            f"<b>Compound {brunnel_type}</b> ({component_count} segments)"
-        )
-
-        if primary_name != "unnamed":
-            html_parts.append(f"<br><b>Name:</b> {primary_name}")
-
-        # Route span information
-        if self.route_span:
-            span = self.route_span
-            html_parts.append(
-                f"<br><b>Route Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
-                f"(length: {span.length_km:.2f} km)"
-            )
-
-        # Combined OSM ID
-        combined_metadata = self.get_combined_metadata()
-        html_parts.append(f"<br><b>Combined OSM ID:</b> {combined_metadata['id']}")
-
-        # Tag conflicts if any
-        if "tag_conflicts" in combined_metadata:
-            html_parts.append("<br><b>Tag Conflicts:</b>")
-            for key, values in combined_metadata["tag_conflicts"].items():
-                values_str = " vs ".join(f"'{v}'" for v in values)
-                html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {values_str}")
-
-        # Component details
-        html_parts.append("<br><br><b>Component Segments:</b>")
-
-        for i, component in enumerate(self.components):
-            html_parts.append(f"<br><br><b>Segment {i+1}:</b>")
-
-            # Component name
-            comp_tags = component.metadata.get("tags", {})
-            if "name" in comp_tags:
-                html_parts.append(f"<br>&nbsp;&nbsp;<b>Name:</b> {comp_tags['name']}")
-
-            # Component OSM ID
-            comp_id = component.metadata.get("id", "unknown")
-            html_parts.append(f"<br>&nbsp;&nbsp;<b>OSM ID:</b> {comp_id}")
-
-            # Component route span
-            if component.route_span:
-                span = component.route_span
-                html_parts.append(
-                    f"<br>&nbsp;&nbsp;<b>Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
-                    f"({span.length_km:.2f} km)"
-                )
-
-            # Component tags (excluding name which we already showed)
-            remaining_tags = {k: v for k, v in comp_tags.items() if k != "name"}
-            if remaining_tags:
-                html_parts.append("<br>&nbsp;&nbsp;<b>Tags:</b>")
-                for key, value in sorted(remaining_tags.items()):
-                    html_parts.append(
-                        f"<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>{key}:</i> {value}"
-                    )
-
-        return "".join(html_parts)
