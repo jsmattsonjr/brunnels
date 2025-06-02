@@ -5,8 +5,6 @@ import math
 
 from geometry import Position
 from brunnel_way import BrunnelType, BrunnelWay, FilterReason
-from route import Route
-from geometry_utils import find_contained_brunnels
 
 
 DEFAULT_API_TIMEOUT = 30
@@ -129,84 +127,3 @@ out geom qt;
     except ValueError as e:  # JSON decode error
         logger.error(f"Invalid response format: {e}")
         return []
-
-
-def find_route_brunnels(
-    route: Route,
-    buffer_km: float,
-    route_buffer_m: float,
-    bearing_tolerance_degrees: float,
-    enable_tag_filtering: bool,
-    keep_polygons: bool,
-) -> List[BrunnelWay]:
-    """
-    Find all bridges and tunnels near the given route and check for containment within route buffer.
-
-    Args:
-        route: Route object representing the route
-        buffer_km: Buffer distance in kilometers to search around route
-        route_buffer_m: Buffer distance in meters to apply around route for containment detection
-        bearing_tolerance_degrees: Bearing alignment tolerance in degrees
-        enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
-        keep_polygons: Whether to keep closed ways (polygons) where first node equals last node
-
-    Returns:
-        List of BrunnelWay objects found near the route, with containment status set
-    """
-    if not route:
-        logger.warning("Cannot find brunnels for empty route")
-        return []
-
-    bbox = route.get_bbox(buffer_km)
-
-    # Calculate and log query area before API call
-    south, west, north, east = bbox
-    lat_diff = north - south
-    lon_diff = east - west
-    avg_lat = (north + south) / 2
-    lat_km = lat_diff * 111.0
-    lon_km = lon_diff * 111.0 * abs(math.cos(math.radians(avg_lat)))
-    area_sq_km = lat_km * lon_km
-
-    logger.debug(
-        f"Querying Overpass API for bridges and tunnels in {area_sq_km:.1f} sq km area..."
-    )
-    raw_ways = query_overpass_brunnels(bbox)
-
-    brunnels = []
-    filtered_count = 0
-
-    for way_data in raw_ways:
-        try:
-            brunnel = parse_overpass_way(way_data, keep_polygons)
-
-            # Count filtered brunnels but keep them for visualization
-            if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
-                filtered_count += 1
-
-            brunnels.append(brunnel)
-        except (KeyError, ValueError) as e:
-            logger.warning(f"Failed to parse brunnel way: {e}")
-            continue
-
-    logger.info(f"Found {len(brunnels)} brunnels near route")
-
-    if enable_tag_filtering and filtered_count > 0:
-        logger.debug(
-            f"{filtered_count} brunnels filtered by cycling relevance tags (will show greyed out)"
-        )
-
-    # Check for containment within the route buffer and bearing alignment
-    find_contained_brunnels(route, brunnels, route_buffer_m, bearing_tolerance_degrees)
-
-    # Count contained vs total brunnels
-    bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
-    tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
-    contained_bridges = [b for b in bridges if b.contained_in_route]
-    contained_tunnels = [b for b in tunnels if b.contained_in_route]
-
-    logger.info(
-        f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
-    )
-
-    return brunnels

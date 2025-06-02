@@ -18,13 +18,10 @@ import os
 import gpxpy
 import gpxpy.gpx
 
-import gpx
 import visualization
-import overpass
+from route import Route, RouteValidationError
 from brunnel_way import BrunnelWay
 from compound_brunnel_way import CompoundBrunnelWay, create_compound_brunnels
-from geometry_utils import filter_overlapping_brunnels
-from distance_utils import calculate_cumulative_distances
 
 # Type alias for brunnel objects
 BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
@@ -209,14 +206,14 @@ def main():
 
     # Load and parse the GPX file into a route
     try:
-        route = gpx.load_gpx_route(args.filename)
+        route = Route.from_file(args.filename)
     except (FileNotFoundError, PermissionError) as e:
         logger.error(f"Failed to read file '{args.filename}': {e}")
         sys.exit(1)
     except gpxpy.gpx.GPXException as e:
         logger.error(f"Failed to parse GPX file: {e}")
         sys.exit(1)
-    except gpx.RouteValidationError as e:
+    except RouteValidationError as e:
         logger.error(f"Route validation failed: {e}")
         sys.exit(1)
 
@@ -224,8 +221,7 @@ def main():
 
     # Find bridges and tunnels near the route (containment detection included)
     try:
-        brunnels = overpass.find_route_brunnels(
-            route,
+        brunnels = route.find_brunnels(
             args.buffer,
             args.route_buffer,
             bearing_tolerance_degrees=args.bearing_tolerance,
@@ -247,8 +243,7 @@ def main():
     # Filter overlapping brunnels (keep only nearest in each overlapping group)
     if not args.no_overlap_filtering:
         try:
-            cumulative_distances = route.get_cumulative_distances()
-            filter_overlapping_brunnels(route, brunnels, cumulative_distances)
+            route.filter_overlapping_brunnels(brunnels)
         except Exception as e:
             logger.error(f"Failed to filter overlapping brunnels: {e}")
             sys.exit(1)
