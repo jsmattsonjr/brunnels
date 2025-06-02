@@ -208,6 +208,163 @@ class CompoundBrunnelWay(Geometry):
 
         return total_distance / valid_points
 
+    @classmethod
+    def detect_adjacent_groups(cls, brunnels: List[BrunnelWay]) -> List[List[int]]:
+        """
+        Detect groups of adjacent brunnels that can be combined into compound brunnels.
+
+        Args:
+            brunnels: List of all brunnels to analyze
+
+        Returns:
+            List of lists, where each inner list contains indices of adjacent brunnels
+            that should be combined (only groups with 2+ members are returned)
+        """
+        # Only consider contained brunnels with route spans
+        contained_indices = [
+            i
+            for i, b in enumerate(brunnels)
+            if b.contained_in_route
+            and b.route_span is not None
+            and b.filter_reason == FilterReason.NONE
+        ]
+
+        if len(contained_indices) < 2:
+            return []
+
+        # Sort by start distance along route
+        contained_indices.sort(key=lambda i: brunnels[i].route_span.start_distance_km)
+
+        # Group by brunnel type first
+        type_groups = {}
+        for idx in contained_indices:
+            brunnel_type = brunnels[idx].brunnel_type
+            if brunnel_type not in type_groups:
+                type_groups[brunnel_type] = []
+            type_groups[brunnel_type].append(idx)
+
+        adjacent_groups = []
+
+        # Check each type group for adjacent segments
+        for brunnel_type, indices in type_groups.items():
+            if len(indices) < 2:
+                continue
+
+            current_group = [indices[0]]
+
+            for i in range(1, len(indices)):
+                curr_idx = indices[i]
+                prev_idx = indices[i - 1]
+
+                curr_brunnel = brunnels[curr_idx]
+                prev_brunnel = brunnels[prev_idx]
+
+                # Check if they share a node using the new method
+                if prev_brunnel.shares_node_with(curr_brunnel):
+                    # Add to current group
+                    current_group.append(curr_idx)
+                else:
+                    # End current group and start new one
+                    if len(current_group) > 1:
+                        adjacent_groups.append(current_group)
+                    current_group = [curr_idx]
+
+            # Don't forget the last group
+            if len(current_group) > 1:
+                adjacent_groups.append(current_group)
+
+        return adjacent_groups
+
+    @classmethod
+    def create_from_brunnels(cls, brunnels: List[BrunnelWay]) -> List[BrunnelWay]:
+        """
+        Create compound brunnels from adjacent segments and return the modified list.
+
+        Args:
+            brunnels: List of all brunnels (original list is not modified)
+
+        Returns:
+            New list with compound brunnels replacing adjacent groups
+        """
+        # Find adjacent groups
+        adjacent_groups = cls.detect_adjacent_groups(brunnels)
+
+        if not adjacent_groups:
+            logger.debug("No adjacent brunnels found for compounding")
+            return brunnels[:]  # Return copy of original list
+
+        logger.debug(
+            f"Found {len(adjacent_groups)} groups of adjacent brunnels to compound"
+        )
+
+        # Create new list with compound brunnels
+        result = []
+        processed_indices = set()
+
+        # Add compound brunnels
+        compound_count = 0
+        for group_indices in adjacent_groups:
+            if len(group_indices) < 2:
+                continue
+
+            components = [brunnels[i] for i in group_indices]
+
+            # Create compound brunnel
+            try:
+                compound = cls(
+                    components=components,
+                    brunnel_type=components[0].brunnel_type,
+                    contained_in_route=True,  # All components are contained
+                    filter_reason=FilterReason.NONE,
+                )
+
+                # Calculate combined route span
+                start_km = min(
+                    comp.route_span.start_distance_km
+                    for comp in components
+                    if comp.route_span
+                )
+                end_km = max(
+                    comp.route_span.end_distance_km
+                    for comp in components
+                    if comp.route_span
+                )
+                compound.route_span = RouteSpan(start_km, end_km, end_km - start_km)
+
+                result.append(compound)
+                processed_indices.update(group_indices)
+                compound_count += 1
+
+                # Log the compound creation
+                component_ids = [
+                    comp.metadata.get("id", "unknown") for comp in components
+                ]
+                logger.debug(
+                    f"Created compound {components[0].brunnel_type.value}: {';'.join(map(str, component_ids))}"
+                )
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to create compound brunnel from group {group_indices}: {e}"
+                )
+                # Fall back to individual brunnels
+                for idx in group_indices:
+                    if idx not in processed_indices:
+                        result.append(brunnels[idx])
+                        processed_indices.add(idx)
+
+        # Add remaining individual brunnels
+        for i, brunnel in enumerate(brunnels):
+            if i not in processed_indices:
+                result.append(brunnel)
+
+        if compound_count > 0:
+            logger.info(
+                f"Created {compound_count} compound brunnels from {len(adjacent_groups)} groups"
+            )
+
+        return result
+
     def __len__(self) -> int:
         """Return the number of components in this compound brunnel."""
         return len(self.components)
@@ -295,9 +452,10 @@ class CompoundBrunnelWay(Geometry):
         return "".join(html_parts)
 
 
+# Backwards compatibility functions with deprecation warnings
 def detect_adjacent_brunnels(brunnels: List[BrunnelWay]) -> List[List[int]]:
     """
-    Detect groups of adjacent brunnels that can be combined into compound brunnels.
+    Backwards compatibility wrapper for CompoundBrunnelWay.detect_adjacent_groups().
 
     Args:
         brunnels: List of all brunnels to analyze
@@ -306,65 +464,15 @@ def detect_adjacent_brunnels(brunnels: List[BrunnelWay]) -> List[List[int]]:
         List of lists, where each inner list contains indices of adjacent brunnels
         that should be combined (only groups with 2+ members are returned)
     """
-    # Only consider contained brunnels with route spans
-    contained_indices = [
-        i
-        for i, b in enumerate(brunnels)
-        if b.contained_in_route
-        and b.route_span is not None
-        and b.filter_reason == FilterReason.NONE
-    ]
-
-    if len(contained_indices) < 2:
-        return []
-
-    # Sort by start distance along route
-    contained_indices.sort(key=lambda i: brunnels[i].route_span.start_distance_km)
-
-    # Group by brunnel type first
-    type_groups = {}
-    for idx in contained_indices:
-        brunnel_type = brunnels[idx].brunnel_type
-        if brunnel_type not in type_groups:
-            type_groups[brunnel_type] = []
-        type_groups[brunnel_type].append(idx)
-
-    adjacent_groups = []
-
-    # Check each type group for adjacent segments
-    for brunnel_type, indices in type_groups.items():
-        if len(indices) < 2:
-            continue
-
-        current_group = [indices[0]]
-
-        for i in range(1, len(indices)):
-            curr_idx = indices[i]
-            prev_idx = indices[i - 1]
-
-            curr_brunnel = brunnels[curr_idx]
-            prev_brunnel = brunnels[prev_idx]
-
-            # Check if they share a node using the new method
-            if prev_brunnel.shares_node_with(curr_brunnel):
-                # Add to current group
-                current_group.append(curr_idx)
-            else:
-                # End current group and start new one
-                if len(current_group) > 1:
-                    adjacent_groups.append(current_group)
-                current_group = [curr_idx]
-
-        # Don't forget the last group
-        if len(current_group) > 1:
-            adjacent_groups.append(current_group)
-
-    return adjacent_groups
+    logger.warning(
+        "detect_adjacent_brunnels() is deprecated. Use CompoundBrunnelWay.detect_adjacent_groups() instead."
+    )
+    return CompoundBrunnelWay.detect_adjacent_groups(brunnels)
 
 
 def create_compound_brunnels(brunnels: List[BrunnelWay]) -> List[BrunnelWay]:
     """
-    Create compound brunnels from adjacent segments and return the modified list.
+    Backwards compatibility wrapper for CompoundBrunnelWay.create_from_brunnels().
 
     Args:
         brunnels: List of all brunnels (original list is not modified)
@@ -372,85 +480,12 @@ def create_compound_brunnels(brunnels: List[BrunnelWay]) -> List[BrunnelWay]:
     Returns:
         New list with compound brunnels replacing adjacent groups
     """
-    # Find adjacent groups
-    adjacent_groups = detect_adjacent_brunnels(brunnels)
-
-    if not adjacent_groups:
-        logger.debug("No adjacent brunnels found for compounding")
-        return brunnels[:]  # Return copy of original list
-
-    logger.debug(
-        f"Found {len(adjacent_groups)} groups of adjacent brunnels to compound"
+    logger.warning(
+        "create_compound_brunnels() is deprecated. Use CompoundBrunnelWay.create_from_brunnels() instead."
     )
-
-    # Create new list with compound brunnels
-    result = []
-    processed_indices = set()
-
-    # Add compound brunnels
-    compound_count = 0
-    for group_indices in adjacent_groups:
-        if len(group_indices) < 2:
-            continue
-
-        components = [brunnels[i] for i in group_indices]
-
-        # Create compound brunnel
-        try:
-            compound = CompoundBrunnelWay(
-                components=components,
-                brunnel_type=components[0].brunnel_type,
-                contained_in_route=True,  # All components are contained
-                filter_reason=FilterReason.NONE,
-            )
-
-            # Calculate combined route span
-            start_km = min(
-                comp.route_span.start_distance_km
-                for comp in components
-                if comp.route_span
-            )
-            end_km = max(
-                comp.route_span.end_distance_km
-                for comp in components
-                if comp.route_span
-            )
-            compound.route_span = RouteSpan(start_km, end_km, end_km - start_km)
-
-            result.append(compound)
-            processed_indices.update(group_indices)
-            compound_count += 1
-
-            # Log the compound creation
-            component_ids = [comp.metadata.get("id", "unknown") for comp in components]
-            logger.debug(
-                f"Created compound {components[0].brunnel_type.value}: {';'.join(map(str, component_ids))}"
-            )
-
-        except Exception as e:
-            logger.warning(
-                f"Failed to create compound brunnel from group {group_indices}: {e}"
-            )
-            # Fall back to individual brunnels
-            for idx in group_indices:
-                if idx not in processed_indices:
-                    result.append(brunnels[idx])
-                    processed_indices.add(idx)
-
-    # Add remaining individual brunnels
-    for i, brunnel in enumerate(brunnels):
-        if i not in processed_indices:
-            result.append(brunnel)
-
-    if compound_count > 0:
-        logger.info(
-            f"Created {compound_count} compound brunnels from {len(adjacent_groups)} groups"
-        )
-
-    return result
+    return CompoundBrunnelWay.create_from_brunnels(brunnels)
 
 
-# Backwards compatibility function with deprecation warning
 def _brunnels_share_node(brunnel1: BrunnelWay, brunnel2: BrunnelWay) -> bool:
     """
     Backwards compatibility wrapper for BrunnelWay.shares_node_with().

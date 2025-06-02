@@ -21,7 +21,7 @@ import gpxpy.gpx
 import visualization
 from route import Route, RouteValidationError
 from brunnel_way import BrunnelWay
-from compound_brunnel_way import CompoundBrunnelWay, create_compound_brunnels
+from compound_brunnel_way import CompoundBrunnelWay
 
 # Type alias for brunnel objects
 BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
@@ -235,7 +235,7 @@ def main():
     # Create compound brunnels from adjacent segments
     if not args.no_compound_brunnels:
         try:
-            brunnels = create_compound_brunnels(brunnels)
+            brunnels = CompoundBrunnelWay.create_from_brunnels(brunnels)
         except Exception as e:
             logger.error(f"Failed to create compound brunnels: {e}")
             sys.exit(1)
