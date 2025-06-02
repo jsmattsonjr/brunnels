@@ -310,9 +310,7 @@ class Route(Geometry):
             # Calculate average distance to route for each brunnel in the group
             brunnel_distances = []
             for brunnel in group:
-                avg_distance = brunnel.average_distance_to_route(
-                    self, cumulative_distances
-                )
+                avg_distance = self.average_distance_to_polyline(brunnel)
                 brunnel_distances.append((brunnel, avg_distance))
 
                 # Get brunnel identifier for logging
@@ -461,6 +459,48 @@ class Route(Geometry):
         )
 
         return brunnels
+
+    def average_distance_to_polyline(self, geometry: Geometry) -> float:
+        """
+        Calculate the average distance from all points in a geometry to the closest points on this route.
+
+        Args:
+            geometry: Any Geometry object (BrunnelWay, CompoundBrunnelWay, etc.)
+
+        Returns:
+            Average distance in kilometers, or float('inf') if calculation fails
+        """
+        geometry_coords = geometry.coordinate_list
+
+        if not geometry_coords or not self.positions:
+            return float("inf")
+
+        # Import here to avoid circular imports
+        from distance_utils import find_closest_point_on_route, haversine_distance
+
+        # Use cached cumulative distances
+        cumulative_distances = self.get_cumulative_distances()
+
+        total_distance = 0.0
+        valid_points = 0
+
+        for geometry_point in geometry_coords:
+            try:
+                _, closest_route_point = find_closest_point_on_route(
+                    geometry_point, self.positions, cumulative_distances
+                )
+                # Calculate direct distance between geometry point and closest route point
+                distance = haversine_distance(geometry_point, closest_route_point)
+                total_distance += distance
+                valid_points += 1
+            except Exception as e:
+                logger.warning(f"Failed to calculate distance for geometry point: {e}")
+                continue
+
+        if valid_points == 0:
+            return float("inf")
+
+        return total_distance / valid_points
 
     @classmethod
     def from_gpx(cls, file_input: TextIO) -> "Route":

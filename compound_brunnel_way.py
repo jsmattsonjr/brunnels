@@ -166,48 +166,6 @@ class CompoundBrunnelWay(Geometry):
                 return name
         return "unnamed"
 
-    def average_distance_to_route(
-        self, route, cumulative_distances: List[float]
-    ) -> float:
-        """
-        Calculate the average distance from all points in this compound brunnel to the route.
-
-        Args:
-            route: Route object representing the route
-            cumulative_distances: Pre-calculated cumulative distances along route
-
-        Returns:
-            Average distance in kilometers, or float('inf') if calculation fails
-        """
-        brunnel_coords = self.coordinate_list
-
-        if not brunnel_coords or not route.positions:
-            return float("inf")
-
-        # Import here to avoid circular imports
-        from distance_utils import find_closest_point_on_route, haversine_distance
-
-        total_distance = 0.0
-        valid_points = 0
-
-        for brunnel_point in brunnel_coords:
-            try:
-                _, closest_route_point = find_closest_point_on_route(
-                    brunnel_point, route.positions, cumulative_distances
-                )
-                # Calculate direct distance between brunnel point and closest route point
-                distance = haversine_distance(brunnel_point, closest_route_point)
-                total_distance += distance
-                valid_points += 1
-            except Exception as e:
-                logger.warning(f"Failed to calculate distance for brunnel point: {e}")
-                continue
-
-        if valid_points == 0:
-            return float("inf")
-
-        return total_distance / valid_points
-
     @classmethod
     def detect_adjacent_groups(cls, brunnels: List[BrunnelWay]) -> List[List[int]]:
         """

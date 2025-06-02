@@ -291,46 +291,6 @@ class BrunnelWay(Geometry):
 
         return aligned
 
-    def average_distance_to_route(
-        self, route, cumulative_distances: List[float]
-    ) -> float:
-        """
-        Calculate the average distance from all points in this brunnel to the route.
-
-        Args:
-            route: Route object representing the route
-            cumulative_distances: Pre-calculated cumulative distances along route
-
-        Returns:
-            Average distance in kilometers, or float('inf') if calculation fails
-        """
-        if not self.coords or not route.positions:
-            return float("inf")
-
-        # Import here to avoid circular imports
-        from distance_utils import find_closest_point_on_route, haversine_distance
-
-        total_distance = 0.0
-        valid_points = 0
-
-        for brunnel_point in self.coords:
-            try:
-                _, closest_route_point = find_closest_point_on_route(
-                    brunnel_point, route.positions, cumulative_distances
-                )
-                # Calculate direct distance between brunnel point and closest route point
-                distance = haversine_distance(brunnel_point, closest_route_point)
-                total_distance += distance
-                valid_points += 1
-            except Exception as e:
-                logger.warning(f"Failed to calculate distance for brunnel point: {e}")
-                continue
-
-        if valid_points == 0:
-            return float("inf")
-
-        return total_distance / valid_points
-
     def shares_node_with(self, other: "BrunnelWay") -> bool:
         """
         Check if this brunnel shares a node with another brunnel.
