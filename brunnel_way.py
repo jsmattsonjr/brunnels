@@ -9,6 +9,12 @@ from enum import Enum
 import logging
 
 from geometry import Position, Geometry
+from distance_utils import (
+    find_closest_point_on_route,
+    find_closest_segments,
+    calculate_bearing,
+    bearings_aligned,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -191,9 +197,6 @@ class BrunnelWay(Geometry):
         if not self.coords:
             return RouteSpan(0.0, 0.0, 0.0)
 
-        # Import here to avoid circular imports
-        from distance_utils import find_closest_point_on_route
-
         min_distance = float("inf")
         max_distance = -float("inf")
 
@@ -253,13 +256,6 @@ class BrunnelWay(Geometry):
         if not route.positions or len(route.positions) < 2:
             logger.debug("Route has insufficient coordinates for bearing calculation")
             return False
-
-        # Import here to avoid circular imports
-        from distance_utils import (
-            find_closest_segments,
-            calculate_bearing,
-            bearings_aligned,
-        )
 
         # Find closest segments between brunnel and route
         brunnel_segment, route_segment = find_closest_segments(

@@ -3,7 +3,7 @@
 Route data model for brunnel analysis.
 """
 
-from typing import Optional, Tuple, List, TextIO, Union
+from typing import Optional, Tuple, List, TextIO, Union, Sequence
 from dataclasses import dataclass, field
 import sys
 import logging
@@ -12,6 +12,14 @@ import gpxpy
 import gpxpy.gpx
 
 from geometry import Position, Geometry
+from distance_utils import (
+    calculate_cumulative_distances,
+    find_closest_point_on_route,
+    haversine_distance,
+)
+from brunnel_way import BrunnelWay, BrunnelType, FilterReason
+from compound_brunnel_way import CompoundBrunnelWay
+from geometry_utils import route_spans_overlap
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +28,22 @@ class RouteValidationError(Exception):
     """Raised when route fails validation checks."""
 
     pass
+
+
+def _get_brunnel_id(brunnel: Union[BrunnelWay, CompoundBrunnelWay]) -> str:
+    """
+    Helper function to get a brunnel's ID for logging purposes.
+
+    Args:
+        brunnel: BrunnelWay or CompoundBrunnelWay object
+
+    Returns:
+        String identifier for the brunnel
+    """
+    if isinstance(brunnel, CompoundBrunnelWay):
+        return brunnel.get_combined_metadata()["id"]
+    else:
+        return brunnel.metadata.get("id", "unknown")
 
 
 @dataclass
@@ -105,16 +129,13 @@ class Route(Geometry):
             List of cumulative distances in kilometers, with same length as positions
         """
         if self._cumulative_distances is None:
-            # Import here to avoid circular imports
-            from distance_utils import calculate_cumulative_distances
-
             self._cumulative_distances = calculate_cumulative_distances(self.positions)
 
         return self._cumulative_distances
 
     def find_contained_brunnels(
         self,
-        brunnels: List,  # List[BrunnelWay] - using generic to avoid import
+        brunnels: List[Union[BrunnelWay, CompoundBrunnelWay]],
         route_buffer_m: float,
         bearing_tolerance_degrees: float,
     ) -> None:
@@ -123,7 +144,7 @@ class Route(Geometry):
         Updates their containment status and calculates route spans for contained brunnels.
 
         Args:
-            brunnels: List of BrunnelWay objects to check (modified in-place)
+            brunnels: List of BrunnelWay/CompoundBrunnelWay objects to check (modified in-place)
             route_buffer_m: Buffer distance in meters to apply around the route (minimum: 1.0)
             bearing_tolerance_degrees: Bearing alignment tolerance in degrees
         """
@@ -137,9 +158,6 @@ class Route(Geometry):
                 f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer_m}m"
             )
             route_buffer_m = 1.0
-
-        # Import here to avoid circular imports
-        from brunnel_way import FilterReason
 
         # Pre-calculate cumulative distances for route span calculations
         logger.debug("Pre-calculating route distances...")
@@ -198,7 +216,7 @@ class Route(Geometry):
                             contained_count += 1
                         except Exception as e:
                             logger.warning(
-                                f"Failed to calculate route span for brunnel {brunnel.metadata.get('id', 'unknown')}: {e}"
+                                f"Failed to calculate route span for brunnel {_get_brunnel_id(brunnel)}: {e}"
                             )
                             logger.warning(f"Evicting brunnel from contained set")
                             brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
@@ -229,7 +247,7 @@ class Route(Geometry):
 
     def filter_overlapping_brunnels(
         self,
-        brunnels: List,  # List[BrunnelLike] - using generic to avoid import
+        brunnels: Sequence[Union[BrunnelWay, CompoundBrunnelWay]],
         cumulative_distances: Optional[List[float]] = None,
     ) -> None:
         """
@@ -242,10 +260,6 @@ class Route(Geometry):
         """
         if not self.positions or not brunnels:
             return
-
-        # Import here to avoid circular imports
-        from brunnel_way import FilterReason
-        from geometry_utils import route_spans_overlap
 
         # Use provided cumulative distances or calculate them
         if cumulative_distances is None:
@@ -312,18 +326,7 @@ class Route(Geometry):
             for brunnel in group:
                 avg_distance = self.average_distance_to_polyline(brunnel)
                 brunnel_distances.append((brunnel, avg_distance))
-
-                # Get brunnel identifier for logging
-                try:
-                    from compound_brunnel_way import CompoundBrunnelWay
-
-                    if isinstance(brunnel, CompoundBrunnelWay):
-                        brunnel_id = brunnel.get_combined_metadata()["id"]
-                    else:
-                        brunnel_id = brunnel.metadata.get("id", "unknown")
-                except ImportError:
-                    brunnel_id = brunnel.metadata.get("id", "unknown")
-
+                brunnel_id = _get_brunnel_id(brunnel)
                 logger.debug(
                     f"  Brunnel {brunnel_id}: avg distance = {avg_distance:.3f}km"
                 )
@@ -333,17 +336,7 @@ class Route(Geometry):
 
             # Keep the closest, filter the rest
             closest_brunnel, closest_distance = brunnel_distances[0]
-
-            # Get closest brunnel identifier for logging
-            try:
-                from compound_brunnel_way import CompoundBrunnelWay
-
-                if isinstance(closest_brunnel, CompoundBrunnelWay):
-                    closest_id = closest_brunnel.get_combined_metadata()["id"]
-                else:
-                    closest_id = closest_brunnel.metadata.get("id", "unknown")
-            except ImportError:
-                closest_id = closest_brunnel.metadata.get("id", "unknown")
+            closest_id = _get_brunnel_id(closest_brunnel)
 
             logger.debug(
                 f"  Keeping closest: {closest_id} (distance: {closest_distance:.3f}km)"
@@ -354,17 +347,7 @@ class Route(Geometry):
                 brunnel.contained_in_route = False
                 total_filtered += 1
 
-                # Get filtered brunnel identifier for logging
-                try:
-                    from compound_brunnel_way import CompoundBrunnelWay
-
-                    if isinstance(brunnel, CompoundBrunnelWay):
-                        brunnel_id = brunnel.get_combined_metadata()["id"]
-                    else:
-                        brunnel_id = brunnel.metadata.get("id", "unknown")
-                except ImportError:
-                    brunnel_id = brunnel.metadata.get("id", "unknown")
-
+                brunnel_id = _get_brunnel_id(brunnel)
                 logger.debug(
                     f"  Filtered: {brunnel_id} (distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
                 )
@@ -381,7 +364,7 @@ class Route(Geometry):
         bearing_tolerance_degrees: float,
         enable_tag_filtering: bool,
         keep_polygons: bool,
-    ) -> List:  # List[BrunnelWay] - using generic to avoid import
+    ) -> List[BrunnelWay]:
         """
         Find all bridges and tunnels near this route and check for containment within route buffer.
 
@@ -399,9 +382,7 @@ class Route(Geometry):
             logger.warning("Cannot find brunnels for empty route")
             return []
 
-        # Import here to avoid circular imports
         from overpass import query_overpass_brunnels
-        from brunnel_way import BrunnelWay, BrunnelType, FilterReason
         import math
 
         bbox = self.get_bbox(buffer_km)
@@ -474,9 +455,6 @@ class Route(Geometry):
 
         if not geometry_coords or not self.positions:
             return float("inf")
-
-        # Import here to avoid circular imports
-        from distance_utils import find_closest_point_on_route, haversine_distance
 
         # Use cached cumulative distances
         cumulative_distances = self.get_cumulative_distances()
