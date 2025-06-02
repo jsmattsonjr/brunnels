@@ -95,7 +95,7 @@ class Route:
         """
         if self._linestring is None:
             # Import here to avoid circular imports
-            from geometry import positions_to_linestring
+            from geometry_utils import positions_to_linestring
 
             self._linestring = positions_to_linestring(self.positions)
         return self._linestring
@@ -171,7 +171,7 @@ class BrunnelWay:
         """
         if self._linestring is None:
             # Import here to avoid circular imports
-            from geometry import positions_to_linestring
+            from geometry_utils import positions_to_linestring
 
             self._linestring = positions_to_linestring(self.coords)
         return self._linestring

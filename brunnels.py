@@ -22,7 +22,7 @@ import gpx
 import visualization
 import overpass
 from merge import merge_adjacent_brunnels
-from geometry import filter_overlapping_brunnels
+from geometry_utils import filter_overlapping_brunnels
 from distance_utils import calculate_cumulative_distances
 
 # Configure logging
