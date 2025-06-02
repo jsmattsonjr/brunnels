@@ -179,7 +179,7 @@ def find_contained_brunnels(
 
     # Pre-calculate cumulative distances for route span calculations
     logger.debug("Pre-calculating route distances...")
-    cumulative_distances = calculate_cumulative_distances(route.positions)
+    cumulative_distances = route.get_cumulative_distances()
     total_route_distance = cumulative_distances[-1] if cumulative_distances else 0.0
     logger.info(f"Total route distance: {total_route_distance:.2f} km")
 

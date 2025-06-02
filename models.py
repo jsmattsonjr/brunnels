@@ -30,6 +30,9 @@ class Route:
         default=None, init=False, repr=False
     )
     _bbox_buffer_km: Optional[float] = field(default=None, init=False, repr=False)
+    _cumulative_distances: Optional[List[float]] = field(
+        default=None, init=False, repr=False
+    )
 
     def get_bbox(self, buffer_km: float = 1.0) -> Tuple[float, float, float, float]:
         """
@@ -55,6 +58,21 @@ class Route:
             self._bbox_buffer_km = buffer_km
 
         return self._bbox
+
+    def get_cumulative_distances(self) -> List[float]:
+        """
+        Get memoized cumulative distances along the route.
+
+        Returns:
+            List of cumulative distances in kilometers, with same length as positions
+        """
+        if self._cumulative_distances is None:
+            # Import here to avoid circular imports
+            from distance_utils import calculate_cumulative_distances
+
+            self._cumulative_distances = calculate_cumulative_distances(self.positions)
+
+        return self._cumulative_distances
 
     def __len__(self) -> int:
         """Return number of positions in route."""

@@ -178,7 +178,7 @@ def main():
     # Filter overlapping brunnels (keep only nearest in each overlapping group)
     if not args.no_overlap_filtering:
         try:
-            cumulative_distances = calculate_cumulative_distances(route.positions)
+            cumulative_distances = route.get_cumulative_distances()
             filter_overlapping_brunnels(route, brunnels, cumulative_distances)
         except Exception as e:
             logger.error(f"Failed to filter overlapping brunnels: {e}")
