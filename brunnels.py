@@ -170,7 +170,7 @@ def log_final_included_brunnels(brunnels: Sequence[BrunnelLike]) -> None:
         brunnel_type = brunnel.brunnel_type.value.capitalize()
 
         if isinstance(brunnel, CompoundBrunnelWay):
-            # Compound brunnel
+            # Compound brunnel - use its specialized methods
             primary_name = brunnel.get_primary_name()
             combined_metadata = brunnel.get_combined_metadata()
             osm_id = combined_metadata["id"]
@@ -185,7 +185,7 @@ def log_final_included_brunnels(brunnels: Sequence[BrunnelLike]) -> None:
                 f"  Compound {brunnel_type}: {primary_name} ({osm_id}) {span_data} [{component_count} segments]"
             )
         else:
-            # Regular brunnel
+            # Regular brunnel - use standard metadata access
             name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
             osm_id = brunnel.metadata.get("id", "unknown")
 

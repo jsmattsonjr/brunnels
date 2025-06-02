@@ -43,6 +43,15 @@ class Geometry(ABC):
             self._linestring = self._positions_to_linestring(self.coordinate_list)
         return self._linestring
 
+    def get_visualization_coordinates(self) -> List[List[float]]:
+        """
+        Get coordinates formatted for visualization (folium maps).
+
+        Returns:
+            List of [latitude, longitude] pairs
+        """
+        return [[pos.latitude, pos.longitude] for pos in self.coordinate_list]
+
     @staticmethod
     def _positions_to_linestring(positions: List[Position]) -> Optional[LineString]:
         """

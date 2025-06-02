@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Updated geometry_utils.py functions to handle compound brunnels.
-This shows the updated functions that need to be added/modified in geometry_utils.py
+Simplified geometry_utils.py functions with better polymorphism.
 """
 
 from typing import List, Optional, Union
@@ -9,17 +8,12 @@ import logging
 from shapely.geometry import LineString
 from geometry import Position, Geometry
 from brunnel_way import BrunnelWay, FilterReason, RouteSpan
+from compound_brunnel_way import CompoundBrunnelWay
 
 logger = logging.getLogger(__name__)
 
-# Import compound brunnel way with fallback for backwards compatibility
-try:
-    from compound_brunnel_way import CompoundBrunnelWay
-
-    BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
-except ImportError:
-    CompoundBrunnelWay = None
-    BrunnelLike = BrunnelWay
+# Clean type alias without fallback
+BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
 
 
 def positions_to_linestring(positions: List[Position]) -> Optional[LineString]:

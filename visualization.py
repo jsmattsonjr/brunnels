@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Route visualization using folium maps with support for compound brunnels.
+Route visualization using folium maps with polymorphic brunnel handling.
 """
 
 from typing import List, Dict, Any, Union, Sequence
@@ -14,44 +14,6 @@ logger = logging.getLogger(__name__)
 
 # Type alias for brunnel objects
 BrunnelLike = Union[BrunnelWay, CompoundBrunnelWay]
-
-
-def _get_brunnel_coordinates(brunnel: BrunnelLike) -> List[List[float]]:
-    """
-    Get coordinates from a brunnel (regular or compound).
-
-    Args:
-        brunnel: BrunnelWay or CompoundBrunnelWay object
-
-    Returns:
-        List of [latitude, longitude] pairs
-    """
-    if isinstance(brunnel, CompoundBrunnelWay):
-        coords = brunnel.coordinate_list
-    else:
-        coords = brunnel.coords
-
-    return [[pos.latitude, pos.longitude] for pos in coords]
-
-
-def _get_brunnel_type(brunnel: BrunnelLike) -> BrunnelType:
-    """Get the brunnel type from a brunnel object."""
-    return brunnel.brunnel_type
-
-
-def _is_brunnel_contained(brunnel: BrunnelLike) -> bool:
-    """Check if a brunnel is contained in the route."""
-    return brunnel.contained_in_route
-
-
-def _get_brunnel_filter_reason(brunnel: BrunnelLike) -> FilterReason:
-    """Get the filter reason from a brunnel object."""
-    return brunnel.filter_reason
-
-
-def _get_brunnel_route_span(brunnel: BrunnelLike):
-    """Get the route span from a brunnel object."""
-    return brunnel.route_span
 
 
 def create_route_map(
@@ -86,8 +48,8 @@ def create_route_map(
     # Create map with initial center (zoom will be set by fit_bounds)
     route_map = folium.Map(location=[center_lat, center_lon], tiles="CartoDB positron")
 
-    # Convert route to coordinate pairs for folium
-    coordinates = [[pos.latitude, pos.longitude] for pos in route]
+    # Convert route to coordinate pairs for folium using the new method
+    coordinates = route.get_visualization_coordinates()
 
     # Add route as polyline
     folium.PolyLine(
@@ -114,14 +76,15 @@ def create_route_map(
     contained_tunnel_count = 0
 
     for brunnel in brunnels:
-        brunnel_coords = _get_brunnel_coordinates(brunnel)
+        # Use polymorphic interface - all brunnels have these properties
+        brunnel_coords = brunnel.get_visualization_coordinates()
         if not brunnel_coords:
             continue
 
-        brunnel_type = _get_brunnel_type(brunnel)
-        contained = _is_brunnel_contained(brunnel)
-        filter_reason = _get_brunnel_filter_reason(brunnel)
-        route_span = _get_brunnel_route_span(brunnel)
+        brunnel_type = brunnel.brunnel_type
+        contained = brunnel.contained_in_route
+        filter_reason = brunnel.filter_reason
+        route_span = brunnel.route_span
 
         # Determine color and opacity based on containment status and filtering
         if contained:
@@ -164,10 +127,8 @@ def create_route_map(
 
         popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
 
-        # Format metadata using brunnel's to_html() method
+        # Use polymorphic to_html() method - both classes implement this
         metadata_html = brunnel.to_html()
-        popup_text = popup_header + metadata_html
-
         popup_text = popup_header + metadata_html
 
         # Style and add brunnel based on type
