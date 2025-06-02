@@ -22,7 +22,8 @@ import gpx
 import visualization
 import overpass
 from merge import merge_adjacent_brunnels
-from models import BrunnelType, FilterReason
+from geometry import filter_overlapping_brunnels
+from distance_utils import calculate_cumulative_distances
 
 # Configure logging
 logger = logging.getLogger("brunnels")
@@ -89,6 +90,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--keep-polygons",
         action="store_true",
         help="Keep closed ways (polygons) where first node equals last node",
+    )
+    parser.add_argument(
+        "--no-overlap-filtering",
+        action="store_true",
+        help="Disable filtering of overlapping brunnels (keep all overlapping brunnels)",
     )
     return parser
 
@@ -168,6 +174,15 @@ def main():
     except Exception as e:
         logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
+
+    # Filter overlapping brunnels (keep only nearest in each overlapping group)
+    if not args.no_overlap_filtering:
+        try:
+            cumulative_distances = calculate_cumulative_distances(route.positions)
+            filter_overlapping_brunnels(route, brunnels, cumulative_distances)
+        except Exception as e:
+            logger.error(f"Failed to filter overlapping brunnels: {e}")
+            sys.exit(1)
 
     # Check for node sharing and merge adjacent brunnels of the same type
     merge_adjacent_brunnels(brunnels)

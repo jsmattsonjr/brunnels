@@ -71,6 +71,7 @@ python brunnels.py route.gpx \
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
 - `--no-tag-filtering`: Disable filtering based on cycling relevance
+- `--no-overlap-filtering`: Disable filtering of overlapping brunnels (keep all overlapping brunnels)
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `--no-open`: Don't automatically open the map in browser
 
@@ -106,7 +107,7 @@ The tool applies smart filtering for cycling routes:
 - **Keeps**: Bridges/tunnels with bicycle access allowed or `highway=cycleway`
 - **Filters out**: Infrastructure marked `bicycle=no`, pure waterways, active railways
 - **Bearing alignment**: Filters out brunnels whose direction doesn't align with your route (±20° tolerance by default)
-- **Grays out**: Non-contained or filtered brunnels for context
+- **Greys out**: Non-contained or filtered brunnels for context
 
 ### Bearing Alignment
 
@@ -118,6 +119,16 @@ The tool checks if bridges and tunnels are aligned with your route direction by:
 4. Filtering out perpendicular or oddly-angled infrastructure that you don't actually cross
 
 This prevents including nearby infrastructure that intersects your route buffer but runs perpendicular to your actual path.
+
+### Overlap Filtering
+
+The tool automatically filters overlapping brunnels to reduce visual clutter when multiple parallel bridges or tunnels span similar portions of your route. When brunnels have overlapping route spans:
+
+Distance calculation: The tool calculates the average distance from each brunnel to your route
+Nearest selection: Only the closest brunnel in each overlapping group is kept
+Filtered display: Non-nearest brunnels are shown in muted colors with "filtered: not nearest among overlapping brunnels" status
+
+This feature can be disabled with `--no-overlap-filtering` if you want to see all detected infrastructure.
 
 ### Merging
 

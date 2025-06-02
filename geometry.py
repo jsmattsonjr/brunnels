@@ -261,3 +261,168 @@ def find_contained_brunnels(
 
     if unaligned_count > 0:
         logger.debug(f"Filtered {unaligned_count} brunnels due to bearing misalignment")
+
+
+def route_spans_overlap(span1: RouteSpan, span2: RouteSpan) -> bool:
+    """
+    Check if two route spans overlap.
+
+    Args:
+        span1: First route span
+        span2: Second route span
+
+    Returns:
+        True if the spans overlap, False otherwise
+    """
+    return (
+        span1.start_distance_km <= span2.end_distance_km
+        and span2.start_distance_km <= span1.end_distance_km
+    )
+
+
+def calculate_brunnel_average_distance_to_route(
+    brunnel: BrunnelWay, route: Route, cumulative_distances: List[float]
+) -> float:
+    """
+    Calculate the average distance from all points in a brunnel to the route.
+
+    Args:
+        brunnel: BrunnelWay object to calculate distance for
+        route: Route object representing the route
+        cumulative_distances: Pre-calculated cumulative distances along route
+
+    Returns:
+        Average distance in kilometers, or float('inf') if calculation fails
+    """
+    if not brunnel.coords or not route.positions:
+        return float("inf")
+
+    total_distance = 0.0
+    valid_points = 0
+
+    for brunnel_point in brunnel.coords:
+        try:
+            _, closest_route_point = find_closest_point_on_route(
+                brunnel_point, route.positions, cumulative_distances
+            )
+            # Calculate direct distance between brunnel point and closest route point
+            from distance_utils import haversine_distance
+
+            distance = haversine_distance(brunnel_point, closest_route_point)
+            total_distance += distance
+            valid_points += 1
+        except Exception as e:
+            logger.warning(f"Failed to calculate distance for brunnel point: {e}")
+            continue
+
+    if valid_points == 0:
+        return float("inf")
+
+    return total_distance / valid_points
+
+
+def filter_overlapping_brunnels(
+    route: Route, brunnels: List[BrunnelWay], cumulative_distances: List[float]
+) -> None:
+    """
+    Filter overlapping brunnels, keeping only the nearest one for each overlapping group.
+
+    Args:
+        route: Route object representing the route
+        brunnels: List of BrunnelWay objects to filter (modified in-place)
+        cumulative_distances: Pre-calculated cumulative distances along route
+    """
+    if not route or not brunnels:
+        return
+
+    # Only consider contained brunnels with route spans
+    contained_brunnels = [
+        b
+        for b in brunnels
+        if b.contained_in_route
+        and b.route_span is not None
+        and b.filter_reason == FilterReason.NONE
+    ]
+
+    if len(contained_brunnels) < 2:
+        return  # Nothing to filter
+
+    # Find groups of overlapping brunnels
+    overlap_groups = []
+    processed = set()
+
+    for i, brunnel1 in enumerate(contained_brunnels):
+        if i in processed:
+            continue
+
+        # Start a new group with this brunnel
+        current_group = [brunnel1]
+        processed.add(i)
+
+        # Find all brunnels that overlap with any brunnel in the current group
+        # Keep expanding the group until no more overlaps are found
+        changed = True
+        while changed:
+            changed = False
+            for j, brunnel2 in enumerate(contained_brunnels):
+                if j in processed:
+                    continue
+
+                # Check if brunnel2 overlaps with any brunnel in current group
+                for brunnel_in_group in current_group:
+                    if route_spans_overlap(
+                        brunnel_in_group.route_span,  # type: ignore[arg-type]
+                        brunnel2.route_span,  # type: ignore[arg-type]
+                    ):
+                        current_group.append(brunnel2)
+                        processed.add(j)
+                        changed = True
+                        break
+
+        # Only add groups with more than one brunnel
+        if len(current_group) > 1:
+            overlap_groups.append(current_group)
+
+    if not overlap_groups:
+        logger.debug("No overlapping brunnels found")
+        return
+
+    # Filter each overlap group, keeping only the nearest
+    total_filtered = 0
+    for group in overlap_groups:
+        logger.debug(f"Processing overlap group with {len(group)} brunnels")
+
+        # Calculate average distance to route for each brunnel in the group
+        brunnel_distances = []
+        for brunnel in group:
+            avg_distance = calculate_brunnel_average_distance_to_route(
+                brunnel, route, cumulative_distances
+            )
+            brunnel_distances.append((brunnel, avg_distance))
+            logger.debug(
+                f"  Brunnel {brunnel.metadata.get('id', 'unknown')}: avg distance = {avg_distance:.3f}km"
+            )
+
+        # Sort by distance (closest first)
+        brunnel_distances.sort(key=lambda x: x[1])
+
+        # Keep the closest, filter the rest
+        closest_brunnel, closest_distance = brunnel_distances[0]
+        logger.debug(
+            f"  Keeping closest: {closest_brunnel.metadata.get('id', 'unknown')} "
+            f"(distance: {closest_distance:.3f}km)"
+        )
+
+        for brunnel, distance in brunnel_distances[1:]:
+            brunnel.filter_reason = FilterReason.NOT_NEAREST
+            brunnel.contained_in_route = False
+            total_filtered += 1
+            logger.debug(
+                f"  Filtered: {brunnel.metadata.get('id', 'unknown')} "
+                f"(distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
+            )
+
+    if total_filtered > 0:
+        logger.info(
+            f"Filtered {total_filtered} overlapping brunnels, keeping nearest in each group"
+        )
