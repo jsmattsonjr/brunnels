@@ -5,7 +5,6 @@ import math
 
 from models import Position, BrunnelType, BrunnelWay, FilterReason, Route
 from geometry import find_contained_brunnels
-from gpx import calculate_route_bbox
 
 
 DEFAULT_API_TIMEOUT = 30
@@ -154,7 +153,7 @@ def find_route_brunnels(
         logger.warning("Cannot find brunnels for empty route")
         return []
 
-    bbox = calculate_route_bbox(route, buffer_km)
+    bbox = route.get_bbox(buffer_km)
 
     # Calculate and log query area before API call
     south, west, north, east = bbox

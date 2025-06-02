@@ -68,7 +68,7 @@ def parse_gpx_to_route(file_input: TextIO) -> Route:
     return route
 
 
-def calculate_route_bbox(
+def _calculate_route_bbox(
     route: Route, buffer_km: float = 1.0
 ) -> Tuple[float, float, float, float]:
     """

@@ -3,7 +3,7 @@
 Data models for brunnel analysis.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass, field
 from shapely.geometry import LineString
 from enum import Enum
@@ -26,6 +26,33 @@ class Route:
 
     positions: List[Position]
     _linestring: Optional[LineString] = field(default=None, init=False, repr=False)
+    _bbox: Optional[Tuple[float, float, float, float]] = field(
+        default=None, init=False, repr=False
+    )
+
+    def get_bbox(self, buffer_km: float = 1.0) -> Tuple[float, float, float, float]:
+        """
+        Get memoized bounding box for this route with buffer.
+
+        Args:
+            buffer_km: Buffer distance in kilometers (default: 1.0)
+
+        Returns:
+            Tuple of (south, west, north, east) in decimal degrees
+
+        Raises:
+            ValueError: If route is empty
+        """
+        if not self.positions:
+            raise ValueError("Cannot calculate bounding box for empty route")
+
+        if self._bbox is None:
+            # Import here to avoid circular imports
+            from gpx import _calculate_route_bbox
+
+            self._bbox = _calculate_route_bbox(self, buffer_km)
+
+        return self._bbox
 
     def __len__(self) -> int:
         """Return number of positions in route."""

@@ -7,7 +7,6 @@ from typing import List, Optional, Dict, Any
 import logging
 import folium
 from models import Position, BrunnelWay, BrunnelType, FilterReason, Route
-from gpx import calculate_route_bbox
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +143,7 @@ def create_route_map(
         brunnels = []
 
     # Calculate buffered bounding box using existing function
-    south, west, north, east = calculate_route_bbox(route, buffer_km)
+    south, west, north, east = route.get_bbox(buffer_km)
 
     center_lat = (south + north) / 2
     center_lon = (west + east) / 2
