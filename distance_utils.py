@@ -6,6 +6,7 @@ Distance calculation utilities for route analysis.
 from typing import List, Tuple, Optional
 import math
 import logging
+from geopy.distance import geodesic
 from geometry import Position
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def haversine_distance(pos1: Position, pos2: Position) -> float:
     """
-    Calculate the haversine distance between two positions.
+    Calculate the geodesic distance between two positions using geopy.
 
     Args:
         pos1: First position
@@ -22,23 +23,9 @@ def haversine_distance(pos1: Position, pos2: Position) -> float:
     Returns:
         Distance in kilometers
     """
-    # Convert latitude and longitude from degrees to radians
-    lat1, lon1 = math.radians(pos1.latitude), math.radians(pos1.longitude)
-    lat2, lon2 = math.radians(pos2.latitude), math.radians(pos2.longitude)
-
-    # Haversine formula
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    )
-    c = 2 * math.asin(math.sqrt(a))
-
-    # Radius of earth in kilometers
-    r = 6371
-
-    return c * r
+    return geodesic(
+        (pos1.latitude, pos1.longitude), (pos2.latitude, pos2.longitude)
+    ).kilometers
 
 
 def calculate_cumulative_distances(route: List[Position]) -> List[float]:

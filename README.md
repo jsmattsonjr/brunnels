@@ -27,7 +27,7 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 ### Install Dependencies
 
 ```bash
-pip install gpxpy folium requests shapely
+pip install gpxpy folium requests shapely geopy
 ```
 
 ### Download
@@ -144,7 +144,7 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 
 ### Coordinate System
 - Uses WGS84 decimal degrees (standard GPS coordinates)
-- Haversine distance calculations for accuracy
+- Geodesic distance calculations for accuracy using geopy
 - Handles routes worldwide (excludes polar regions and antimeridian crossings)
 
 ### Data Sources
