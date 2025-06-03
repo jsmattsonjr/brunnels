@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 
-from geometry import Position, Geometry
-from distance_utils import find_closest_point_on_route
+from .geometry import Geometry
+from .distance_utils import find_closest_point_on_route
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ class Brunnel(Geometry, ABC):
         Returns:
             True if brunnel is aligned with route within tolerance, False otherwise
         """
-        from distance_utils import (
+        from .distance_utils import (
             find_closest_segments,
             calculate_bearing,
             bearings_aligned,

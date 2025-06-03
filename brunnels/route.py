@@ -11,15 +11,15 @@ from math import cos, radians
 import gpxpy
 import gpxpy.gpx
 
-from geometry import Position, Geometry
-from distance_utils import (
+from .geometry import Position, Geometry
+from .distance_utils import (
     calculate_cumulative_distances,
     find_closest_point_on_route,
     haversine_distance,
 )
-from brunnel import Brunnel, BrunnelType, FilterReason
-from brunnel_way import BrunnelWay
-from geometry_utils import route_spans_overlap
+from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel_way import BrunnelWay
+from .geometry_utils import route_spans_overlap
 
 logger = logging.getLogger(__name__)
 
@@ -363,7 +363,7 @@ class Route(Geometry):
             logger.warning("Cannot find brunnels for empty route")
             return []
 
-        from overpass import query_overpass_brunnels
+        from .overpass import query_overpass_brunnels
         import math
 
         bbox = self.get_bbox(buffer_km)

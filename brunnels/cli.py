@@ -9,7 +9,7 @@ Requirements:
 
 """
 
-from typing import List, Sequence
+from typing import Sequence
 import webbrowser
 import argparse
 import logging
@@ -18,11 +18,10 @@ import os
 import gpxpy
 import gpxpy.gpx
 
-import visualization
-from route import Route, RouteValidationError
-from brunnel import Brunnel
-from brunnel_way import BrunnelWay
-from compound_brunnel_way import CompoundBrunnelWay
+from . import visualization
+from .route import Route, RouteValidationError
+from .brunnel import Brunnel
+from .compound_brunnel_way import CompoundBrunnelWay
 
 # Configure logging
 logger = logging.getLogger("brunnels")

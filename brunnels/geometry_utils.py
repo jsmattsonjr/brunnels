@@ -6,8 +6,9 @@ Simplified geometry_utils.py functions with clean polymorphism.
 from typing import List, Optional
 import logging
 from shapely.geometry import LineString
-from geometry import Position, Geometry
-from brunnel import RouteSpan
+
+from .geometry import Position, Geometry
+from .brunnel import RouteSpan
 
 logger = logging.getLogger(__name__)
 

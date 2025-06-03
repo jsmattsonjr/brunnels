@@ -24,25 +24,53 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 - Python 3.7+
 - Internet connection (for OpenStreetMap data queries)
 
-### Install Dependencies
+### Install from GitHub
 
 ```bash
-pip install gpxpy folium requests shapely geopy
+pip install git+https://github.com/jsmattsonjr/brunnels.git
 ```
 
-### Download
+### Development Installation
 
 ```bash
 git clone https://github.com/jsmattsonjr/brunnels.git
 cd brunnels
+pip install -e .
+```
+
+### Run from Source (No Installation)
+
+If you prefer not to install the package, you can run it directly from the cloned repository:
+
+```bash
+git clone https://github.com/jsmattsonjr/brunnels.git
+cd brunnels
+# Install dependencies only
+pip install gpxpy folium requests shapely geopy
+# Run directly from source
+python3 -m brunnels.cli your_route.gpx
+```
+
+Or use the development wrapper script:
+
+```bash
+./run_brunnels.py your_route.gpx
 ```
 
 ## Usage
 
 ### Basic Usage
 
+**If installed via pip:**
 ```bash
-python brunnels.py your_route.gpx
+brunnels your_route.gpx
+```
+
+**If running from source:**
+```bash
+python3 -m brunnels.cli your_route.gpx
+# or
+./run_brunnels.py your_route.gpx
 ```
 
 This will:
@@ -54,8 +82,20 @@ This will:
 
 ### Advanced Options
 
+**If installed via pip:**
 ```bash
-python brunnels.py route.gpx \
+brunnels route.gpx \
+  --output my_map.html \
+  --buffer 0.5 \
+  --route-buffer 5.0 \
+  --bearing-tolerance 15.0 \
+  --no-tag-filtering \
+  --log-level DEBUG
+```
+
+**If running from source:**
+```bash
+python3 -m brunnels.cli route.gpx \
   --output my_map.html \
   --buffer 0.5 \
   --route-buffer 5.0 \
@@ -77,8 +117,38 @@ python brunnels.py route.gpx \
 
 ### Reading from Standard Input
 
+**If installed via pip:**
 ```bash
-cat route.gpx | python brunnels.py -
+cat route.gpx | brunnels -
+```
+
+**If running from source:**
+```bash
+cat route.gpx | python3 -m brunnels.cli -
+```
+
+## Python API Usage
+
+You can also use brunnels as a Python library:
+
+```python
+from brunnels import Route, BrunnelWay
+
+# Load a route
+route = Route.from_file("my_route.gpx")
+
+# Find brunnels
+brunnels = route.find_brunnels(
+    buffer_km=0.1,
+    route_buffer_m=3.0,
+    bearing_tolerance_degrees=20.0,
+    enable_tag_filtering=True,
+    keep_polygons=False
+)
+
+# Create visualization
+from brunnels import visualization
+visualization.create_route_map(route, "map.html", brunnels, 0.1)
 ```
 
 ## Understanding the Output
@@ -204,7 +274,27 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 
 ## Contributing
 
-This project welcomes contributions!
+This project welcomes contributions! Please feel free to submit issues, feature requests, or pull requests.
+
+### Development Setup
+
+```bash
+git clone https://github.com/jsmattsonjr/brunnels.git
+cd brunnels
+pip install -e ".[dev]"
+```
+
+### Running Tests
+
+```bash
+pytest
+```
+
+### Code Formatting
+
+```bash
+black brunnels/
+```
 
 ## License
 
@@ -213,3 +303,5 @@ MIT License
 ## Acknowledgments
 
 - Anthropic's Claude wrote most of the code
+- OpenStreetMap contributors for the bridge and tunnel data
+- The Biketerra community for inspiration and feedback

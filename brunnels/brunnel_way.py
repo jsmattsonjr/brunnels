@@ -7,8 +7,8 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 import logging
 
-from geometry import Position
-from brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
+from .geometry import Position
+from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 
 logger = logging.getLogger(__name__)
 

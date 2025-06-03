@@ -7,10 +7,10 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 import logging
 
-from geometry import Position
-from brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
-from coordinate_combiner import combine_osm_way_coordinates
-from brunnel_way import BrunnelWay
+from .geometry import Position
+from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
+from .coordinate_combiner import combine_osm_way_coordinates
+from .brunnel_way import BrunnelWay
 
 logger = logging.getLogger(__name__)
 

@@ -6,8 +6,9 @@ Route visualization using folium maps with polymorphic brunnel handling.
 from typing import Sequence
 import logging
 import folium
-from brunnel import Brunnel, BrunnelType, FilterReason
-from route import Route
+
+from .brunnel import Brunnel, BrunnelType, FilterReason
+from .route import Route
 
 logger = logging.getLogger(__name__)
 

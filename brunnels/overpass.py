@@ -2,8 +2,6 @@ from typing import Dict, Any, Tuple, List
 import requests
 import logging
 
-from brunnel_way import BrunnelWay
-
 
 DEFAULT_API_TIMEOUT = 30
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"

@@ -7,7 +7,8 @@ from typing import List, Tuple, Optional
 import math
 import logging
 from geopy.distance import geodesic
-from geometry import Position
+
+from .geometry import Position
 
 logger = logging.getLogger(__name__)
 
