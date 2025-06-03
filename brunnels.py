@@ -163,36 +163,9 @@ def log_final_included_brunnels(brunnels: Sequence[Brunnel]) -> None:
         key=lambda b: (b.route_span.start_distance_km if b.route_span else 0.0)
     )
 
-    logger.info(f"Included brunnels (final):")
+    logger.info("Included brunnels (final):")
     for brunnel in included_brunnels:
-        brunnel_type = brunnel.brunnel_type.value.capitalize()
-
-        if isinstance(brunnel, CompoundBrunnelWay):
-            # Compound brunnel - use its specialized methods
-            primary_name = brunnel.get_primary_name()
-            component_count = len(brunnel.components)
-
-            if brunnel.route_span:
-                span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
-            else:
-                span_data = "no span data"
-
-            logger.info(
-                f"  Compound {brunnel_type}: {primary_name} ({brunnel.get_id()}) {span_data} [{component_count} segments]"
-            )
-        else:
-            # Regular brunnel - use standard metadata access
-            if isinstance(brunnel, BrunnelWay):
-                name = brunnel.metadata.get("tags", {}).get("name", "unnamed")
-            else:
-                name = "unnamed"
-
-            if brunnel.route_span:
-                span_data = f"{brunnel.route_span.start_distance_km:.2f}-{brunnel.route_span.end_distance_km:.2f} km (length: {brunnel.route_span.length_km:.2f} km)"
-            else:
-                span_data = "no span data"
-
-            logger.info(f"  {brunnel_type}: {name} ({brunnel.get_id()}) {span_data}")
+        logger.info(f"  {brunnel.get_log_description()}")
 
 
 def main():

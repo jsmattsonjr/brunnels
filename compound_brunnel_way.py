@@ -187,6 +187,17 @@ class CompoundBrunnelWay(Brunnel):
                 return name
         return "unnamed"
 
+    def get_display_name(self) -> str:
+        """Get the display name for this compound brunnel."""
+        return self.get_primary_name()
+
+    def get_short_description(self) -> str:
+        """Get a short description for logging."""
+        brunnel_type = self.brunnel_type.value.capitalize()
+        name = self.get_display_name()
+        component_count = len(self.components)
+        return f"Compound {brunnel_type}: {name} ({self.get_id()}) [{component_count} segments]"
+
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """
         Check if this compound brunnel's bearing is aligned with the route at their closest point.

@@ -92,6 +92,24 @@ class Brunnel(Geometry, ABC):
         """Get a string identifier for this brunnel."""
         pass
 
+    @abstractmethod
+    def get_display_name(self) -> str:
+        """Get the display name for this brunnel (e.g., 'Main Street' or 'unnamed')."""
+        pass
+
+    @abstractmethod
+    def get_short_description(self) -> str:
+        """Get a short description for logging (e.g., 'Bridge: Main Street (123456)')."""
+        pass
+
+    def get_log_description(self) -> str:
+        """Get a standardized description for logging with route span info."""
+        if self.route_span:
+            span_info = f"{self.route_span.start_distance_km:.2f}-{self.route_span.end_distance_km:.2f} km (length: {self.route_span.length_km:.2f} km)"
+            return f"{self.get_short_description()} {span_info}"
+        else:
+            return f"{self.get_short_description()} (no route span)"
+
     def is_contained_by(self, route_geometry) -> bool:
         """
         Check if this brunnel is completely contained within a route geometry.
@@ -168,7 +186,7 @@ class Brunnel(Geometry, ABC):
         coords = self.coordinate_list
         if not coords or len(coords) < 2:
             logger.debug(
-                f"Brunnel {self.get_id()} has insufficient coordinates for bearing calculation"
+                f"{self.get_short_description()} has insufficient coordinates for bearing calculation"
             )
             return False
 
@@ -180,7 +198,9 @@ class Brunnel(Geometry, ABC):
         brunnel_segment, route_segment = find_closest_segments(coords, route.positions)
 
         if brunnel_segment is None or route_segment is None:
-            logger.debug(f"Could not find closest segments for brunnel {self.get_id()}")
+            logger.debug(
+                f"Could not find closest segments for {self.get_short_description()}"
+            )
             return False
 
         # Extract segment coordinates
@@ -195,9 +215,7 @@ class Brunnel(Geometry, ABC):
         aligned = bearings_aligned(brunnel_bearing, route_bearing, tolerance_degrees)
 
         logger.debug(
-            f"Brunnel {self.get_id()}: "
-            f"brunnel_bearing={brunnel_bearing:.1f}°, route_bearing={route_bearing:.1f}°, "
-            f"aligned={aligned} (tolerance={tolerance_degrees}°)"
+            f"{self.get_short_description()}: brunnel_bearing={brunnel_bearing:.1f}°, route_bearing={route_bearing:.1f}°, aligned={aligned} (tolerance={tolerance_degrees}°)"
         )
 
         return aligned

@@ -311,7 +311,7 @@ class Route(Geometry):
                 avg_distance = self.average_distance_to_polyline(brunnel)
                 brunnel_distances.append((brunnel, avg_distance))
                 logger.debug(
-                    f"  Brunnel {brunnel.get_id()}: avg distance = {avg_distance:.3f}km"
+                    f"  {brunnel.get_short_description()}: avg distance = {avg_distance:.3f}km"
                 )
 
             # Sort by distance (closest first)
@@ -321,7 +321,7 @@ class Route(Geometry):
             closest_brunnel, closest_distance = brunnel_distances[0]
 
             logger.debug(
-                f"  Keeping closest: {closest_brunnel.get_id()} (distance: {closest_distance:.3f}km)"
+                f"  Keeping closest: {closest_brunnel.get_short_description()} (distance: {closest_distance:.3f}km)"
             )
 
             for brunnel, distance in brunnel_distances[1:]:
@@ -330,7 +330,7 @@ class Route(Geometry):
                 total_filtered += 1
 
                 logger.debug(
-                    f"  Filtered: {brunnel.get_id()} (distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
+                    f"  Filtered: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
                 )
 
         if total_filtered > 0:

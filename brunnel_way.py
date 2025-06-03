@@ -42,6 +42,16 @@ class BrunnelWay(Brunnel):
         """Get a string identifier for this brunnel."""
         return str(self.metadata.get("id", "unknown"))
 
+    def get_display_name(self) -> str:
+        """Get the display name for this brunnel."""
+        return self.metadata.get("tags", {}).get("name", "unnamed")
+
+    def get_short_description(self) -> str:
+        """Get a short description for logging."""
+        brunnel_type = self.brunnel_type.value.capitalize()
+        name = self.get_display_name()
+        return f"{brunnel_type}: {name} ({self.get_id()})"
+
     def shares_node_with(self, other: "BrunnelWay") -> bool:
         """
         Check if this brunnel shares a node with another brunnel.
