@@ -9,6 +9,7 @@ import logging
 
 from geometry import Position
 from brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
+from coordinate_combiner import combine_osm_way_coordinates
 from brunnel_way import BrunnelWay
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class CompoundBrunnelWay(Brunnel):
 
     def _compute_combined_coordinates(self) -> List[Position]:
         """
-        Compute the combined coordinates from all components in route order.
+        Compute the combined coordinates from all components in correct directional order.
 
         Returns:
             List of Position objects representing the full compound brunnel
@@ -86,20 +87,29 @@ class CompoundBrunnelWay(Brunnel):
         if not self.components:
             return []
 
+        try:
+            # Use sophisticated directional combining
+            return combine_osm_way_coordinates(self.components)
+        except Exception as e:
+            logger.error(f"Failed to combine coordinates directionally: {e}")
+            logger.warning("Falling back to naive concatenation")
+            # Fallback to naive approach for robustness
+            return self._naive_combine_coordinates()
+
+    def _naive_combine_coordinates(self) -> List[Position]:
+        """
+        Fallback naive coordinate combination (current approach).
+
+        Returns:
+            List of Position objects using simple concatenation
+        """
         combined_coords = []
-
         for i, component in enumerate(self.components):
-            coords = component.coords[:]
-
             if i == 0:
-                # First component - add all coordinates
-                combined_coords.extend(coords)
+                combined_coords.extend(component.coords)
             else:
-                # Subsequent components - skip first coordinate to avoid duplication
-                # (assuming they share a node with the previous component)
-                if coords:
-                    combined_coords.extend(coords[1:])
-
+                if component.coords:
+                    combined_coords.extend(component.coords[1:])
         return combined_coords
 
     def get_combined_metadata(self) -> Dict[str, Any]:
