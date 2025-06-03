@@ -5,7 +5,6 @@ Route data model for brunnel analysis.
 
 from typing import Optional, Tuple, List, TextIO, Sequence
 from dataclasses import dataclass, field
-import sys
 import logging
 import math
 from math import cos, radians
@@ -512,7 +511,7 @@ class Route(Geometry):
         Load and parse a GPX file into a route.
 
         Args:
-            filename: Path to GPX file, or "-" for stdin
+            filename: Path to GPX file
 
         Returns:
             Route object representing the route
@@ -522,13 +521,9 @@ class Route(Geometry):
             FileNotFoundError: If file doesn't exist
             PermissionError: If file can't be read
         """
-        if filename == "-":
-            logger.debug("Reading GPX data from stdin")
-            return cls.from_gpx(sys.stdin)
-        else:
-            logger.debug(f"Reading GPX file: {filename}")
-            with open(filename, "r", encoding="utf-8") as f:
-                return cls.from_gpx(f)
+        logger.debug(f"Reading GPX file: {filename}")
+        with open(filename, "r", encoding="utf-8") as f:
+            return cls.from_gpx(f)
 
     @staticmethod
     def _validate_route(positions: List[Position]) -> None:

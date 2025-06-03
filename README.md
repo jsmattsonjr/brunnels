@@ -115,18 +115,6 @@ python3 -m brunnels.cli route.gpx \
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `--no-open`: Don't automatically open the map in browser
 
-### Reading from Standard Input
-
-**If installed via pip:**
-```bash
-cat route.gpx | brunnels -
-```
-
-**If running from source:**
-```bash
-cat route.gpx | python3 -m brunnels.cli -
-```
-
 ## Python API Usage
 
 You can also use brunnels as a Python library:

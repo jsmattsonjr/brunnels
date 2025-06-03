@@ -41,7 +41,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "filename",
         type=str,
-        help="GPX file to process (use '-' for stdin)",
+        help="GPX file to process",
     )
     parser.add_argument(
         "--output",
