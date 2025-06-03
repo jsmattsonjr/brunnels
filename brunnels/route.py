@@ -7,6 +7,7 @@ from typing import Optional, Tuple, List, TextIO, Sequence
 from dataclasses import dataclass, field
 import sys
 import logging
+import math
 from math import cos, radians
 import gpxpy
 import gpxpy.gpx
@@ -19,6 +20,7 @@ from .geometry_utils import (
 )
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 from .brunnel_way import BrunnelWay
+from .overpass import query_overpass_brunnels
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +174,7 @@ class Route(Geometry):
             try:
                 route_geometry = route_geometry.buffer(0)
                 if route_geometry.is_valid:
-                    logger.info("Successfully fixed invalid geometry")
+                    logger.warning("Successfully fixed invalid geometry")
                 else:
                     logger.warning(
                         "Could not fix invalid geometry - containment results may be unreliable"
@@ -333,7 +335,7 @@ class Route(Geometry):
                 )
 
         if total_filtered > 0:
-            logger.info(
+            logger.debug(
                 f"Filtered {total_filtered} overlapping brunnels, keeping nearest in each group"
             )
 
@@ -361,9 +363,6 @@ class Route(Geometry):
         if not self.positions:
             logger.warning("Cannot find brunnels for empty route")
             return []
-
-        from .overpass import query_overpass_brunnels
-        import math
 
         bbox = self.get_bbox(buffer_km)
 
@@ -415,7 +414,7 @@ class Route(Geometry):
         contained_bridges = [b for b in bridges if b.contained_in_route]
         contained_tunnels = [b for b in tunnels if b.contained_in_route]
 
-        logger.info(
+        logger.debug(
             f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
         )
 

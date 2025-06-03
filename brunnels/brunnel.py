@@ -10,7 +10,12 @@ from enum import Enum
 import logging
 
 from .geometry import Geometry
-from .geometry_utils import find_closest_point_on_route
+from .geometry_utils import (
+    find_closest_point_on_route,
+    find_closest_segments,
+    calculate_bearing,
+    bearings_aligned,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -177,11 +182,6 @@ class Brunnel(Geometry, ABC):
         Returns:
             True if brunnel is aligned with route within tolerance, False otherwise
         """
-        from .geometry_utils import (
-            find_closest_segments,
-            calculate_bearing,
-            bearings_aligned,
-        )
 
         coords = self.coordinate_list
         if not coords or len(coords) < 2:

@@ -448,7 +448,7 @@ class CompoundBrunnelWay(Brunnel):
                 result.append(brunnel)
 
         if compound_count > 0:
-            logger.info(
+            logger.debug(
                 f"Created {compound_count} compound brunnels from {len(adjacent_groups)} groups"
             )
 
