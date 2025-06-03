@@ -12,14 +12,13 @@ import gpxpy
 import gpxpy.gpx
 
 from .geometry import Position, Geometry
-from .distance_utils import (
+from .geometry_utils import (
     calculate_cumulative_distances,
     find_closest_point_on_route,
     haversine_distance,
 )
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 from .brunnel_way import BrunnelWay
-from .geometry_utils import route_spans_overlap
 
 logger = logging.getLogger(__name__)
 
@@ -574,3 +573,20 @@ class Route(Geometry):
     def __iter__(self):
         """Allow iteration over positions."""
         return iter(self.positions)
+
+
+def route_spans_overlap(span1: RouteSpan, span2: RouteSpan) -> bool:
+    """
+    Check if two route spans overlap.
+
+    Args:
+        span1: First route span
+        span2: Second route span
+
+    Returns:
+        True if the spans overlap, False otherwise
+    """
+    return (
+        span1.start_distance_km <= span2.end_distance_km
+        and span2.start_distance_km <= span1.end_distance_km
+    )
