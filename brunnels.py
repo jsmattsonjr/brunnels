@@ -163,7 +163,7 @@ def log_final_included_brunnels(brunnels: Sequence[Brunnel]) -> None:
         key=lambda b: (b.route_span.start_distance_km if b.route_span else 0.0)
     )
 
-    logger.info("Included brunnels (final):")
+    logger.info(f"Included brunnels ({len(included_brunnels)}):")
     for brunnel in included_brunnels:
         logger.info(f"  {brunnel.get_log_description()}")
 
