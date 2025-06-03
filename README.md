@@ -77,8 +77,10 @@ This will:
 1. Parse your GPX file
 2. Find all bridges and tunnels in an area extending 100m beyond your route's bounding box
 3. Filter brunnels based on cycling relevance and bearing alignment with your route
-4. Generate an interactive map at `brunnel_map.html`
+4. Generate an interactive map with a filename based on your input file (e.g., `route.gpx` → `route map.html`)
 5. Automatically open the map in your default browser
+
+If the output file already exists, the tool will automatically try numbered variations (e.g., `route map (1).html`, `route map (2).html`) to avoid overwriting existing files.
 
 ### Advanced Options
 
@@ -106,7 +108,7 @@ python3 -m brunnels.cli route.gpx \
 
 ### Options
 
-- `--output FILE`: Specify output HTML filename (default: `brunnel_map.html`)
+- `--output FILE`: Specify output HTML filename (default: auto-generated based on input filename)
 - `--buffer DISTANCE`: Search radius around route in kilometers (default: 0.1km)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
@@ -114,6 +116,21 @@ python3 -m brunnels.cli route.gpx \
 - `--no-overlap-filtering`: Disable filtering of overlapping brunnels (keep all overlapping brunnels)
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `--no-open`: Don't automatically open the map in browser
+
+## Output Files
+
+### Automatic Filename Generation
+
+By default, the tool generates output filenames based on your input file:
+
+- `my_route.gpx` → `my_route map.html`
+- `Sunday Ride.GPX` → `Sunday Ride map.html`
+- `track.tcx` → `track.tcx map.html` (if you somehow use non-GPX files)
+
+If the output file already exists, numbered versions are automatically tried:
+- `my_route map.html` (if this exists, try...)
+- `my_route map (1).html` (if this exists, try...)
+- `my_route map (2).html` (and so on...)
 
 ## Python API Usage
 

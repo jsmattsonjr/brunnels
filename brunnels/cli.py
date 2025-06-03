@@ -9,7 +9,7 @@ Requirements:
 
 """
 
-from typing import Sequence
+from typing import Sequence, Optional
 import webbrowser
 import argparse
 import logging
@@ -22,6 +22,7 @@ from . import visualization
 from .route import Route, RouteValidationError
 from .brunnel import Brunnel
 from .compound_brunnel_way import CompoundBrunnelWay
+from .file_utils import generate_output_filename
 
 # Configure logging
 logger = logging.getLogger("brunnels")
@@ -46,8 +47,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=str,
-        default="brunnel_map.html",
-        help="Output HTML map file (default: brunnel_map.html)",
+        default=None,
+        help="Output HTML map file (default: auto-generated based on input filename)",
     )
     parser.add_argument(
         "--buffer",
@@ -100,6 +101,33 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Disable creation of compound brunnels from adjacent segments",
     )
     return parser
+
+
+def determine_output_filename(input_filename: str, output_arg: Optional[str]) -> str:
+    """
+    Determine the output filename to use.
+
+    Args:
+        input_filename: Path to the input GPX file
+        output_arg: Value from --output argument (None if not specified)
+
+    Returns:
+        Output filename to use
+
+    Raises:
+        RuntimeError: If auto-generation fails
+        ValueError: If constructed filename would be illegal
+    """
+    if output_arg is not None:
+        # User specified an output filename explicitly
+        return output_arg
+
+    # Auto-generate based on input filename
+    try:
+        return generate_output_filename(input_filename)
+    except (RuntimeError, ValueError) as e:
+        logger.error(f"Failed to generate output filename: {e}")
+        raise
 
 
 def open_file_in_browser(filename: str) -> None:
@@ -174,6 +202,13 @@ def main():
     # Setup logging
     setup_logging(args.log_level)
 
+    # Determine output filename
+    try:
+        output_filename = determine_output_filename(args.filename, args.output)
+        logger.debug(f"Output filename: {output_filename}")
+    except (RuntimeError, ValueError):
+        sys.exit(1)
+
     # Load and parse the GPX file into a route
     try:
         route = Route.from_file(args.filename)
@@ -223,14 +258,14 @@ def main():
 
     # Create visualization map
     try:
-        visualization.create_route_map(route, args.output, brunnels, args.buffer)
+        visualization.create_route_map(route, output_filename, brunnels, args.buffer)
     except Exception as e:
         logger.error(f"Failed to create map: {e}")
         sys.exit(1)
 
     # Automatically open the HTML file in the default browser
     if not args.no_open:
-        open_file_in_browser(args.output)
+        open_file_in_browser(output_filename)
 
 
 if __name__ == "__main__":
