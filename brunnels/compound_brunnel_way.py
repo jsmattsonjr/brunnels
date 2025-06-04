@@ -165,22 +165,7 @@ class CompoundBrunnelWay(Brunnel):
         combined["id"] = ";".join(osm_ids)
         combined["total_length_km"] = total_length
 
-        # Merge tags from all components (prioritize first component for conflicts)
-        merged_tags = {}
-        for component in self.components:
-            comp_tags = component.metadata.get("tags", {})
-            for key, value in comp_tags.items():
-                if key not in merged_tags:
-                    merged_tags[key] = value
-                elif merged_tags[key] != value:
-                    # Tag conflict - keep first value but note the conflict
-                    if "tag_conflicts" not in combined:
-                        combined["tag_conflicts"] = {}
-                    if key not in combined["tag_conflicts"]:
-                        combined["tag_conflicts"][key] = [merged_tags[key]]
-                    combined["tag_conflicts"][key].append(value)
-
-        combined["tags"] = merged_tags
+        combined["tags"] = {}
 
         return combined
 
@@ -258,13 +243,6 @@ class CompoundBrunnelWay(Brunnel):
         # Combined OSM ID
         combined_metadata = self.get_combined_metadata()
         html_parts.append(f"<br><b>Combined OSM ID:</b> {combined_metadata['id']}")
-
-        # Tag conflicts if any
-        if "tag_conflicts" in combined_metadata:
-            html_parts.append("<br><b>Tag Conflicts:</b>")
-            for key, values in combined_metadata["tag_conflicts"].items():
-                values_str = " vs ".join(f"'{v}'" for v in values)
-                html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {values_str}")
 
         # Component details
         html_parts.append("<br><br><b>Component Segments:</b>")
