@@ -7,9 +7,8 @@ from typing import List, Tuple, Optional
 import math
 import logging
 from geopy.distance import geodesic
-from shapely.geometry import LineString
 
-from .geometry import Position, Geometry
+from .geometry import Position
 
 logger = logging.getLogger(__name__)
 
@@ -285,18 +284,3 @@ def bearings_aligned(
     opposite_direction = abs(diff - 180) <= tolerance_degrees
 
     return same_direction or opposite_direction
-
-
-def positions_to_linestring(positions: List[Position]) -> Optional[LineString]:
-    """
-    Convert a list of Position objects to a Shapely LineString.
-
-    Note: This function now delegates to the Geometry base class method.
-
-    Args:
-        positions: List of Position objects
-
-    Returns:
-        LineString object, or None if positions is empty or has less than 2 points
-    """
-    return Geometry._positions_to_linestring(positions)
