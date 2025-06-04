@@ -301,5 +301,6 @@ MIT License
 ## Acknowledgments
 
 - Anthropic's Claude wrote most of the code
+- Google's Jules has also made several contributions
 - OpenStreetMap contributors for the bridge and tunnel data
 - The Biketerra community for inspiration and feedback
