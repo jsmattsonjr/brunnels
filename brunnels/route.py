@@ -384,7 +384,7 @@ class Route(Geometry):
 
         for way_data in raw_ways:
             try:
-                brunnel = BrunnelWay.from_overpass_data(way_data, keep_polygons)
+                brunnel = BrunnelWay.from_overpass_data(way_data, keep_polygons, enable_tag_filtering)
 
                 # Count filtered brunnels but keep them for visualization
                 if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
