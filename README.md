@@ -51,11 +51,6 @@ pip install gpxpy folium requests shapely geopy
 python3 -m brunnels.cli your_route.gpx
 ```
 
-Or use the development wrapper script:
-
-```bash
-./run_brunnels.py your_route.gpx
-```
 
 ## Usage
 
@@ -69,8 +64,6 @@ brunnels your_route.gpx
 **If running from source:**
 ```bash
 python3 -m brunnels.cli your_route.gpx
-# or
-./run_brunnels.py your_route.gpx
 ```
 
 This will:
