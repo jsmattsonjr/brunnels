@@ -181,6 +181,19 @@ def calculate_bearing(start_pos: Position, end_pos: Position) -> float:
     Returns:
         Bearing in degrees (0-360, where 0° is north, 90° is east)
     """
+    if start_pos == end_pos:
+        return 0.0
+
+    # Handle polar cases
+    if math.isclose(start_pos.latitude, 90.0):  # Start is North Pole
+        return 180.0
+    if math.isclose(start_pos.latitude, -90.0):  # Start is South Pole
+        return 0.0
+    if math.isclose(end_pos.latitude, 90.0):  # End is North Pole
+        return 0.0
+    if math.isclose(end_pos.latitude, -90.0):  # End is South Pole
+        return 180.0
+
     lat1 = math.radians(start_pos.latitude)
     lat2 = math.radians(end_pos.latitude)
     lon1 = math.radians(start_pos.longitude)
