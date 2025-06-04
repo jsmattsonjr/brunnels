@@ -42,7 +42,6 @@ class FilterReason(Enum):
     NO_ROUTE_SPAN = "failed to calculate route span"
     UNALIGNED = "bearing not aligned with route"
     NOT_NEAREST = "not nearest among overlapping brunnels"
-    MERGED = "merged into adjacent brunnel"
 
     def __str__(self) -> str:
         return self.value
