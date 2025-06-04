@@ -204,7 +204,7 @@ class BrunnelWay(Brunnel):
 
     @classmethod
     def should_filter(
-        cls, metadata: Dict[str, Any], keep_polygons: bool = False
+        cls, metadata: Dict[str, Any], keep_polygons: bool = False, enable_tag_filtering: bool = True
     ) -> FilterReason:
         """
         Determine if a brunnel should be filtered out based on cycling relevance and geometry.
@@ -217,6 +217,8 @@ class BrunnelWay(Brunnel):
             FilterReason.NONE if the brunnel should be kept, otherwise returns
             the reason for filtering.
         """
+        if not enable_tag_filtering:
+            return FilterReason.NONE
         # Check for polygon (closed way) if keep_polygons is False
         if not keep_polygons:
             nodes = metadata.get("nodes", [])
@@ -251,7 +253,7 @@ class BrunnelWay(Brunnel):
 
     @classmethod
     def from_overpass_data(
-        cls, way_data: Dict[str, Any], keep_polygons: bool = False
+        cls, way_data: Dict[str, Any], keep_polygons: bool = False, enable_tag_filtering: bool = True
     ) -> "BrunnelWay":
         """
         Parse a single way from Overpass response into BrunnelWay object.
@@ -270,7 +272,7 @@ class BrunnelWay(Brunnel):
                 coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
 
         brunnel_type = cls.determine_type(way_data)
-        filter_reason = cls.should_filter(way_data, keep_polygons)
+        filter_reason = cls.should_filter(way_data, keep_polygons, enable_tag_filtering)
 
         return cls(
             coords=coords,
