@@ -203,37 +203,61 @@ class DirectionalCoordinateCombiner:
         Returns:
             List of direction strings ('forward' or 'reverse') for each component
         """
-        directions = ["forward"]  # Start with first component in forward direction
+        if not self.components:
+            return []
+        if len(self.components) == 1:
+            # Single component is always considered "forward" in its own context
+            return ["forward"]
+
+        directions = []
+        first_connection = self.connections[0]
+
+        # Determine initial direction for the first component based on its connection to the second.
+        # If the first component connects via its 'first' node, it implies it might be "backward"
+        # relative to the start of the sequence.
+        if first_connection.component1_end == "first":
+            directions.append("reverse")
+        else: # component1_end == "last"
+            directions.append("forward")
 
         for i, conn in enumerate(self.connections):
-            # Determine direction of next component based on connection pattern
+            # Determine direction of next component (self.components[i+1])
+            # based on the already determined direction of the current component (self.components[i])
             prev_direction = directions[i]
-            prev_end = conn.component1_end
-            next_end = conn.component2_end
+            prev_end = conn.component1_end # How self.components[i] connects
+            next_end = conn.component2_end # How self.components[i+1] connects
 
-            # If previous component is reversed, flip its effective end
+            # If previous component's actual direction is reverse, its connection end is flipped
             if prev_direction == "reverse":
                 prev_end = "last" if prev_end == "first" else "first"
 
-            # Determine next component direction based on connection pattern
+            # Determine next component's direction
             if prev_end == "last" and next_end == "first":
-                # last->first: normal concatenation
+                # e.g. CompA (ends) -> CompB (starts) : CompB is forward
                 next_direction = "forward"
             elif prev_end == "last" and next_end == "last":
-                # last->last: reverse second component
+                # e.g. CompA (ends) -> CompB (ends) : CompB is reverse
                 next_direction = "reverse"
             elif prev_end == "first" and next_end == "first":
-                # first->first: reverse second component
+                # e.g. CompA (starts) -> CompB (starts) : CompB is reverse
                 next_direction = "reverse"
             elif prev_end == "first" and next_end == "last":
-                # first->last: normal concatenation
+                # e.g. CompA (starts) -> CompB (ends) : CompB is forward
                 next_direction = "forward"
             else:
+                # This case should ideally not be reached if component1_end and component2_end are always 'first' or 'last'
                 raise ValueError(
-                    f"Unexpected connection pattern: {prev_end}->{next_end}"
+                    f"Unexpected connection pattern: {prev_end}->{next_end} for components {conn.component1_idx} and {conn.component2_idx}"
                 )
 
-            directions.append(next_direction)
+            # This direction is for self.components[i+1]
+            # If 'directions' list has N elements, they are for components 0 to N-1.
+            # We are calculating direction for component i+1.
+            if len(directions) == i + 1: # If we are about to add direction for component i+1
+                 directions.append(next_direction)
+            else:
+                # This case should not happen if logic is correct, implies mismatch in loop / list population
+                raise RuntimeError(f"Directions list length {len(directions)} out of sync with component index {i+1}")
 
         return directions
 
