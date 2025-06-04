@@ -363,7 +363,7 @@ def test_calculate_bearing_poles():
     # From North Pole to some point
     north_pole = Position(latitude=90.0, longitude=0.0)
     point_south_of_np = Position(latitude=89.0, longitude=45.0) # Arbitrary longitude
-    assert calculate_bearing(north_pole, point_south_of_np) == pytest.approx(135.0) # Due South
+    assert calculate_bearing(north_pole, point_south_of_np) == pytest.approx(180.0) # Due South
 
     # To North Pole from some point
     point_near_np = Position(latitude=89.0, longitude=45.0)
@@ -372,7 +372,7 @@ def test_calculate_bearing_poles():
     # From South Pole to some point
     south_pole = Position(latitude=-90.0, longitude=0.0)
     point_north_of_sp = Position(latitude=-89.0, longitude=120.0) # Arbitrary longitude
-    assert calculate_bearing(south_pole, point_north_of_sp) == pytest.approx(120.0) # Due North
+    assert calculate_bearing(south_pole, point_north_of_sp) == pytest.approx(0.0) # Due North
 
     # To South Pole from some point
     point_near_sp = Position(latitude=-89.0, longitude=120.0)
