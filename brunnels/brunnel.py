@@ -156,7 +156,7 @@ class Brunnel(Geometry, ABC):
         """
         coords = self.coordinate_list
         if not coords:
-            return RouteSpan(0.0, 0.0, 0.0)
+            return RouteSpan(0.0, 0.0)
 
         min_distance = float("inf")
         max_distance = -float("inf")
@@ -170,7 +170,7 @@ class Brunnel(Geometry, ABC):
             min_distance = min(min_distance, cumulative_dist)
             max_distance = max(max_distance, cumulative_dist)
 
-        return RouteSpan(min_distance, max_distance, max_distance - min_distance)
+        return RouteSpan(min_distance, max_distance)
 
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """
