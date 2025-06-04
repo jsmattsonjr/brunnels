@@ -164,8 +164,7 @@ def find_closest_point_on_route(
             best_position = closest_point
 
             # Calculate cumulative distance to this point
-            segment_length = cumulative_distances[i + 1] - cumulative_distances[i]
-            best_cumulative_distance = cumulative_distances[i] + t * segment_length
+            best_cumulative_distance = cumulative_distances[i] + haversine_distance(seg_start, best_position)
 
     return best_cumulative_distance, best_position
 
