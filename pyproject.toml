@@ -54,7 +54,7 @@ Issues = "https://github.com/jsmattsonjr/brunnels/issues"
 brunnels = "brunnels.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["brunnels*"]
 
 [tool.black]
