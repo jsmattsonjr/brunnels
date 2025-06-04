@@ -108,21 +108,20 @@ def _validate_full_path(filepath: str) -> None:
 
 def _try_create_file(filepath: str) -> bool:
     """
-    Try to create a file exclusively (to test if it exists and avoid race conditions).
+    Try to create a file exclusively to reserve its name and avoid race conditions.
+    The file is kept if created.
 
     Args:
-        filepath: Path to the file to test
+        filepath: Path to the file to create and reserve
 
     Returns:
-        True if file was successfully created (and then removed), False if it already exists
+        True if file was successfully created, False if it already exists
     """
     try:
         # Try to create the file exclusively
         with open(filepath, "x") as f:
             pass  # File created successfully
 
-        # Remove the file immediately since we were just testing
-        os.remove(filepath)
         return True
 
     except FileExistsError:
