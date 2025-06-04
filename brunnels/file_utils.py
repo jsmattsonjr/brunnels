@@ -12,24 +12,24 @@ logger = logging.getLogger(__name__)
 
 def generate_output_filename(input_filename: str) -> str:
     """
-    Generate an output HTML filename based on the input filename.
+    Generates an output HTML filename and reserves it by creating an empty file.
 
     Strategy:
     1. If input ends with .gpx (case-insensitive), drop it
     2. Append " map.html"
-    3. If file exists, try " (1).html", " (2).html", etc.
+    3. If file exists, try " (1).html", " (2).html", etc. (by attempting to create exclusively)
     4. Stop at 180 attempts (antimeridian reference)
-    5. Use exclusive open to avoid race conditions
+    5. Use exclusive open (`open(path, 'x')`) to avoid race conditions and reserve the name.
 
     Args:
         input_filename: Path to the input GPX file
 
     Returns:
-        Safe output filename that doesn't exist yet
+        Safe output filename that has been created as an empty file to reserve its name
 
     Raises:
         RuntimeError: If no available filename found after 180 attempts
-        ValueError: If constructed filename would be illegal
+        ValueError: If a filename cannot be created (e.g., due to permissions or an invalid name detected by the OS)
     """
     # Get the directory and base name
     input_dir = os.path.dirname(input_filename)
@@ -44,23 +44,30 @@ def generate_output_filename(input_filename: str) -> str:
     # Construct the base output filename
     base_output = base_name + " map"
 
-    # Validate the base filename before proceeding
-    _validate_filename_component(base_output)
-
     # Try the base filename first
     candidate = os.path.join(input_dir, base_output + ".html")
-    _validate_full_path(candidate)
-
-    if _try_create_file(candidate):
-        return candidate
+    try:
+        with open(candidate, "x") as f:
+            pass  # File created successfully and is kept
+        return candidate # Found and reserved a good filename
+    except FileExistsError:
+        pass  # File already exists, proceed to numbered variants
+    except (PermissionError, OSError) as e:
+        logger.error(f"Cannot create file {candidate}: {e}")
+        raise ValueError(f"Cannot create file: {e}")
 
     # Try numbered variants
     for i in range(1, 181):  # 1 to 180 (antimeridian reference)
         candidate = os.path.join(input_dir, f"{base_output} ({i}).html")
-        _validate_full_path(candidate)
-
-        if _try_create_file(candidate):
-            return candidate
+        try:
+            with open(candidate, "x") as f:
+                pass  # File created successfully and is kept
+            return candidate # Found and reserved a good filename
+        except FileExistsError:
+            continue  # File already exists, try next number
+        except (PermissionError, OSError) as e:
+            logger.error(f"Cannot create file {candidate}: {e}")
+            raise ValueError(f"Cannot create file: {e}")
 
     # If we get here, we've tried 180 files and none worked
     logger.error(
@@ -69,66 +76,3 @@ def generate_output_filename(input_filename: str) -> str:
         f"Please clean up your output directory or specify --output explicitly."
     )
     raise RuntimeError("No available filename found after 180 attempts")
-
-
-def _validate_filename_component(filename: str) -> None:
-    """
-    Validate that a filename component is legal.
-
-    We assume the input filename is valid and we only add safe characters.
-    This is a simple sanity check for our constructed filename.
-
-    Args:
-        filename: Filename component to validate (without directory or extension)
-
-    Raises:
-        ValueError: If filename has obvious issues
-    """
-    # Check for empty filename
-    if not filename or filename.isspace():
-        logger.error("Filename is empty or contains only whitespace")
-        raise ValueError("Filename cannot be empty")
-
-
-def _validate_full_path(filepath: str) -> None:
-    """
-    Validate that a full file path is reasonable.
-
-    Args:
-        filepath: Full file path to validate
-
-    Raises:
-        ValueError: If path is problematic
-    """
-    # Validate the filename component
-    filename = os.path.basename(filepath)
-    name_without_ext = os.path.splitext(filename)[0]
-    _validate_filename_component(name_without_ext)
-
-
-def _try_create_file(filepath: str) -> bool:
-    """
-    Try to create a file exclusively (to test if it exists and avoid race conditions).
-
-    Args:
-        filepath: Path to the file to test
-
-    Returns:
-        True if file was successfully created (and then removed), False if it already exists
-    """
-    try:
-        # Try to create the file exclusively
-        with open(filepath, "x") as f:
-            pass  # File created successfully
-
-        # Remove the file immediately since we were just testing
-        os.remove(filepath)
-        return True
-
-    except FileExistsError:
-        # File already exists
-        return False
-    except (PermissionError, OSError) as e:
-        # Some other error occurred (permissions, disk full, etc.)
-        logger.error(f"Cannot create file {filepath}: {e}")
-        raise ValueError(f"Cannot create file: {e}")
