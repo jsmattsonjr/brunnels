@@ -68,3 +68,6 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [tool.setuptools_scm]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
