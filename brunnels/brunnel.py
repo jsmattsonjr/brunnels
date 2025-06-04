@@ -57,13 +57,15 @@ class Direction(Enum):
         return self.value
 
 
+from dataclasses import dataclass, field
+
 @dataclass
 class RouteSpan:
     """Information about where a brunnel spans along a route."""
 
     start_distance_km: float  # Distance from route start where brunnel begins
     end_distance_km: float  # Distance from route start where brunnel ends
-    length_km: float  # Length of route spanned by brunnel
+    length_km: float = field(init=False)  # Length of route spanned by brunnel
 
     def __post_init__(self):
         """Calculate length after initialization."""
