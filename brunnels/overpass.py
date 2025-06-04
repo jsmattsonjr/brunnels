@@ -18,7 +18,7 @@ def query_overpass_brunnels(
 
     # Overpass QL query for both bridge and tunnel ways with geometry
     query = f"""
-[out:json][timeout:25];
+[out:json][timeout:{DEFAULT_API_TIMEOUT}];
 (
   way[bridge]({south},{west},{north},{east});
   way[tunnel]({south},{west},{north},{east});
