@@ -6,11 +6,73 @@ Route visualization using folium maps with polymorphic brunnel handling.
 from typing import Sequence
 import logging
 import folium
+from folium.template import Template
 
 from .brunnel import Brunnel, BrunnelType, FilterReason
 from .route import Route
 
 logger = logging.getLogger(__name__)
+
+
+class BrunnelLegend(folium.MacroElement):
+    """Custom legend for brunnel visualization with dynamic counts."""
+
+    def __init__(
+        self, bridge_count, tunnel_count, contained_bridge_count, contained_tunnel_count
+    ):
+        super().__init__()
+        self.bridge_count = bridge_count
+        self.tunnel_count = tunnel_count
+        self.contained_bridge_count = contained_bridge_count
+        self.contained_tunnel_count = contained_tunnel_count
+
+        # Use folium's template string approach
+        self._template = Template(
+            """
+        {% macro html(this, kwargs) %}
+        <div id="brunnel-legend" style="
+            position: fixed;
+            bottom: 50px;
+            left: 50px;
+            width: 230px;
+            min-height: 140px;
+            max-height: 250px;
+            background-color: white;
+            border: 2px solid grey;
+            z-index: 9999;
+            font-size: 13px;
+            padding: 12px;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            overflow: hidden;
+            box-sizing: border-box;
+        ">
+            <b>Legend</b><br>
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: red; font-weight: bold; font-size: 16px;">—</span>
+                GPX Route
+            </div>
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: blue; font-weight: bold; font-size: 16px;">—</span>
+                Included Bridges ({{ this.contained_bridge_count }})
+            </div>
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: brown; font-weight: bold; font-size: 16px; letter-spacing: 2px;">- -</span>
+                Included Tunnels ({{ this.contained_tunnel_count }})
+            </div>
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: lightsteelblue; font-weight: bold; font-size: 16px;">—</span>
+                Excluded Bridges ({{ this.bridge_count - this.contained_bridge_count }})
+            </div>
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: rosybrown; font-weight: bold; font-size: 16px; letter-spacing: 2px;">- -</span>
+                Excluded Tunnels ({{ this.tunnel_count - this.contained_tunnel_count }})
+            </div>
+        </div>
+        {% endmacro %}
+        """
+        )
 
 
 def create_route_map(
@@ -155,37 +217,21 @@ def create_route_map(
                 z_index=2,  # Ensure bridges are above route
             ).add_to(route_map)
 
+    # Add legend with dynamic counts
+    legend = BrunnelLegend(
+        bridge_count,
+        tunnel_count,
+        contained_bridge_count,
+        contained_tunnel_count,
+    )
+    route_map.add_child(legend)
+
     # Fit map bounds to buffered route area
     bounds = [[south, west], [north, east]]  # Southwest corner  # Northeast corner
     route_map.fit_bounds(bounds)
 
-    # Add legend as HTML overlay by post-processing the saved file
-    legend_html = f"""
-    <div style='position: fixed; bottom: 50px; left: 50px; width: 220px; height: 170px; 
-                background-color: white; border: 2px solid grey; z-index: 9999; 
-                font-size: 14px; padding: 10px; font-family: Arial, sans-serif;'>
-        <b>Legend</b><br>
-        <span style='color: red; font-weight: bold;'>—</span> GPX Route<br>
-        <span style='color: blue; font-weight: bold;'>—</span> Included Bridges ({contained_bridge_count})<br>
-        <span style='color: brown; font-weight: bold;'>- -</span> Included Tunnels ({contained_tunnel_count})<br>
-        <span style='color: lightsteelblue; font-weight: bold;'>—</span> Excluded Bridges ({bridge_count - contained_bridge_count})<br>
-        <span style='color: rosybrown; font-weight: bold;'>- -</span> Excluded Tunnels ({tunnel_count - contained_tunnel_count})
-    </div>
-    """
-
-    # Save map first
     route_map.save(output_filename)
 
-    # Read the saved HTML file and inject legend
-    with open(output_filename, "r", encoding="utf-8") as f:
-        html_content = f.read()
-
-    # Insert legend before closing body tag
-    html_content = html_content.replace("</body>", legend_html + "</body>")
-
-    # Write back the modified HTML
-    with open(output_filename, "w", encoding="utf-8") as f:
-        f.write(html_content)
     logger.debug(
         f"Map saved to {output_filename} with {contained_bridge_count}/{bridge_count} bridges and {contained_tunnel_count}/{tunnel_count} tunnels contained in route buffer"
     )
