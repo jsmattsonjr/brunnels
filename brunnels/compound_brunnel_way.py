@@ -398,7 +398,7 @@ class CompoundBrunnelWay(Brunnel):
                     for comp in components
                     if comp.route_span
                 )
-                compound.route_span = RouteSpan(start_km, end_km, end_km - start_km)
+                compound.route_span = RouteSpan(start_km, end_km)
 
                 result.append(compound)
                 processed_indices.update(group_indices)
