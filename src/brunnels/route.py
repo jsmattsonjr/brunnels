@@ -4,6 +4,7 @@ Route data model for brunnel analysis.
 """
 
 from typing import Optional, Tuple, List, TextIO, Sequence
+import collections
 from dataclasses import dataclass, field
 import logging
 import math
@@ -380,7 +381,7 @@ class Route(Geometry):
         raw_ways = query_overpass_brunnels(bbox)
 
         brunnels = []
-        filtered_count = 0
+        filter_reason_counts = collections.Counter()
 
         for way_data in raw_ways:
             try:
@@ -390,7 +391,7 @@ class Route(Geometry):
 
                 # Count filtered brunnels but keep them for visualization
                 if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
-                    filtered_count += 1
+                    filter_reason_counts[brunnel.filter_reason] += 1
 
                 brunnels.append(brunnel)
             except (KeyError, ValueError) as e:
@@ -399,9 +400,13 @@ class Route(Geometry):
 
         logger.info(f"Found {len(brunnels)} brunnels near route")
 
-        if enable_tag_filtering and filtered_count > 0:
+        if enable_tag_filtering and sum(filter_reason_counts.values()) > 0:
+            reason_counts_str = ", ".join(
+                f"{reason.value}: {count}"
+                for reason, count in filter_reason_counts.items()
+            )
             logger.debug(
-                f"{filtered_count} brunnels filtered by cycling relevance tags (will show greyed out)"
+                f"{sum(filter_reason_counts.values())} brunnels filtered ({reason_counts_str}) (will show greyed out)"
             )
 
         # Check for containment within the route buffer and bearing alignment

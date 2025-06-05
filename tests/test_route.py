@@ -3,10 +3,14 @@ import os
 from io import StringIO
 import tempfile # Add this to the imports at the top of the file
 import math
+import logging # Added for logger mocking
+from unittest.mock import patch, MagicMock # Added for mocking
+import collections # Added for Counter, though not directly used in assertions here
 
 from brunnels.route import Route, RouteValidationError, route_spans_overlap
 from brunnels.geometry import Position # Corrected import for RouteSpan
-from brunnels.brunnel import RouteSpan # RouteSpan imported from brunnel module
+from brunnels.brunnel import RouteSpan, FilterReason # RouteSpan imported from brunnel module, FilterReason added
+from brunnels.brunnel_way import BrunnelWay # Added for potential mock object creation
 from gpxpy.gpx import GPXException # Corrected import for GPXException
 from brunnels.geometry_utils import haversine_distance # Required for manual check
 
@@ -480,3 +484,129 @@ def test_route_spans_overlap_point_span_outside():
     span_point_outside = RouteSpan(start_distance_km=10.1, end_distance_km=10.1)
     assert route_spans_overlap(span_outer, span_point_outside) is False
     assert route_spans_overlap(span_point_outside, span_outer) is False
+
+
+# Tests for Route.find_brunnels method
+class TestFindBrunnels: # Using a class for grouping related tests
+
+    @patch('brunnels.route.logger') # Target logger in route.py
+    @patch('brunnels.route.query_overpass_brunnels')
+    def test_find_brunnels_logging_detailed_filter_reasons(self, mock_query_overpass, mock_logger):
+        # 1. Set up a simple Route
+        # Making route points far apart to simplify containment logic for non-filtered items;
+        # for this test, we mostly care about tag filtering log.
+        route = Route(positions=[Position(0,0,0), Position(10,10,0)])
+
+        # 2. Prepare mock way_data to trigger various FilterReasons
+        mock_way_data = [
+            {'id': 1, 'type': 'way', 'tags': {'bicycle': 'no', 'highway': 'path'}, 'geometry': [{'lat': 0.1, 'lon': 0.1}, {'lat': 0.2, 'lon': 0.2}]}, # BICYCLE_NO
+            {'id': 2, 'type': 'way', 'tags': {'waterway': 'river'}, 'geometry': [{'lat': 1.1, 'lon': 1.1}, {'lat': 1.2, 'lon': 1.2}]}, # WATERWAY
+            {'id': 3, 'type': 'way', 'tags': {'railway': 'rail', 'service': 'mainline'}, 'geometry': [{'lat': 2.1, 'lon': 2.1}, {'lat': 2.2, 'lon': 2.2}]}, # RAILWAY
+            # This one should not be filtered by tags initially, but might be filtered by containment/alignment.
+            # To ensure it doesn't complicate the tag filtering log count, let's make its geometry far away or very short.
+            # For this test, we focus on the tag-based filter counts.
+            {'id': 4, 'type': 'way', 'tags': {'highway': 'residential'}, 'geometry': [{'lat': 30.0, 'lon': 30.0}, {'lat': 30.1, 'lon': 30.1}]}, # Not filtered by tags, likely not contained.
+            {'id': 5, 'type': 'way', 'tags': {'bicycle': 'dismount', 'highway':'cycleway'}, 'geometry': [{'lat': 0.3, 'lon': 0.3}, {'lat': 0.4, 'lon': 0.4}]} # BICYCLE_DISMOUNT
+        ]
+
+        # Configure mock query_overpass_brunnels
+        mock_query_overpass.return_value = mock_way_data
+
+        # Configure find_contained_brunnels to not interfere too much, or ensure items filtered by tags stay that way
+        # The actual BrunnelWay objects will be created. We need to ensure their filter_reason is set as expected.
+        # The logic inside find_brunnels will call BrunnelWay.from_overpass_data.
+        # If a brunnel is tag-filtered, its filter_reason is set there.
+        # find_contained_brunnels only processes brunnels with FilterReason.NONE.
+
+        # 3. Call find_brunnels
+        route.find_brunnels(
+            buffer=1000, # meters, large enough to find ways from Overpass query
+            route_buffer=50, # meters, for containment check
+            bearing_tolerance_degrees=30,
+            enable_tag_filtering=True,
+            keep_polygons=False
+        )
+
+        # 4. Construct the expected log message string
+        # Based on mock_way_data:
+        # - 1 BICYCLE_NO
+        # - 1 WATERWAY
+        # - 1 RAILWAY
+        # - 1 BICYCLE_DISMOUNT
+        # Total = 4 tag-filtered brunnels.
+        # The non-tag-filtered one (id:4) will be processed for containment.
+        # If it's not contained, it gets FilterReason.NOT_CONTAINED. This happens *after* the tag filtering log.
+        # So, the log message we are testing should only reflect the initial tag-based filtering.
+
+        expected_total_filtered = 4
+
+        # The order of reasons in filter_reason_counts can vary.
+        # Python 3.7+ Counters remember insertion order. Let's assume that for now.
+        # BrunnelWay.from_overpass_data processes tags in a specific order usually.
+        # FilterReason.BICYCLE_NO.value = "bicycle=no"
+        # FilterReason.WATERWAY.value = "has waterway tag"
+        # FilterReason.RAILWAY.value = "railway (not abandoned)"
+        # FilterReason.BICYCLE_DISMOUNT.value = "bicycle=dismount"
+
+        # Expected string parts:
+        expected_parts = {
+            f"{FilterReason.BICYCLE_NO.value}: 1",
+            f"{FilterReason.WATERWAY.value}: 1",
+            f"{FilterReason.RAILWAY.value}: 1",
+            f"{FilterReason.BICYCLE_DISMOUNT.value}: 1"
+        }
+
+        # Iterate through logger calls to find the one we're interested in
+        found_log_call = False
+        for call_args in mock_logger.debug.call_args_list:
+            log_message = call_args[0][0] # First argument of the call
+            if "brunnels filtered" in log_message and "will show greyed out" in log_message:
+                found_log_call = True
+                # Check total count
+                assert f"{expected_total_filtered} brunnels filtered" in log_message
+                # Check individual reason counts
+                for part in expected_parts:
+                    assert part in log_message
+                break
+
+        assert found_log_call, "The expected debug log message for filtered brunnels was not found."
+
+    @patch('brunnels.route.logger')
+    @patch('brunnels.route.query_overpass_brunnels')
+    def test_find_brunnels_logging_no_tag_filtered_brunnels(self, mock_query_overpass, mock_logger):
+        route = Route(positions=[Position(0,0,0), Position(10,10,0)])
+        mock_way_data = [
+            {'id': 1, 'type': 'way', 'tags': {'highway': 'residential'}, 'geometry': [{'lat': 0.1, 'lon': 0.1}]},
+            {'id': 2, 'type': 'way', 'tags': {'bridge': 'yes'}, 'geometry': [{'lat': 1.1, 'lon': 1.1}]}
+        ]
+        mock_query_overpass.return_value = mock_way_data
+
+        route.find_brunnels(
+            buffer=1000, route_buffer=50, bearing_tolerance_degrees=30,
+            enable_tag_filtering=True, keep_polygons=False
+        )
+
+        # Assert that the specific log message about tag-filtered brunnels is NOT called
+        for call_args in mock_logger.debug.call_args_list:
+            log_message = call_args[0][0]
+            assert not ("brunnels filtered" in log_message and "will show greyed out" in log_message)
+
+    @patch('brunnels.route.logger')
+    @patch('brunnels.route.query_overpass_brunnels')
+    def test_find_brunnels_tag_filtering_disabled_logging(self, mock_query_overpass, mock_logger):
+        route = Route(positions=[Position(0,0,0), Position(10,10,0)])
+        mock_way_data = [ # Same data that would be filtered if enabled
+            {'id': 1, 'type': 'way', 'tags': {'bicycle': 'no'}, 'geometry': [{'lat': 0.1, 'lon': 0.1}]},
+        ]
+        mock_query_overpass.return_value = mock_way_data
+
+        route.find_brunnels(
+            buffer=1000, route_buffer=50, bearing_tolerance_degrees=30,
+            enable_tag_filtering=False, # Tag filtering disabled
+            keep_polygons=False
+        )
+
+        # Assert that the specific log message about tag-filtered brunnels is NOT called
+        for call_args in mock_logger.debug.call_args_list:
+            log_message = call_args[0][0]
+            assert not ("brunnels filtered" in log_message and "will show greyed out" in log_message)
