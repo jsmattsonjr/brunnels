@@ -301,7 +301,7 @@ class Route(Geometry):
             return
 
         # Filter each overlap group, keeping only the nearest
-        total_filtered = 0
+        filtered = 0
         for group in overlap_groups:
             logger.debug(f"Processing overlap group with {len(group)} brunnels")
 
@@ -327,15 +327,15 @@ class Route(Geometry):
             for brunnel, distance in brunnel_distances[1:]:
                 brunnel.filter_reason = FilterReason.NOT_NEAREST
                 brunnel.contained_in_route = False
-                total_filtered += 1
+                filtered += 1
 
                 logger.debug(
                     f"  Filtered: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
                 )
 
-        if total_filtered > 0:
+        if filtered > 0:
             logger.debug(
-                f"Filtered {total_filtered} overlapping brunnels, keeping nearest in each group"
+                f"Filtered {filtered} overlapping brunnels, keeping nearest in each group"
             )
 
     def find_brunnels(
