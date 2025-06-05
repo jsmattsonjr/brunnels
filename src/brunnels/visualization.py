@@ -79,7 +79,7 @@ def create_route_map(
     route: Route,
     output_filename: str,
     brunnels: Sequence[Brunnel],
-    buffer_km: float,
+    buffer_m: float,
 ) -> None:
     """
     Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
@@ -88,7 +88,7 @@ def create_route_map(
         route: Route object representing the route
         output_filename: Path where HTML map file should be saved
         brunnels: Sequence of Brunnel objects to display on map
-        buffer_km: Buffer distance in kilometers for map bounds (default: 1.0)
+        buffer_m: Buffer distance in meters for map bounds (default: 1.0)
 
     Raises:
         ValueError: If route is empty
@@ -97,7 +97,7 @@ def create_route_map(
         raise ValueError("Cannot create map for empty route")
 
     # Calculate buffered bounding box using existing function
-    south, west, north, east = route.get_bbox(buffer_km)
+    south, west, north, east = route.get_bbox(buffer_m)
 
     center_lat = (south + north) / 2
     center_lon = (west + east) / 2

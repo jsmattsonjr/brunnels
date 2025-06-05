@@ -68,7 +68,7 @@ python3 -m brunnels.cli your_route.gpx
 
 This will:
 1. Parse your GPX file
-2. Find all bridges and tunnels in an area extending 100m beyond your route's bounding box
+2. Find all bridges and tunnels in an area extending 10m beyond your route's bounding box
 3. Filter brunnels based on cycling relevance and bearing alignment with your route
 4. Generate an interactive map with a filename based on your input file (e.g., `route.gpx` → `route map.html`)
 5. Automatically open the map in your default browser
@@ -102,7 +102,7 @@ python3 -m brunnels.cli route.gpx \
 ### Options
 
 - `--output FILE`: Specify output HTML filename (default: auto-generated based on input filename)
-- `--bbox-buffer DISTANCE`: Search radius around route in kilometers (default: 0.1km)
+- `--bbox-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
 - `--no-tag-filtering`: Disable filtering based on cycling relevance
@@ -137,7 +137,7 @@ route = Route.from_file("my_route.gpx")
 
 # Find brunnels
 brunnels = route.find_brunnels(
-    buffer_km=0.1,
+    buffer_m=10,  # Changed from buffer_km=0.1
     route_buffer_m=3.0,
     bearing_tolerance_degrees=20.0,
     enable_tag_filtering=True,
@@ -146,7 +146,7 @@ brunnels = route.find_brunnels(
 
 # Create visualization
 from brunnels import visualization
-visualization.create_route_map(route, "map.html", brunnels, 0.1)
+visualization.create_route_map(route, "map.html", brunnels, 10) # Changed from 0.1
 ```
 
 ## Understanding the Output
