@@ -81,7 +81,7 @@ If the output file already exists, the tool will automatically try numbered vari
 ```bash
 brunnels route.gpx \
   --output my_map.html \
-  --buffer 0.5 \
+  --bbox-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
   --no-tag-filtering \
@@ -92,7 +92,7 @@ brunnels route.gpx \
 ```bash
 python3 -m brunnels.cli route.gpx \
   --output my_map.html \
-  --buffer 0.5 \
+  --bbox-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
   --no-tag-filtering \
@@ -102,7 +102,7 @@ python3 -m brunnels.cli route.gpx \
 ### Options
 
 - `--output FILE`: Specify output HTML filename (default: auto-generated based on input filename)
-- `--buffer DISTANCE`: Search radius around route in kilometers (default: 0.1km)
+- `--bbox-buffer DISTANCE`: Search radius around route in kilometers (default: 0.1km)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
 - `--no-tag-filtering`: Disable filtering based on cycling relevance

@@ -51,7 +51,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Output HTML map file (default: auto-generated based on input filename)",
     )
     parser.add_argument(
-        "--buffer",
+        "--bbox-buffer",
         type=float,
         default=0.1,
         help="Search buffer around route in kilometers (default: 0.1)",
@@ -227,7 +227,7 @@ def main():
     # Find bridges and tunnels near the route (containment detection included)
     try:
         brunnels: Sequence[Brunnel] = route.find_brunnels(
-            args.buffer,
+            args.bbox_buffer,
             args.route_buffer,
             bearing_tolerance_degrees=args.bearing_tolerance,
             enable_tag_filtering=not args.no_tag_filtering,
@@ -258,7 +258,7 @@ def main():
 
     # Create visualization map
     try:
-        visualization.create_route_map(route, output_filename, brunnels, args.buffer)
+        visualization.create_route_map(route, output_filename, brunnels, args.bbox_buffer)
     except Exception as e:
         logger.error(f"Failed to create map: {e}")
         sys.exit(1)
