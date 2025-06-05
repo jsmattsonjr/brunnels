@@ -38,7 +38,7 @@ class Route(Geometry):
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
-    _bbox_buffer_km: Optional[float] = field(default=None, init=False, repr=False)
+    _bbox_buffer_m: Optional[float] = field(default=None, init=False, repr=False)
     _cumulative_distances: Optional[List[float]] = field(
         default=None, init=False, repr=False
     )
@@ -48,12 +48,12 @@ class Route(Geometry):
         """Return the list of Position objects for this geometry."""
         return self.positions
 
-    def get_bbox(self, buffer_km: float = 1.0) -> Tuple[float, float, float, float]:
+    def get_bbox(self, buffer_m: float = 1.0) -> Tuple[float, float, float, float]:
         """
         Get memoized bounding box for this route with buffer.
 
         Args:
-            buffer_km: Buffer distance in kilometers (default: 1.0)
+            buffer_m: Buffer distance in meters (default: 1.0)
 
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
@@ -64,18 +64,18 @@ class Route(Geometry):
         if not self.positions:
             raise ValueError("Cannot calculate bounding box for empty route")
 
-        if self._bbox is None or self._bbox_buffer_km != buffer_km:
-            self._bbox = self._calculate_bbox(buffer_km)
-            self._bbox_buffer_km = buffer_km
+        if self._bbox is None or self._bbox_buffer_m != buffer_m:
+            self._bbox = self._calculate_bbox(buffer_m)
+            self._bbox_buffer_m = buffer_m
 
         return self._bbox
 
-    def _calculate_bbox(self, buffer_km: float) -> Tuple[float, float, float, float]:
+    def _calculate_bbox(self, buffer_m: float) -> Tuple[float, float, float, float]:
         """
         Calculate bounding box for route with optional buffer.
 
         Args:
-            buffer_km: Buffer distance in kilometers
+            buffer_m: Buffer distance in meters
 
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
@@ -86,12 +86,12 @@ class Route(Geometry):
         min_lat, max_lat = min(latitudes), max(latitudes)
         min_lon, max_lon = min(longitudes), max(longitudes)
 
-        # Convert buffer from km to approximate degrees
-        # 1 degree latitude ≈ 111 km
+        # Convert buffer from m to approximate degrees
+        # 1 degree latitude ≈ 111 km = 111000m
         # longitude varies by latitude, use average
         avg_lat = (min_lat + max_lat) / 2
-        lat_buffer = buffer_km / 111.0
-        lon_buffer = buffer_km / (111.0 * abs(cos(radians(avg_lat))))
+        lat_buffer = buffer_m / 111000.0
+        lon_buffer = buffer_m / (111000.0 * abs(cos(radians(avg_lat))))
 
         # Apply buffer (ensure we don't exceed valid coordinate ranges)
         south = max(-90.0, min_lat - lat_buffer)
@@ -100,7 +100,7 @@ class Route(Geometry):
         east = min(180.0, max_lon + lon_buffer)
 
         logger.debug(
-            f"Route bounding box: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {buffer_km}km buffer"
+            f"Route bounding box: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {buffer_m}m buffer"
         )
 
         return (south, west, north, east)
@@ -340,7 +340,7 @@ class Route(Geometry):
 
     def find_brunnels(
         self,
-        buffer_km: float,
+        buffer_m: float,
         route_buffer_m: float,
         bearing_tolerance_degrees: float,
         enable_tag_filtering: bool,
@@ -350,7 +350,7 @@ class Route(Geometry):
         Find all bridges and tunnels near this route and check for containment within route buffer.
 
         Args:
-            buffer_km: Buffer distance in kilometers to search around route
+            buffer_m: Buffer distance in meters to search around route
             route_buffer_m: Buffer distance in meters to apply around route for containment detection
             bearing_tolerance_degrees: Bearing alignment tolerance in degrees
             enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
@@ -363,7 +363,7 @@ class Route(Geometry):
             logger.warning("Cannot find brunnels for empty route")
             return []
 
-        bbox = self.get_bbox(buffer_km)
+        bbox = self.get_bbox(buffer_m)
 
         # Calculate and log query area before API call
         south, west, north, east = bbox
