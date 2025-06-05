@@ -34,14 +34,14 @@ class FilterReason(Enum):
     """Enumeration for brunnel filtering reasons."""
 
     NONE = "none"
-    BICYCLE_NO = "bicycle=no"
-    WATERWAY = "has waterway tag"
-    RAILWAY = "railway (not abandoned)"
-    POLYGON = "closed way (first node equals last node)"
-    NOT_CONTAINED = "not contained within route buffer"
-    NO_ROUTE_SPAN = "failed to calculate route span"
-    UNALIGNED = "bearing not aligned with route"
-    NOT_NEAREST = "not nearest among overlapping brunnels"
+    BICYCLE_NO = "bicycle_no"
+    WATERWAY = "waterway"
+    RAILWAY = "railway_not_abandoned"
+    POLYGON = "closed_way"
+    NOT_CONTAINED = "outwith_route_buffer"
+    NO_ROUTE_SPAN = "no_route_span"
+    UNALIGNED = "not_aligned_with_route"
+    NOT_NEAREST = "not_nearest_among_overlapping_brunnels"
 
     def __str__(self) -> str:
         return self.value
@@ -58,6 +58,7 @@ class Direction(Enum):
 
 
 from dataclasses import dataclass, field
+
 
 @dataclass
 class RouteSpan:

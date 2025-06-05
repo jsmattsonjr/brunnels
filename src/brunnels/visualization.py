@@ -258,7 +258,7 @@ def create_route_map(
         logger.debug(f"total_tunnels_found={tunnel_count}")
 
         for reason, count in filter_reason_counts.items():
-            logger.debug((f"filtered_reason: {reason.value}={count}"))
+            logger.debug((f"filtered_reason[{reason.value}]={count}"))
 
         logger.debug(f"contained_bridges={contained_bridge_count}")
         logger.debug(f"contained_tunnels={contained_tunnel_count}")
