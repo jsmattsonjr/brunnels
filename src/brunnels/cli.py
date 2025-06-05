@@ -227,7 +227,7 @@ def main():
     # Find bridges and tunnels near the route (containment detection included)
     try:
         brunnels: Sequence[Brunnel] = route.find_brunnels(
-            args.bbox_buffer_m,
+            args.bbox_buffer,
             args.route_buffer,
             bearing_tolerance_degrees=args.bearing_tolerance,
             enable_tag_filtering=not args.no_tag_filtering,
@@ -258,7 +258,9 @@ def main():
 
     # Create visualization map
     try:
-        visualization.create_route_map(route, output_filename, brunnels, args.bbox_buffer_m)
+        visualization.create_route_map(
+            route, output_filename, brunnels, args.bbox_buffer
+        )
     except Exception as e:
         logger.error(f"Failed to create map: {e}")
         sys.exit(1)

@@ -137,8 +137,8 @@ route = Route.from_file("my_route.gpx")
 
 # Find brunnels
 brunnels = route.find_brunnels(
-    buffer_m=10,  # Changed from buffer_km=0.1
-    route_buffer_m=3.0,
+    buffer=10,  # Changed from buffer_km=0.1
+    route_buffer=3.0,
     bearing_tolerance_degrees=20.0,
     enable_tag_filtering=True,
     keep_polygons=False

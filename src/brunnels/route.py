@@ -38,7 +38,7 @@ class Route(Geometry):
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
-    _bbox_buffer_m: Optional[float] = field(default=None, init=False, repr=False)
+    _bbox_buffer: Optional[float] = field(default=None, init=False, repr=False)
     _cumulative_distances: Optional[List[float]] = field(
         default=None, init=False, repr=False
     )
@@ -48,12 +48,12 @@ class Route(Geometry):
         """Return the list of Position objects for this geometry."""
         return self.positions
 
-    def get_bbox(self, buffer_m: float = 1.0) -> Tuple[float, float, float, float]:
+    def get_bbox(self, buffer: float = 1.0) -> Tuple[float, float, float, float]:
         """
         Get memoized bounding box for this route with buffer.
 
         Args:
-            buffer_m: Buffer distance in meters (default: 1.0)
+            buffer: Buffer distance in meters (default: 1.0)
 
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
@@ -64,18 +64,18 @@ class Route(Geometry):
         if not self.positions:
             raise ValueError("Cannot calculate bounding box for empty route")
 
-        if self._bbox is None or self._bbox_buffer_m != buffer_m:
-            self._bbox = self._calculate_bbox(buffer_m)
-            self._bbox_buffer_m = buffer_m
+        if self._bbox is None or self._bbox_buffer != buffer:
+            self._bbox = self._calculate_bbox(buffer)
+            self._bbox_buffer = buffer
 
         return self._bbox
 
-    def _calculate_bbox(self, buffer_m: float) -> Tuple[float, float, float, float]:
+    def _calculate_bbox(self, buffer: float) -> Tuple[float, float, float, float]:
         """
         Calculate bounding box for route with optional buffer.
 
         Args:
-            buffer_m: Buffer distance in meters
+            buffer: Buffer distance in meters
 
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
@@ -90,8 +90,8 @@ class Route(Geometry):
         # 1 degree latitude ≈ 111 km = 111000m
         # longitude varies by latitude, use average
         avg_lat = (min_lat + max_lat) / 2
-        lat_buffer = buffer_m / 111000.0
-        lon_buffer = buffer_m / (111000.0 * abs(cos(radians(avg_lat))))
+        lat_buffer = buffer / 111000.0
+        lon_buffer = buffer / (111000.0 * abs(cos(radians(avg_lat))))
 
         # Apply buffer (ensure we don't exceed valid coordinate ranges)
         south = max(-90.0, min_lat - lat_buffer)
@@ -100,7 +100,7 @@ class Route(Geometry):
         east = min(180.0, max_lon + lon_buffer)
 
         logger.debug(
-            f"Route bounding box: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {buffer_m}m buffer"
+            f"Route bounding box: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {buffer}m buffer"
         )
 
         return (south, west, north, east)
@@ -120,7 +120,7 @@ class Route(Geometry):
     def find_contained_brunnels(
         self,
         brunnels: List[Brunnel],
-        route_buffer_m: float,
+        route_buffer: float,
         bearing_tolerance_degrees: float,
     ) -> None:
         """
@@ -129,7 +129,7 @@ class Route(Geometry):
 
         Args:
             brunnels: List of Brunnel objects to check (modified in-place)
-            route_buffer_m: Buffer distance in meters to apply around the route (minimum: 1.0)
+            route_buffer: Buffer distance in meters to apply around the route (minimum: 1.0)
             bearing_tolerance_degrees: Bearing alignment tolerance in degrees
         """
         if not self.positions:
@@ -137,11 +137,11 @@ class Route(Geometry):
             return
 
         # Ensure minimum buffer for containment analysis
-        if route_buffer_m < 1.0:
+        if route_buffer < 1.0:
             logger.warning(
-                f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer_m}m"
+                f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer}m"
             )
-            route_buffer_m = 1.0
+            route_buffer = 1.0
 
         # Pre-calculate cumulative distances for route span calculations
         logger.debug("Pre-calculating route distances...")
@@ -157,8 +157,8 @@ class Route(Geometry):
 
         # Convert buffer from meters to approximate degrees
         avg_lat = self.positions[0].latitude
-        lat_buffer = route_buffer_m / 111000.0  # 1 degree latitude ≈ 111 km
-        lon_buffer = route_buffer_m / (111000.0 * abs(cos(radians(avg_lat))))
+        lat_buffer = route_buffer / 111000.0  # 1 degree latitude ≈ 111 km
+        lon_buffer = route_buffer / (111000.0 * abs(cos(radians(avg_lat))))
 
         # Use the smaller of the two buffers to be conservative
         buffer_degrees = min(lat_buffer, lon_buffer)
@@ -221,7 +221,7 @@ class Route(Geometry):
 
         logger.debug(
             f"Found {contained_count} brunnels completely contained and aligned within the route buffer "
-            f"out of {len(brunnels)} total (with {route_buffer_m}m buffer, {bearing_tolerance_degrees}° tolerance)"
+            f"out of {len(brunnels)} total (with {route_buffer}m buffer, {bearing_tolerance_degrees}° tolerance)"
         )
 
         if unaligned_count > 0:
@@ -340,8 +340,8 @@ class Route(Geometry):
 
     def find_brunnels(
         self,
-        buffer_m: float,
-        route_buffer_m: float,
+        buffer: float,
+        route_buffer: float,
         bearing_tolerance_degrees: float,
         enable_tag_filtering: bool,
         keep_polygons: bool,
@@ -350,8 +350,8 @@ class Route(Geometry):
         Find all bridges and tunnels near this route and check for containment within route buffer.
 
         Args:
-            buffer_m: Buffer distance in meters to search around route
-            route_buffer_m: Buffer distance in meters to apply around route for containment detection
+            buffer: Buffer distance in meters to search around route
+            route_buffer: Buffer distance in meters to apply around route for containment detection
             bearing_tolerance_degrees: Bearing alignment tolerance in degrees
             enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
             keep_polygons: Whether to keep closed ways (polygons) where first node equals last node
@@ -363,7 +363,7 @@ class Route(Geometry):
             logger.warning("Cannot find brunnels for empty route")
             return []
 
-        bbox = self.get_bbox(buffer_m)
+        bbox = self.get_bbox(buffer)
 
         # Calculate and log query area before API call
         south, west, north, east = bbox
@@ -384,7 +384,9 @@ class Route(Geometry):
 
         for way_data in raw_ways:
             try:
-                brunnel = BrunnelWay.from_overpass_data(way_data, keep_polygons, enable_tag_filtering)
+                brunnel = BrunnelWay.from_overpass_data(
+                    way_data, keep_polygons, enable_tag_filtering
+                )
 
                 # Count filtered brunnels but keep them for visualization
                 if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
@@ -403,9 +405,7 @@ class Route(Geometry):
             )
 
         # Check for containment within the route buffer and bearing alignment
-        self.find_contained_brunnels(
-            brunnels, route_buffer_m, bearing_tolerance_degrees
-        )
+        self.find_contained_brunnels(brunnels, route_buffer, bearing_tolerance_degrees)
 
         # Count contained vs total brunnels
         bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
