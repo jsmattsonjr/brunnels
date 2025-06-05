@@ -4,6 +4,7 @@ Route visualization using folium maps with polymorphic brunnel handling.
 """
 
 from typing import Sequence
+import collections
 import logging
 import folium
 from folium.template import Template
@@ -80,6 +81,7 @@ def create_route_map(
     output_filename: str,
     brunnels: Sequence[Brunnel],
     buffer: float,
+    metrics: bool,
 ) -> None:
     """
     Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
@@ -133,6 +135,9 @@ def create_route_map(
     tunnel_count = 0
     contained_bridge_count = 0
     contained_tunnel_count = 0
+    compound_count = 0
+    individual_count = 0
+    filter_reason_counts = collections.Counter()
 
     for brunnel in brunnels:
         # Use polymorphic interface - all brunnels have these properties
@@ -144,6 +149,9 @@ def create_route_map(
         contained = brunnel.contained_in_route
         filter_reason = brunnel.filter_reason
         route_span = brunnel.route_span
+
+        if filter_reason != FilterReason.NONE:
+            filter_reason_counts[filter_reason] += 1
 
         # Determine color and opacity based on containment status and filtering
         if contained:
@@ -169,6 +177,12 @@ def create_route_map(
             bridge_count += 1
         else:
             tunnel_count += 1
+
+        if brunnel.contained_in_route:
+            if hasattr(brunnel, "components"):  # CompoundBrunnelWay
+                compound_count += 1
+            else:
+                individual_count += 1
 
         # Create popup text with full metadata
         if contained:
@@ -235,3 +249,20 @@ def create_route_map(
     logger.debug(
         f"Map saved to {output_filename} with {contained_bridge_count}/{bridge_count} bridges and {contained_tunnel_count}/{tunnel_count} tunnels contained in route buffer"
     )
+
+    if metrics and sum(filter_reason_counts.values()) > 0:
+        # Log detailed filtering metrics
+        logger.debug("=== BRUNNELS_METRICS ===")
+        logger.debug(f"total_brunnels_found={len(brunnels)}")
+        logger.debug(f"total_bridges_found={bridge_count}")
+        logger.debug(f"total_tunnels_found={tunnel_count}")
+
+        for reason, count in filter_reason_counts.items():
+            logger.debug((f"filtered_reason: {reason.value}={count}"))
+
+        logger.debug(f"contained_bridges={contained_bridge_count}")
+        logger.debug(f"contained_tunnels={contained_tunnel_count}")
+        logger.debug(f"final_included_individual={individual_count}")
+        logger.debug(f"final_included_compound={compound_count}")
+        logger.debug(f"final_included_total={individual_count + compound_count}")
+        logger.debug("=== END_BRUNNELS_METRICS ===")

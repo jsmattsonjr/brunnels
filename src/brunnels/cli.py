@@ -100,6 +100,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable creation of compound brunnels from adjacent segments",
     )
+    parser.add_argument(
+        "--metrics",
+        action="store_true",
+        help="Output structured metrics after processing",
+    )
     return parser
 
 
@@ -259,7 +264,7 @@ def main():
     # Create visualization map
     try:
         visualization.create_route_map(
-            route, output_filename, brunnels, args.bbox_buffer
+            route, output_filename, brunnels, args.bbox_buffer, args.metrics
         )
     except Exception as e:
         logger.error(f"Failed to create map: {e}")
