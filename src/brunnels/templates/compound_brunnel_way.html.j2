@@ -1,0 +1,42 @@
+<b>Compound {{ brunnel_type.value.capitalize() }}</b> ({{ components|length }} segments)
+
+{% if primary_name != "unnamed" %}
+    <br><b>Name:</b> {{ primary_name }}
+{% endif %}
+
+{% if route_span %}
+    <br><b>Route Span:</b> {{ "%.2f"|format(route_span.start_distance_km) }} - {{ "%.2f"|format(route_span.end_distance_km) }} km (length: {{ "%.2f"|format(route_span.length_km) }} km)
+{% endif %}
+
+<br><b>Combined OSM ID:</b> {{ combined_metadata.id }}
+
+<br><br><b>Component Segments:</b>
+
+{% for component in components %}
+    <br><br><b>Segment {{ loop.index }}:</b>
+
+    {% set comp_tags = component.metadata.get("tags", {}) %}
+    {% if comp_tags.name %}
+        <br>&nbsp;&nbsp;<b>Name:</b> {{ comp_tags.name }}
+    {% endif %}
+
+    <br>&nbsp;&nbsp;<b>OSM ID:</b> {{ component.get_id() }}
+
+    {% if component.route_span %}
+        <br>&nbsp;&nbsp;<b>Span:</b> {{ "%.2f"|format(component.route_span.start_distance_km) }} - {{ "%.2f"|format(component.route_span.end_distance_km) }} km ({{ "%.2f"|format(component.route_span.length_km) }} km)
+    {% endif %}
+
+    {% set remaining_tags = {} %}
+    {% for k, v in comp_tags.items() %}
+        {% if k != "name" %}
+            {% set _ = remaining_tags.update({k: v}) %}
+        {% endif %}
+    {% endfor %}
+
+    {% if remaining_tags %}
+        <br>&nbsp;&nbsp;<b>Tags:</b>
+        {% for key, value in remaining_tags.items()|sort %}
+            <br>&nbsp;&nbsp;&nbsp;&nbsp;<i>{{ key }}:</i> {{ value }}
+        {% endfor %}
+    {% endif %}
+{% endfor %}

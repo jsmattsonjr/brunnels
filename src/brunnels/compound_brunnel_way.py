@@ -6,6 +6,8 @@ Compound BrunnelWay implementation for handling adjacent brunnel segments.
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 import logging
+from jinja2 import Environment, FileSystemLoader
+import os
 
 from .geometry import Position
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
@@ -213,69 +215,27 @@ class CompoundBrunnelWay(Brunnel):
 
     def to_html(self) -> str:
         """
-        Format this compound brunnel's metadata into HTML for popup display.
+        Format this compound brunnel's metadata into HTML for popup display using Jinja2.
 
         Returns:
             HTML-formatted string with compound brunnel information
         """
-        html_parts = []
+        # Get the directory of the current file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Path to the templates directory
+        template_dir = os.path.join(current_dir, "templates")
 
-        # Header with compound information
-        brunnel_type = self.brunnel_type.value.capitalize()
-        component_count = len(self.components)
-        primary_name = self.get_primary_name()
+        env = Environment(loader=FileSystemLoader(template_dir), autoescape=True)
+        template = env.get_template("compound_brunnel_way.html.j2")
 
-        html_parts.append(
-            f"<b>Compound {brunnel_type}</b> ({component_count} segments)"
-        )
-
-        if primary_name != "unnamed":
-            html_parts.append(f"<br><b>Name:</b> {primary_name}")
-
-        # Route span information
-        if self.route_span:
-            span = self.route_span
-            html_parts.append(
-                f"<br><b>Route Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
-                f"(length: {span.length_km:.2f} km)"
-            )
-
-        # Combined OSM ID
-        combined_metadata = self.get_combined_metadata()
-        html_parts.append(f"<br><b>Combined OSM ID:</b> {combined_metadata['id']}")
-
-        # Component details
-        html_parts.append("<br><br><b>Component Segments:</b>")
-
-        for i, component in enumerate(self.components):
-            html_parts.append(f"<br><br><b>Segment {i+1}:</b>")
-
-            # Component name
-            comp_tags = component.metadata.get("tags", {})
-            if "name" in comp_tags:
-                html_parts.append(f"<br>&nbsp;&nbsp;<b>Name:</b> {comp_tags['name']}")
-
-            # Component OSM ID
-            html_parts.append(f"<br>&nbsp;&nbsp;<b>OSM ID:</b> {component.get_id()}")
-
-            # Component route span
-            if component.route_span:
-                span = component.route_span
-                html_parts.append(
-                    f"<br>&nbsp;&nbsp;<b>Span:</b> {span.start_distance_km:.2f} - {span.end_distance_km:.2f} km "
-                    f"({span.length_km:.2f} km)"
-                )
-
-            # Component tags (excluding name which we already showed)
-            remaining_tags = {k: v for k, v in comp_tags.items() if k != "name"}
-            if remaining_tags:
-                html_parts.append("<br>&nbsp;&nbsp;<b>Tags:</b>")
-                for key, value in sorted(remaining_tags.items()):
-                    html_parts.append(
-                        f"<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>{key}:</i> {value}"
-                    )
-
-        return "".join(html_parts)
+        context = {
+            "brunnel_type": self.brunnel_type,
+            "components": self.components,
+            "primary_name": self.get_primary_name(),
+            "route_span": self.route_span,
+            "combined_metadata": self.get_combined_metadata(),
+        }
+        return template.render(context)
 
     @classmethod
     def detect_adjacent_groups(cls, brunnels: List[BrunnelWay]) -> List[List[int]]:

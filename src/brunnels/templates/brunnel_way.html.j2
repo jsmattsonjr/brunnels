@@ -1,0 +1,88 @@
+{% macro format_complex_value(key, value, indent_level=0) %}
+    {% set indent = "&nbsp;" * (indent_level * 4) %}
+    {% if value is mapping %}
+        {% if not value %}
+            {{ indent|safe }}<i>{{ key }}:</i> {}
+        {% else %}
+            {{ indent|safe }}<i>{{ key }}:</i>
+            {% for k, v in value.items() %}
+                {% if v is mapping or v is sequence and v is not string %}
+                    <br>{{ format_complex_value(k, v, indent_level + 1) }}
+                {% else %}
+                    <br>{{ ("&nbsp;" * ((indent_level + 1) * 4))|safe }}<i>{{ k }}:</i> {{ v }}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    {% elif value is sequence and value is not string %}
+        {% if not value %}
+            {{ indent|safe }}<i>{{ key }}:</i> []
+        {% else %}
+            {{ indent|safe }}<i>{{ key }}:</i>
+            {% for item in value %}
+                {% if item is mapping or item is sequence and item is not string %}
+                    <br>{{ format_complex_value("[" ~ loop.index0 ~ "]", item, indent_level + 1) }}
+                {% else %}
+                    <br>{{ ("&nbsp;" * ((indent_level + 1) * 4))|safe }}[{{ loop.index0 }}]: {{ item }}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    {% else %}
+        {{ indent|safe }}<i>{{ key }}:</i> {{ value }}
+    {% endif %}
+{% endmacro %}
+
+{% if metadata.tags.name %}
+    <b>{{ metadata.tags.name }}</b>
+{% endif %}
+
+{% if metadata.tags.alt_name %}
+    <br><b>AKA:</b> {{ metadata.tags.alt_name }}
+{% endif %}
+
+<br><b>OSM ID:</b> {{ id }}
+
+{% set remaining_tags = {} %}
+{% for k, v in metadata.tags.items() %}
+    {% if k not in ["name", "alt_name"] %}
+        {% set _ = remaining_tags.update({k: v}) %}
+    {% endif %}
+{% endfor %}
+
+{% if remaining_tags %}
+    <br><b>Tags:</b>
+    {% for key, value in remaining_tags.items()|sort %}
+        <br>&nbsp;&nbsp;<i>{{ key }}:</i> {{ value }}
+    {% endfor %}
+{% endif %}
+
+{% set other_data = {} %}
+{% for k, v in metadata.items() %}
+    {% if k not in ["tags", "id", "geometry", "type"] %}
+        {% set _ = other_data.update({k: v}) %}
+    {% endif %}
+{% endfor %}
+
+{% if other_data %}
+    <br><b>Other:</b>
+    {% for key, value in other_data.items()|sort %}
+        {% if value is mapping or value is sequence and value is not string %}
+            {% if key in ["nodes", "bounds"] %}
+                {% set formatted_value_lines = format_complex_value(key, value, 0).split('<br>') %}
+                <br>&nbsp;&nbsp;{{ formatted_value_lines[0]|safe }}<br>
+                {% for i in range(1, formatted_value_lines|length) %}
+                    {% if formatted_value_lines[i].strip() %}
+                        {{ formatted_value_lines[i]|safe }}<br>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                {% set value_str = value|string %}
+                {% if value_str|length > 50 %}
+                    {% set value_str = value_str[:47] + "..." %}
+                {% endif %}
+                <br>&nbsp;&nbsp;<i>{{ key }}:</i> {{ value_str }}
+            {% endif %}
+        {% else %}
+            <br>&nbsp;&nbsp;<i>{{ key }}:</i> {{ value }}
+        {% endif %}
+    {% endfor %}
+{% endif %}

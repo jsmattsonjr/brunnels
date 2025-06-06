@@ -867,3 +867,234 @@ def test_create_from_brunnels_preserves_original_list_order_for_non_compounded()
     assert indiv_A.metadata['id'] == 10
     assert indiv_B.metadata['id'] == 20
     assert indiv_C.metadata['id'] == 30
+
+
+# Helper to normalize HTML for comparison (basic normalization)
+def normalize_html(html_str: str) -> str:
+    return "".join(html_str.replace("<br>", "\n").split())
+
+
+# Tests for BrunnelWay.to_html (Jinja2 template rendering)
+def test_brunnel_way_to_html_full_metadata():
+    # Instance with most fields present
+    coords = [Position(latitude=40.7128, longitude=-74.0060), Position(latitude=40.7138, longitude=-74.0070)]
+    metadata = {
+        "id": "w123",
+        "type": "way", # This is usually present in OSM data
+        "tags": {
+            "name": "Brooklyn Bridge",
+            "alt_name": "East River Bridge",
+            "highway": "primary",
+            "lanes": "6",
+            "layer": "1",
+        },
+        "nodes": [101, 102, 103],
+        "bounds": { # Example of a complex structure
+            "minlat": 40.7120, "minlon": -74.0080,
+            "maxlat": 40.7140, "maxlon": -74.0050
+        },
+        "custom_other_field": "some value"
+    }
+    brunnel_way = BrunnelWay(
+        coords=coords, metadata=metadata, brunnel_type=BrunnelType.BRIDGE
+    )
+
+    expected_html = (
+        "<b>Brooklyn Bridge</b>"
+        "<br><b>AKA:</b> East River Bridge"
+        "<br><b>OSM ID:</b> w123"
+        "<br><b>Tags:</b>"
+        "<br>&nbsp;&nbsp;<i>highway:</i> primary"
+        "<br>&nbsp;&nbsp;<i>lanes:</i> 6"
+        "<br>&nbsp;&nbsp;<i>layer:</i> 1"
+        "<br><b>Other:</b>"
+        "<br>&nbsp;&nbsp;<i>bounds:</i><br>" # Note: format_complex_value adds a <br> after key:
+        "&nbsp;&nbsp;&nbsp;&nbsp;<i>maxlat:</i> 40.714<br>" # Macro output has <br> at end of each item line
+        "&nbsp;&nbsp;&nbsp;&nbsp;<i>maxlon:</i> -74.005<br>"
+        "&nbsp;&nbsp;&nbsp;&nbsp;<i>minlat:</i> 40.712<br>"
+        "&nbsp;&nbsp;&nbsp;&nbsp;<i>minlon:</i> -74.008<br>"
+        "<br>&nbsp;&nbsp;<i>custom_other_field:</i> some value" # Other simple field
+        "<br>&nbsp;&nbsp;<i>nodes:</i><br>"
+        "&nbsp;&nbsp;&nbsp;&nbsp;[0]: 101<br>"
+        "&nbsp;&nbsp;&nbsp;&nbsp;[1]: 102<br>"
+        "&nbsp;&nbsp;&nbsp;&nbsp;[2]: 103<br>"
+    )
+    # Normalize whitespace and remove trailing <br> from complex for comparison
+    actual_html = brunnel_way.to_html()
+
+    # The template might produce slightly different spacing or trailing <br> in complex types.
+    # Let's refine the expected HTML based on how the macro actually renders.
+    # The macro `format_complex_value` for dicts/lists:
+    #   {{ indent }}<i>{{ key }}:</i>
+    #   <br>{{ "&nbsp;" * ((indent_level + 1) * 4) }}<i>{{ k }}:</i> {{ v }}  <- for dict items
+    #   <br>{{ "&nbsp;" * ((indent_level + 1) * 4) }}[{{ loop.index0 }}]: {{ item }} <- for list items
+    # The structure in the python code was:
+    # html_parts.append("<br>" + "<br>".join(indented_lines)) where indented_lines were like "&nbsp;&nbsp;<i>key</i>: val"
+    # The template is:
+    # <br>
+    # {% for line in formatted_value %}
+    #     {% if line.strip() %}
+    #         &nbsp;&nbsp;{{ line }}<br>  <-- This adds an extra <br> at the end of each line from macro
+    #     {% endif %}
+    # {% endfor %}
+    # And the macro itself for dict:
+    # parts = [f"{indent}<i>{key}:</i>"]
+    # parts.append(f"{nested_indent}<i>{k}:</i> {v}") -> then "<br>".join(parts)
+    # So a complex value like 'bounds' would be rendered by macro as:
+    # <i>bounds:</i><br>&nbsp;&nbsp;&nbsp;&nbsp;<i>maxlat:</i> 40.714<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>maxlon:</i> -74.005 ...
+    # Then the main template does: <br>&nbsp;&nbsp;{{ above_output_line_1 }}<br>&nbsp;&nbsp;{{ above_output_line_2 }}<br>
+    # This means the expected HTML needs to be very precise.
+
+    # Let's re-derive expected HTML carefully from template structure:
+    expected_html_revised = (
+        "<b>Brooklyn Bridge</b>"
+        "<br><b>AKA:</b> East River Bridge"
+        "<br><b>OSM ID:</b> w123"
+        "<br><b>Tags:</b>"
+        "<br>&nbsp;&nbsp;<i>highway:</i> primary"
+        "<br>&nbsp;&nbsp;<i>lanes:</i> 6"
+        "<br>&nbsp;&nbsp;<i>layer:</i> 1"
+        "<br><b>Other:</b>"
+        # bounds (complex, handled by macro, then looped in main template)
+            # Key line gets 2 &nbsp; prefix from outer loop.
+            # Value lines from macro already have 4 &nbsp; and are used directly.
+            "<br>&nbsp;&nbsp;<i>bounds:</i><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;<i>minlat:</i> 40.712<br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;<i>minlon:</i> -74.008<br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;<i>maxlat:</i> 40.714<br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;<i>maxlon:</i> -74.005<br>"
+        # custom_other_field (simple)
+        "<br>&nbsp;&nbsp;<i>custom_other_field:</i> some value"
+        # nodes (complex, handled by macro, then looped in main template)
+            "<br>&nbsp;&nbsp;<i>nodes:</i><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;[0]: 101<br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;[1]: 102<br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;[2]: 103<br>"
+    )
+    # Final check on how split('<br>') and join with <br> works for the complex part
+    # format_complex_value for dict: "<i>key:</i><br>INDENT<i>k1:</i>v1<br>INDENT<i>k2:</i>v2"
+    # Then main template:
+    # <br> <!-- before "Other:" item -->
+    # &nbsp;&nbsp;{{ line from split by <br> }}<br> <!-- for each line -->
+    # So "<i>key:</i>" becomes "&nbsp;&nbsp;<i>key:</i><br>"
+    # "INDENT<i>k1:</i>v1" becomes "&nbsp;&nbsp;INDENT<i>k1:</i>v1<br>"
+    # This matches `expected_html_revised` structure.
+
+    assert normalize_html(actual_html) == normalize_html(expected_html_revised)
+
+
+def test_brunnel_way_to_html_minimal_metadata():
+    # Instance with only essential fields
+    coords = [Position(latitude=51.5074, longitude=-0.1278)] # Single point for simplicity if needed
+    metadata = {"id": "w456", "tags": {}} # No name, no alt_name, no other tags
+    brunnel_way = BrunnelWay(
+        coords=coords, metadata=metadata, brunnel_type=BrunnelType.TUNNEL
+    )
+    expected_html = "<br><b>OSM ID:</b> w456" # Only ID if no name/tags and no "Other"
+    # If metadata has 'type', it would appear in 'Other'. Let's assume it doesn't for minimal.
+    # The current BrunnelWay constructor doesn't add 'type' to self.metadata if not present.
+    # The template for "Other" checks: `if k not in ["tags", "id", "geometry", "type"]`
+    # So if self.metadata = {"id": "w456", "tags": {}}, other_data will be empty.
+    assert normalize_html(brunnel_way.to_html()) == normalize_html(expected_html)
+
+def test_brunnel_way_to_html_no_other_data():
+    coords = [Position(latitude=0,longitude=0)]
+    metadata = {
+        "id": "w789",
+        "tags": {"name": "Simple Bridge"},
+        # No 'nodes', 'bounds', or other custom fields that would go into "Other"
+        # 'type':'way' and 'geometry' are excluded by template logic.
+    }
+    brunnel_way = BrunnelWay(
+        coords=coords, metadata=metadata, brunnel_type=BrunnelType.BRIDGE
+    )
+    expected_html = (
+        "<b>Simple Bridge</b>"
+        "<br><b>OSM ID:</b> w789"
+        # No "Tags:" section if only name is present in tags and no other tags
+        # The template logic for remaining_tags:
+        # {% set remaining_tags = {} %}
+        # {% for k, v in metadata.tags.items() %}
+        #    {% if k not in ["name", "alt_name"] %} ...
+        # If only "name" is in tags, remaining_tags is empty, so "Tags:" is not printed.
+        # No "Other:" section if other_data is empty.
+    )
+    assert normalize_html(brunnel_way.to_html()) == normalize_html(expected_html)
+
+
+# Tests for CompoundBrunnelWay.to_html (Jinja2 template rendering)
+def test_compound_brunnel_way_to_html_basic():
+    comp1_coords = [Position(0,0), Position(0,1)]
+    comp1_meta = {"id": "c1", "tags": {"name": "Segment Alpha", "bridge": "yes"}}
+    comp1_span = RouteSpan(0.0, 1.0)
+    component1 = BrunnelWay(comp1_coords, comp1_meta, BrunnelType.BRIDGE, route_span=comp1_span)
+
+    comp2_coords = [Position(0,1), Position(0,2)]
+    comp2_meta = {"id": "c2", "tags": {"highway": "primary", "layer":"1"}} # No name for this one
+    comp2_span = RouteSpan(1.0, 2.0)
+    component2 = BrunnelWay(comp2_coords, comp2_meta, BrunnelType.BRIDGE, route_span=comp2_span)
+
+    compound_brunnel = CompoundBrunnelWay(
+        components=[component1, component2],
+        brunnel_type=BrunnelType.BRIDGE,
+        route_span=RouteSpan(0.0, 2.0) # Overall span
+    )
+    # Mock get_combined_metadata for simplicity as it's complex
+    # The to_html method calls self.get_combined_metadata() which computes it.
+    # The compound_brunnel_way.html.j2 template expects `combined_metadata.id`
+    # The real get_combined_metadata() produces an id like "c1;c2"
+
+    expected_html = (
+        "<b>Compound Bridge</b> (2 segments)"
+        "<br><b>Name:</b> Segment Alpha" # From component1 (primary name)
+        "<br><b>Route Span:</b> 0.00 - 2.00 km (length: 2.00 km)"
+        "<br><b>Combined OSM ID:</b> c1;c2" # From get_combined_metadata()
+        "<br><br><b>Component Segments:</b>"
+        # Component 1
+        "<br><br><b>Segment 1:</b>"
+        "<br>&nbsp;&nbsp;<b>Name:</b> Segment Alpha"
+        "<br>&nbsp;&nbsp;<b>OSM ID:</b> c1"
+        "<br>&nbsp;&nbsp;<b>Span:</b> 0.00 - 1.00 km (1.00 km)"
+        "<br>&nbsp;&nbsp;<b>Tags:</b>" # Only non-name tags
+        "<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>bridge:</i> yes"
+        # Component 2
+        "<br><br><b>Segment 2:</b>"
+        # No name for component 2 in its tags, so Name line is skipped by template
+        "<br>&nbsp;&nbsp;<b>OSM ID:</b> c2"
+        "<br>&nbsp;&nbsp;<b>Span:</b> 1.00 - 2.00 km (1.00 km)"
+        "<br>&nbsp;&nbsp;<b>Tags:</b>"
+        "<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>highway:</i> primary"
+        "<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>layer:</i> 1"
+    )
+
+    actual_html = compound_brunnel.to_html()
+    assert normalize_html(actual_html) == normalize_html(expected_html)
+
+def test_compound_brunnel_way_to_html_unnamed_no_overall_span():
+    comp1_coords = [Position(0,0)]
+    comp1_meta = {"id": "t1", "tags": {"tunnel": "yes"}} # No name
+    # No route_span for component for this test variation
+    component1 = BrunnelWay(comp1_coords, comp1_meta, BrunnelType.TUNNEL)
+
+    compound_brunnel = CompoundBrunnelWay(
+        components=[component1],
+        brunnel_type=BrunnelType.TUNNEL
+        # No overall route_span
+    )
+
+    expected_html = (
+        "<b>Compound Tunnel</b> (1 segments)"
+        # No "Name:" line as primary_name will be "unnamed"
+        # No "Route Span:" line as self.route_span is None
+        "<br><b>Combined OSM ID:</b> t1"
+        "<br><br><b>Component Segments:</b>"
+        # Component 1
+        "<br><br><b>Segment 1:</b>"
+        # No name for component 1
+        "<br>&nbsp;&nbsp;<b>OSM ID:</b> t1"
+        # No span for component 1
+        "<br>&nbsp;&nbsp;<b>Tags:</b>"
+        "<br>&nbsp;&nbsp;&nbsp;&nbsp;<i>tunnel:</i> yes"
+    )
+    actual_html = compound_brunnel.to_html()
+    assert normalize_html(actual_html) == normalize_html(expected_html)
