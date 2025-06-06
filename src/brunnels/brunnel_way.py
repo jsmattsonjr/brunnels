@@ -9,6 +9,8 @@ import logging
 
 from .geometry import Position
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
+from .filter_pipeline import FilterPipeline # Should be existing
+from .filters import create_standard_brunnel_filter_pipeline # New import
 
 logger = logging.getLogger(__name__)
 
@@ -203,80 +205,29 @@ class BrunnelWay(Brunnel):
         return BrunnelType.BRIDGE
 
     @classmethod
-    def should_filter(
-        cls, metadata: Dict[str, Any], keep_polygons: bool = False, enable_tag_filtering: bool = True
-    ) -> FilterReason:
-        """
-        Determine if a brunnel should be filtered out based on cycling relevance and geometry.
-
-        Args:
-            metadata: OSM metadata for the brunnel
-            keep_polygons: If False, filter out closed ways (first node == last node)
-
-        Returns:
-            FilterReason.NONE if the brunnel should be kept, otherwise returns
-            the reason for filtering.
-        """
-        if not enable_tag_filtering:
-            return FilterReason.NONE
-        # Check for polygon (closed way) if keep_polygons is False
-        if not keep_polygons:
-            nodes = metadata.get("nodes", [])
-            if len(nodes) >= 2 and nodes[0] == nodes[-1]:
-                return FilterReason.POLYGON
-
-        tags = metadata.get("tags", {})
-
-        # Check bicycle tag first - highest priority
-        if "bicycle" in tags:
-            if tags["bicycle"] == "no":
-                return FilterReason.BICYCLE_NO
-            else:
-                # bicycle=* (anything other than "no") - keep and skip other checks
-                return FilterReason.NONE
-
-        # Check for cycleway - keep and skip other checks
-        if tags.get("highway") == "cycleway":
-            return FilterReason.NONE
-
-        # Check for waterway - filter out
-        if "waterway" in tags:
-            return FilterReason.WATERWAY
-
-        # Check for railway - filter out unless abandoned
-        if "railway" in tags:
-            if tags["railway"] != "abandoned":
-                return FilterReason.RAILWAY
-
-        # Default: keep the brunnel
-        return FilterReason.NONE
-
-    @classmethod
     def from_overpass_data(
         cls, way_data: Dict[str, Any], keep_polygons: bool = False, enable_tag_filtering: bool = True
     ) -> "BrunnelWay":
-        """
-        Parse a single way from Overpass response into BrunnelWay object.
-
-        Args:
-            way_data: Raw way data from Overpass API
-            keep_polygons: Whether to keep closed ways (polygons)
-
-        Returns:
-            BrunnelWay object
-        """
-        # Extract coordinates from geometry
         coords = []
         if "geometry" in way_data:
             for node in way_data["geometry"]:
                 coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
 
         brunnel_type = cls.determine_type(way_data)
-        filter_reason = cls.should_filter(way_data, keep_polygons, enable_tag_filtering)
 
-        return cls(
+        temp_brunnel = cls(
             coords=coords,
             metadata=way_data,
             brunnel_type=brunnel_type,
-            filter_reason=filter_reason,
+            filter_reason=FilterReason.NONE
         )
+
+        standard_pipeline = create_standard_brunnel_filter_pipeline(
+            keep_polygons=keep_polygons,
+            enable_tag_filtering=enable_tag_filtering
+        )
+
+        # Apply pipeline - it modifies temp_brunnel in place if it's part of a list
+        standard_pipeline.apply([temp_brunnel])
+
+        return temp_brunnel

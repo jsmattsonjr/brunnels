@@ -7,7 +7,11 @@ and visualize them on interactive maps using OpenStreetMap data.
 """
 import importlib.metadata
 
-__version__ = importlib.metadata.version('brunnels')
+try:
+    __version__ = importlib.metadata.version('brunnels')
+except importlib.metadata.PackageNotFoundError:
+    # Package is not installed, assign a default version or leave as None
+    __version__ = "0.0.0-dev"
 __author__ = "Jim Mattson"
 __email__ = "jsmattsonjr@gmail.com"
 
@@ -15,6 +19,7 @@ __email__ = "jsmattsonjr@gmail.com"
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 from .brunnel_way import BrunnelWay
 from .compound_brunnel_way import CompoundBrunnelWay
+from .filter_pipeline import FilterPipeline
 from .route import Route, RouteValidationError
 from .geometry import Position
 
@@ -25,6 +30,7 @@ __all__ = [
     "RouteSpan",
     "BrunnelWay",
     "CompoundBrunnelWay",
+    "FilterPipeline",
     "Route",
     "RouteValidationError",
     "Position",

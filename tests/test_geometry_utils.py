@@ -1,7 +1,7 @@
 import pytest
 import math
-from brunnels.geometry import Position
-from brunnels.geometry_utils import haversine_distance, calculate_cumulative_distances, point_to_line_segment_distance_and_projection, find_closest_point_on_route, calculate_bearing, find_closest_segments, bearings_aligned
+from src.brunnels.geometry import Position
+from src.brunnels.geometry_utils import haversine_distance, calculate_cumulative_distances, point_to_line_segment_distance_and_projection, find_closest_point_on_route, calculate_bearing, find_closest_segments, bearings_aligned
 
 def test_haversine_distance_known_values():
     # Test with known coordinates and distance (e.g., Paris to London)

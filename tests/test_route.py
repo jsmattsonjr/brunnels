@@ -7,15 +7,15 @@ import logging  # Added for logger mocking
 from unittest.mock import patch, MagicMock  # Added for mocking
 import collections  # Added for Counter, though not directly used in assertions here
 
-from brunnels.route import Route, RouteValidationError, route_spans_overlap
-from brunnels.geometry import Position  # Corrected import for RouteSpan
-from brunnels.brunnel import (
+from src.brunnels.route import Route, RouteValidationError, route_spans_overlap
+from src.brunnels.geometry import Position
+from src.brunnels.brunnel import (
     RouteSpan,
     FilterReason,
-)  # RouteSpan imported from brunnel module, FilterReason added
-from brunnels.brunnel_way import BrunnelWay  # Added for potential mock object creation
-from gpxpy.gpx import GPXException  # Corrected import for GPXException
-from brunnels.geometry_utils import haversine_distance  # Required for manual check
+)
+from src.brunnels.brunnel_way import BrunnelWay
+from gpxpy.gpx import GPXException # Corrected import for GPXException
+from src.brunnels.geometry_utils import haversine_distance
 
 
 # Helper function to create GPX content

@@ -1,12 +1,12 @@
 import pytest
 from shapely.geometry import LineString, Polygon
 
-from brunnels.brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
-from brunnels.brunnel_way import BrunnelWay
-from brunnels.geometry import Position
-from brunnels.route import Route
-from brunnels.geometry_utils import calculate_bearing # For reference in tests
-from brunnels.compound_brunnel_way import CompoundBrunnelWay
+from src.brunnels.brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
+from src.brunnels.brunnel_way import BrunnelWay
+from src.brunnels.geometry import Position
+from src.brunnels.route import Route
+from src.brunnels.geometry_utils import calculate_bearing # For reference in tests
+from src.brunnels.compound_brunnel_way import CompoundBrunnelWay
 
 
 # Helper function to create a BrunnelWay instance for testing

@@ -1,8 +1,8 @@
 import pytest
 import math
 from hypothesis import given, strategies as st, assume
-from brunnels.geometry import Position
-from brunnels.geometry_utils import (
+from src.brunnels.geometry import Position
+from src.brunnels.geometry_utils import (
     haversine_distance, 
     calculate_bearing,
     point_to_line_segment_distance_and_projection,
@@ -142,7 +142,7 @@ class TestBoundingBoxProperties:
            st.floats(0, 10))  # Buffer in km
     def test_bbox_contains_all_points(self, positions, buffer_km):
         """Bounding box should contain all route points."""
-        from brunnels.route import Route
+        from src.brunnels.route import Route
         
         route = Route(positions)
         south, west, north, east = route.get_bbox(buffer_km)
@@ -155,7 +155,7 @@ class TestBoundingBoxProperties:
     @given(st.lists(valid_position, min_size=1, max_size=100))
     def test_bbox_buffer_expansion(self, positions):
         """Larger buffer should never shrink bounding box."""
-        from brunnels.route import Route
+        from src.brunnels.route import Route
         
         route = Route(positions)
         
@@ -175,9 +175,9 @@ class TestCoordinateCombinerProperties:
                    min_size=2, max_size=5))
     def test_coordinate_combining_preserves_total_length(self, component_coords):
         """Combined coordinates should preserve total geometric length."""
-        from brunnels.brunnel_way import BrunnelWay
-        from brunnels.coordinate_combiner import combine_osm_way_coordinates
-        from brunnels.brunnel import BrunnelType
+        from src.brunnels.brunnel_way import BrunnelWay
+        from src.brunnels.coordinate_combiner import combine_osm_way_coordinates
+        from src.brunnels.brunnel import BrunnelType
         
         # Create mock BrunnelWay components
         components = []

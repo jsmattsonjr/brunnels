@@ -1,9 +1,9 @@
 import pytest
 
-from brunnels.coordinate_combiner import DirectionalCoordinateCombiner
-from brunnels.brunnel_way import BrunnelWay
-from brunnels.geometry import Position
-from brunnels.brunnel import BrunnelType
+from src.brunnels.coordinate_combiner import DirectionalCoordinateCombiner
+from src.brunnels.brunnel_way import BrunnelWay
+from src.brunnels.geometry import Position
+from src.brunnels.brunnel import BrunnelType
 
 
 def create_mock_way(

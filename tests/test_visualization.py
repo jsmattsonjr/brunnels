@@ -58,7 +58,7 @@ class TestCreateRouteMapLayerControl(unittest.TestCase):
 
         mock_folium_map.assert_called_once()
         _, map_kwargs = mock_folium_map.call_args
-        self.assertEqual(map_kwargs.get('tiles'), "CartoDB positron")
+        self.assertIsNone(map_kwargs.get('tiles')) # Verify that tiles is None initially
 
         self.assertEqual(mock_folium_tilelayer.call_count, 2)
 
