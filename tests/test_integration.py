@@ -91,10 +91,10 @@ class BrunnelsTestResult:
     def _parse_included_brunnels(self):
         """Parse individual and compound brunnel details from stderr"""
         # Parse individual bridges
-        individual_pattern = (
+        individual_bridge_pattern = (
             r"Bridge: ([^(]+) \(([^)]+)\) ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
         )
-        for match in re.finditer(individual_pattern, self.stderr):
+        for match in re.finditer(individual_bridge_pattern, self.stderr):
             self.included_brunnels.append(
                 {
                     "name": match.group(1).strip(),
@@ -103,12 +103,30 @@ class BrunnelsTestResult:
                     "end_km": float(match.group(4)),
                     "length_km": float(match.group(5)),
                     "type": "individual",
+                    "brunnel_type": "bridge",
+                }
+            )
+
+        # Parse individual tunnels
+        individual_tunnel_pattern = (
+            r"Tunnel: ([^(]+) \(([^)]+)\) ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
+        )
+        for match in re.finditer(individual_tunnel_pattern, self.stderr):
+            self.included_brunnels.append(
+                {
+                    "name": match.group(1).strip(),
+                    "osm_id": match.group(2),
+                    "start_km": float(match.group(3)),
+                    "end_km": float(match.group(4)),
+                    "length_km": float(match.group(5)),
+                    "type": "individual",
+                    "brunnel_type": "tunnel",
                 }
             )
 
         # Parse compound bridges
-        compound_pattern = r"Compound Bridge: ([^(]+) \(([^)]+)\) \[(\d+) segments\] ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
-        for match in re.finditer(compound_pattern, self.stderr):
+        compound_bridge_pattern = r"Compound Bridge: ([^(]+) \(([^)]+)\) \[(\d+) segments\] ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
+        for match in re.finditer(compound_bridge_pattern, self.stderr):
             self.included_brunnels.append(
                 {
                     "name": match.group(1).strip(),
@@ -118,6 +136,23 @@ class BrunnelsTestResult:
                     "end_km": float(match.group(5)),
                     "length_km": float(match.group(6)),
                     "type": "compound",
+                    "brunnel_type": "bridge",
+                }
+            )
+
+        # Parse compound tunnels
+        compound_tunnel_pattern = r"Compound Tunnel: ([^(]+) \(([^)]+)\) \[(\d+) segments\] ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
+        for match in re.finditer(compound_tunnel_pattern, self.stderr):
+            self.included_brunnels.append(
+                {
+                    "name": match.group(1).strip(),
+                    "osm_id": match.group(2),
+                    "segments": int(match.group(3)),
+                    "start_km": float(match.group(4)),
+                    "end_km": float(match.group(5)),
+                    "length_km": float(match.group(6)),
+                    "type": "compound",
+                    "brunnel_type": "tunnel",
                 }
             )
 
@@ -376,7 +411,155 @@ class TestTorontoWaterfrontRoute:
         assert "marker" in html_content.lower()
 
 
-# Additional utility for manual testing/debugging
+class TestTransfagarasanRoute:
+    """Integration tests for Transfăgărășan Mountain Pass"""
+
+    @pytest.fixture
+    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
+        """Load metadata JSON file matching the GPX basename"""
+        metadata_file = gpx_file.with_suffix(".json")
+        with open(metadata_file) as f:
+            return json.load(f)
+
+    @pytest.fixture
+    def gpx_file(self) -> Path:
+        """Path to Transfăgărășan GPX file"""
+        return Path(__file__).parent / "fixtures" / "Transfagarasan.gpx"
+
+    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test Transfăgărășan route with default settings"""
+        result = run_brunnels_cli(gpx_file)
+
+        # Basic execution
+        assert result.exit_code == 0, f"CLI failed: {result.stderr}"
+        assert result.html_content is not None, "No HTML output generated"
+
+        expected = metadata["expected_results"]
+
+        # Validate core metrics
+        assert result.metrics["track_points"] == metadata["track_points"]
+        assert abs(result.metrics["total_distance_km"] - metadata["distance_km"]) < 0.1
+
+        # Validate brunnel counts
+        assert_in_range(
+            result.metrics["total_brunnels_found"],
+            expected["total_brunnels_found"],
+            "total_brunnels_found",
+        )
+        assert_in_range(
+            result.metrics["contained_bridges"],
+            expected["contained_bridges"],
+            "contained_bridges",
+        )
+        assert_in_range(
+            result.metrics["contained_tunnels"],
+            expected["contained_tunnels"],
+            "contained_tunnels",
+        )
+        assert_in_range(
+            result.metrics["final_included_total"],
+            expected["final_included_total"],
+            "final_included_total",
+        )
+        assert_in_range(
+            result.metrics["final_included_individual"],
+            expected["final_included_individual"],
+            "final_included_individual",
+        )
+        assert_in_range(
+            result.metrics["final_included_compound"],
+            expected["final_included_compound"],
+            "final_included_compound",
+        )
+
+        # Validate filtering
+        filtering_expected = expected["filtered_brunnels"]
+        for reason, expected_range in filtering_expected.items():
+            if reason in result.filtering:
+                assert_in_range(
+                    result.filtering[reason], expected_range, f"filtered_{reason}"
+                )
+
+    def test_known_bridges_and_tunnels_present(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test that known bridges and tunnels are detected correctly"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        # Collect all OSM IDs from included brunnels
+        included_osm_ids = set()
+        for brunnel in result.included_brunnels:
+            if brunnel["type"] == "compound":
+                ids = brunnel["osm_id"].split(";")
+                included_osm_ids.update(ids)
+            else:
+                included_osm_ids.add(brunnel["osm_id"])
+
+        # Check known bridges
+        for bridge in metadata["known_bridges"]:
+            assert (
+                str(bridge["osm_way_id"]) in included_osm_ids
+            ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
+
+        # Check known tunnels
+        for tunnel in metadata["known_tunnels"]:
+            assert (
+                str(tunnel["osm_way_id"]) in included_osm_ids
+            ), f"Known tunnel {tunnel['name']} (OSM {tunnel['osm_way_id']}) not found"
+
+    def test_tunnel_concentration_area(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test that tunnel concentration around 16-22km mark is detected"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        # Count tunnels in the 16-22km range
+        tunnels_in_range = [
+            b
+            for b in result.included_brunnels
+            if 16.0 <= b.get("start_km", 0) <= 22.0
+            and b.get("brunnel_type") == "tunnel"
+        ]
+
+        # Should have significant tunnel concentration in this area
+        assert (
+            len(tunnels_in_range) >= 5
+        ), f"Expected >=5 tunnels in 16-22km range, found {len(tunnels_in_range)}"
+
+    def test_no_compound_brunnels_expected(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test that no compound brunnels are created (infrastructure is well-spaced)"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        compound_count = len(
+            [b for b in result.included_brunnels if b["type"] == "compound"]
+        )
+        assert (
+            compound_count == 0
+        ), f"Expected 0 compound brunnels, found {compound_count}"
+
+    def test_mountain_road_bearing_alignment(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test bearing alignment on serpentine mountain road"""
+        # Test with stricter tolerance
+        strict_result = run_brunnels_cli(gpx_file, bearing_tolerance=10.0)
+        assert strict_result.exit_code == 0
+
+        # Test with default tolerance
+        default_result = run_brunnels_cli(gpx_file)
+        assert default_result.exit_code == 0
+
+        # Stricter tolerance should result in same or fewer included brunnels
+        assert (
+            strict_result.metrics["final_included_total"]
+            <= default_result.metrics["final_included_total"]
+        ), "Stricter bearing tolerance should not increase included brunnels"
+        # Additional utility for manual testing/debugging
+
+
 def debug_route(gpx_filename: str):
     """Run any route and print detailed comparison with expected values"""
     gpx_file = Path(f"tests/fixtures/{gpx_filename}")
@@ -464,6 +647,7 @@ def debug_toronto_route():
     "gpx_filename",
     [
         "Toronto.gpx",
+        "Transfagarasan.gpx",
         # Add more routes here as you create them:
         # "amsterdam_center.gpx",
         # "rural_trail.gpx",

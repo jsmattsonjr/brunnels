@@ -1,0 +1,170 @@
+{
+  "route_name": "Transfăgărășan Mountain Pass",
+  "location": "Carpathian Mountains, Romania",
+  "distance_km": 30.07,
+  "track_points": 980,
+  "description": "Famous mountain pass road through the Carpathian Mountains with numerous bridges and tunnels",
+  "test_purpose": "mountain_infrastructure",
+  "bounding_box": {
+    "south": 45.6030,
+    "west": 24.5677,
+    "north": 45.7272,
+    "east": 24.6202,
+    "area_sq_km": 56.1
+  },
+  "expected_results": {
+    "total_brunnels_found": "50-60",
+    "total_bridges_found": "30-40",
+    "total_tunnels_found": "15-25",
+    "contained_bridges": "17-21",
+    "contained_tunnels": "8-12",
+    "final_included_individual": "25-33",
+    "final_included_compound": "0-2",
+    "final_included_total": "25-33",
+    "filtered_brunnels": {
+      "outwith_route_buffer": "12-20",
+      "waterway": "6-12",
+      "not_aligned_with_route": "0-3",
+      "bicycle_no": "0-5",
+      "railway_not_abandoned": "0-5",
+      "closed_way": "0-3"
+    }
+  },
+  "known_bridges": [
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 199277719,
+      "approximate_km": 2.5,
+      "length_km": 0.03
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 336261053,
+      "approximate_km": 4.9,
+      "length_km": 0.03
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 698546198,
+      "approximate_km": 6.5,
+      "length_km": 0.03
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 698546205,
+      "approximate_km": 7.6,
+      "length_km": 0.02
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 284417562,
+      "approximate_km": 25.5,
+      "length_km": 0.05
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 284417553,
+      "approximate_km": 27.0,
+      "length_km": 0.07
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 336075752,
+      "approximate_km": 28.5,
+      "length_km": 0.03
+    }
+  ],
+  "known_tunnels": [
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 336078333,
+      "approximate_km": 16.2,
+      "length_km": 0.02
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 336078322,
+      "approximate_km": 16.3,
+      "length_km": 0.03
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 336078231,
+      "approximate_km": 16.6,
+      "length_km": 0.04
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 467656117,
+      "approximate_km": 22.2,
+      "length_km": 0.03
+    },
+    {
+      "name": "Transfăgărășan",
+      "osm_way_id": 336075748,
+      "approximate_km": 22.4,
+      "length_km": 0.04
+    }
+  ],
+  "test_scenarios": [
+    {
+      "name": "default_settings",
+      "args": {},
+      "expected_included": 29,
+      "expected_compounds": 0
+    },
+    {
+      "name": "strict_bearing_tolerance",
+      "args": {
+        "bearing_tolerance": 10.0
+      },
+      "expected_final_included_total": "20-28",
+      "notes": "Mountain road with serpentines may filter more bridges with stricter tolerance"
+    },
+    {
+      "name": "loose_route_buffer",
+      "args": {
+        "route_buffer": 10.0
+      },
+      "expected_included": "29-35",
+      "notes": "Larger buffer may include additional mountain infrastructure"
+    },
+    {
+      "name": "disable_tag_filtering",
+      "args": {
+        "no_tag_filtering": true
+      },
+      "expected_total_brunnels": "55+",
+      "notes": "Should include waterway infrastructure"
+    }
+  ],
+  "performance_benchmarks": {
+    "processing_time_seconds": "2-5",
+    "memory_usage_mb": "<150",
+    "overpass_query_time_seconds": "1-2"
+  },
+  "test_categories": [
+    "mountain_infrastructure",
+    "high_tunnel_density",
+    "serpentine_roads",
+    "engineering_marvels",
+    "no_compound_brunnels"
+  ],
+  "notes": [
+    "Excellent test for mountain pass infrastructure",
+    "High concentration of tunnels in middle section (16-22km)",
+    "Many short individual bridges and tunnels",
+    "No compound brunnels expected - infrastructure is well-spaced",
+    "Good test for bearing alignment on serpentine mountain roads",
+    "Famous tourist route - high OSM mapping quality expected"
+  ],
+  "osm_data_characteristics": {
+    "brunnel_density": "high",
+    "mapping_quality": "excellent",
+    "railway_infrastructure": "minimal",
+    "stability": "high"
+  },
+  "osm_data_date": "2024-12-17",
+  "baseline_established": "2024-12-17",
+  "stability": "high"
+}
