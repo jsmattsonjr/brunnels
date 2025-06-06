@@ -19,6 +19,7 @@ import gpxpy
 import gpxpy.gpx
 
 from . import visualization
+from .config import BrunnelsConfig
 from .route import Route, RouteValidationError
 from .brunnel import Brunnel
 from .compound_brunnel_way import CompoundBrunnelWay
@@ -146,9 +147,9 @@ def open_file_in_browser(filename: str) -> None:
         logger.warning(f"Please manually open {abs_path}")
 
 
-def setup_logging(log_level: str) -> None:
+def setup_logging(config: BrunnelsConfig) -> None:
     """Setup logging configuration."""
-    level = getattr(logging, log_level)
+    level = getattr(logging, config.log_level)
 
     # Create formatter
     formatter = logging.Formatter(
@@ -199,8 +200,19 @@ def main():
     parser = create_argument_parser()
     args = parser.parse_args()
 
+    # Create config instance
+    config = BrunnelsConfig()
+    config.bbox_buffer = args.bbox_buffer
+    config.route_buffer = args.route_buffer
+    config.bearing_tolerance = args.bearing_tolerance
+    config.log_level = args.log_level
+    config.enable_tag_filtering = not args.no_tag_filtering
+    config.keep_polygons = args.keep_polygons
+    config.no_overlap_filtering = args.no_overlap_filtering
+    config.metrics = args.metrics
+
     # Setup logging
-    setup_logging(args.log_level)
+    setup_logging(config)
 
     # Determine output filename
     try:
@@ -226,13 +238,7 @@ def main():
 
     # Find bridges and tunnels near the route (containment detection included)
     try:
-        brunnels: Sequence[Brunnel] = route.find_brunnels(
-            args.bbox_buffer,
-            args.route_buffer,
-            bearing_tolerance_degrees=args.bearing_tolerance,
-            enable_tag_filtering=not args.no_tag_filtering,
-            keep_polygons=args.keep_polygons,
-        )
+        brunnels: Sequence[Brunnel] = route.find_brunnels(config)
     except Exception as e:
         logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
@@ -245,7 +251,7 @@ def main():
         sys.exit(1)
 
     # Filter overlapping brunnels (keep only nearest in each overlapping group)
-    if not args.no_overlap_filtering:
+    if not config.no_overlap_filtering:
         try:
             route.filter_overlapping_brunnels(brunnels)
         except Exception as e:
@@ -257,9 +263,7 @@ def main():
 
     # Create visualization map
     try:
-        visualization.create_route_map(
-            route, output_filename, brunnels, args.bbox_buffer, args.metrics
-        )
+        visualization.create_route_map(route, output_filename, brunnels, config)
     except Exception as e:
         logger.error(f"Failed to create map: {e}")
         sys.exit(1)
