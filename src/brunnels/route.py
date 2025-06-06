@@ -48,7 +48,7 @@ class Route(Geometry):
         """Return the list of Position objects for this geometry."""
         return self.positions
 
-    def get_bbox(self, buffer: float = 1.0) -> Tuple[float, float, float, float]:
+    def get_bbox(self, buffer: float = 10.0) -> Tuple[float, float, float, float]:
         """
         Get memoized bounding box for this route with buffer.
 
@@ -340,7 +340,7 @@ class Route(Geometry):
 
     def find_brunnels(
         self,
-        buffer: float,
+        bbox_buffer: float,
         route_buffer: float,
         bearing_tolerance_degrees: float,
         enable_tag_filtering: bool,
@@ -363,7 +363,7 @@ class Route(Geometry):
             logger.warning("Cannot find brunnels for empty route")
             return []
 
-        bbox = self.get_bbox(buffer)
+        bbox = self.get_bbox(bbox_buffer)
 
         # Calculate and log query area before API call
         south, west, north, east = bbox
