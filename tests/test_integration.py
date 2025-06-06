@@ -560,6 +560,128 @@ class TestTransfagarasanRoute:
         # Additional utility for manual testing/debugging
 
 
+class TestArea51Route:
+    """Integration tests for Area 51 Desert Route (zero brunnels edge case)"""
+
+    @pytest.fixture
+    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
+        """Load metadata JSON file matching the GPX basename"""
+        metadata_file = gpx_file.with_suffix(".json")
+        with open(metadata_file) as f:
+            return json.load(f)
+
+    @pytest.fixture
+    def gpx_file(self) -> Path:
+        """Path to Area51 GPX file"""
+        return Path(__file__).parent / "fixtures" / "Area51.gpx"
+
+    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test Area51 route with default settings (zero brunnels case)"""
+        result = run_brunnels_cli(gpx_file)
+
+        # Basic execution
+        assert result.exit_code == 0, f"CLI failed: {result.stderr}"
+        assert result.html_content is not None, "No HTML output generated"
+
+        expected = metadata["expected_results"]
+
+        # Validate core metrics
+        assert result.metrics["track_points"] == metadata["track_points"]
+        assert abs(result.metrics["total_distance_km"] - metadata["distance_km"]) < 0.1
+
+        # Validate brunnel counts (all should be 0)
+        assert result.metrics["total_brunnels_found"] == 0
+        assert result.metrics["total_bridges_found"] == 0
+        assert result.metrics["total_tunnels_found"] == 0
+        assert result.metrics["contained_bridges"] == 0
+        assert result.metrics["contained_tunnels"] == 0
+        assert result.metrics["final_included_total"] == 0
+        assert result.metrics["final_included_individual"] == 0
+        assert result.metrics["final_included_compound"] == 0
+
+        # No brunnels should be included
+        assert len(result.included_brunnels) == 0
+
+        # No filtering should occur (no brunnels to filter)
+        assert len(result.filtering) == 0
+
+    def test_zero_brunnels_html_output(self, gpx_file: Path):
+        """Test that HTML output is valid when no brunnels are found"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+        assert result.html_content is not None
+
+        html_content = result.html_content
+
+        # Basic HTML structure should still be present
+        assert "<html" in html_content
+        assert "</html>" in html_content
+        assert "folium" in html_content.lower()
+
+        # Map elements should still exist
+        assert "leaflet" in html_content.lower()
+
+        # Legend should show (0) counts
+        assert "bridge" in html_content.lower()
+        assert "(0)" in html_content  # Should show 0 counts in legend
+
+        # Route should still be displayed
+        assert "polyline" in html_content.lower()
+        assert "marker" in html_content.lower()
+
+    def test_small_query_area_performance(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test performance with very small query area"""
+        import time
+
+        start_time = time.time()
+        result = run_brunnels_cli(gpx_file)
+        end_time = time.time()
+
+        processing_time = end_time - start_time
+        benchmarks = metadata["performance_benchmarks"]
+
+        assert result.exit_code == 0
+
+        # Should be very fast with small query area
+        max_time = int(benchmarks["processing_time_seconds"].split("-")[1])
+        assert (
+            processing_time <= max_time
+        ), f"Processing took {processing_time:.1f}s, expected <{max_time}s"
+
+    def test_no_brunnels_message_logging(self, gpx_file: Path):
+        """Test that appropriate message is logged when no brunnels are found"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        # Should contain the "No brunnels included" message
+        assert "No brunnels included in final map" in result.stderr
+
+    def test_edge_case_various_settings(self, gpx_file: Path):
+        """Test zero brunnels scenario with various parameter combinations"""
+        # Test with different route buffer sizes
+        result_small_buffer = run_brunnels_cli(gpx_file, route_buffer=1.0)
+        result_large_buffer = run_brunnels_cli(gpx_file, route_buffer=50.0)
+
+        assert result_small_buffer.exit_code == 0
+        assert result_large_buffer.exit_code == 0
+
+        # Both should still find 0 brunnels
+        assert result_small_buffer.metrics["final_included_total"] == 0
+        assert result_large_buffer.metrics["final_included_total"] == 0
+
+        # Test with disabled tag filtering
+        result_no_filter = run_brunnels_cli(gpx_file, no_tag_filtering=True)
+        assert result_no_filter.exit_code == 0
+        assert result_no_filter.metrics["final_included_total"] == 0
+
+        # Test with strict bearing tolerance
+        result_strict = run_brunnels_cli(gpx_file, bearing_tolerance=5.0)
+        assert result_strict.exit_code == 0
+        assert result_strict.metrics["final_included_total"] == 0
+
+
 def debug_route(gpx_filename: str):
     """Run any route and print detailed comparison with expected values"""
     gpx_file = Path(f"tests/fixtures/{gpx_filename}")
@@ -646,6 +768,7 @@ def debug_toronto_route():
 @pytest.mark.parametrize(
     "gpx_filename",
     [
+        "Area51.gpx",
         "Toronto.gpx",
         "Transfagarasan.gpx",
         # Add more routes here as you create them:

@@ -250,7 +250,7 @@ def create_route_map(
         f"Map saved to {output_filename} with {contained_bridge_count}/{bridge_count} bridges and {contained_tunnel_count}/{tunnel_count} tunnels contained in route buffer"
     )
 
-    if metrics and sum(filter_reason_counts.values()) > 0:
+    if metrics:
         # Log detailed filtering metrics
         logger.debug("=== BRUNNELS_METRICS ===")
         logger.debug(f"total_brunnels_found={len(brunnels)}")
