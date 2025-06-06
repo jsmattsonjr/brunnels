@@ -96,11 +96,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Disable filtering of overlapping brunnels (keep all overlapping brunnels)",
     )
     parser.add_argument(
-        "--no-compound-brunnels",
-        action="store_true",
-        help="Disable creation of compound brunnels from adjacent segments",
-    )
-    parser.add_argument(
         "--metrics",
         action="store_true",
         help="Output structured metrics after processing",
@@ -243,12 +238,11 @@ def main():
         sys.exit(1)
 
     # Create compound brunnels from adjacent segments
-    if not args.no_compound_brunnels:
-        try:
-            brunnels = CompoundBrunnelWay.create_from_brunnels(brunnels)
-        except Exception as e:
-            logger.error(f"Failed to create compound brunnels: {e}")
-            sys.exit(1)
+    try:
+        brunnels = CompoundBrunnelWay.create_from_brunnels(brunnels)
+    except Exception as e:
+        logger.error(f"Failed to create compound brunnels: {e}")
+        sys.exit(1)
 
     # Filter overlapping brunnels (keep only nearest in each overlapping group)
     if not args.no_overlap_filtering:

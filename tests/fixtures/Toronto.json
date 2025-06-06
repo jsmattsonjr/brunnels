@@ -115,15 +115,6 @@
       },
       "expected_total_brunnels": "1500+",
       "notes": "Should include railway and bicycle=no brunnels"
-    },
-    {
-      "name": "disable_compound_brunnels",
-      "args": {
-        "no_compound_brunnels": true
-      },
-      "expected_included": "10-12",
-      "expected_compounds": 0,
-      "notes": "Should show individual segments instead of compounds"
     }
   ],
   "performance_benchmarks": {

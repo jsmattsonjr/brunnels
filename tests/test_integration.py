@@ -316,35 +316,6 @@ class TestTorontoWaterfrontRoute:
             "strict_bearing_included",
         )
 
-    def test_disable_compound_brunnels(self, gpx_file: Path, metadata: Dict[str, Any]):
-        """Test with compound brunnel creation disabled"""
-        scenario = next(
-            s
-            for s in metadata["test_scenarios"]
-            if s["name"] == "disable_compound_brunnels"
-        )
-
-        result = run_brunnels_cli(gpx_file, **scenario["args"])
-        assert result.exit_code == 0
-
-        # Should have no compounds created
-        assert result.metrics.get("final_included_compound", 0) == 0
-
-        # Should have more individual brunnels than default
-        default_result = run_brunnels_cli(gpx_file)
-        assert (
-            result.metrics["final_included_individual"]
-            >= default_result.metrics["final_included_individual"]
-        )
-
-        # Validate against expected range if provided
-        if "expected_included" in scenario:
-            assert_in_range(
-                result.metrics["final_included_total"],
-                scenario["expected_included"],
-                "no_compounds_total_included",
-            )
-
     def test_performance_benchmarks(self, gpx_file: Path, metadata: Dict[str, Any]):
         """Test performance meets expected benchmarks"""
         import time
