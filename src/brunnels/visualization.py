@@ -106,8 +106,30 @@ def create_route_map(
 
     logger.debug(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
 
-    # Create map with initial center (zoom will be set by fit_bounds)
+    # Initialize map (CartoDB positron will be the default base, but also explicitly added for control)
     route_map = folium.Map(location=[center_lat, center_lon], tiles="CartoDB positron")
+
+    # Add Standard layer (CartoDB positron)
+    folium.TileLayer(
+        tiles="CartoDB positron",
+        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        name="Standard",
+        control=True,
+    ).add_to(route_map)
+
+    # Add Satellite layer (Esri World Imagery)
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr=(
+            "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, "
+            "Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+        ),
+        name="Satellite",
+        control=True,
+    ).add_to(route_map)
+
+    # Add LayerControl
+    folium.LayerControl().add_to(route_map)
 
     # Convert route to coordinate pairs for folium using the new method
     coordinates = route.get_visualization_coordinates()
