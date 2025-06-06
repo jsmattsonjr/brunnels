@@ -20,7 +20,6 @@ from .geometry_utils import (
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 from .brunnel_way import BrunnelWay
 from .overpass import query_overpass_brunnels
-import concurrent.futures
 
 logger = logging.getLogger(__name__)
 
@@ -118,49 +117,6 @@ class Route(Geometry):
 
         return self._cumulative_distances
 
-    def _process_brunnel_containment(
-        self,
-        brunnel: Brunnel,
-        route_geometry, # Already a shapely geometry
-        cumulative_distances: List[float],
-        bearing_tolerance_degrees: float,
-    ) -> Brunnel:
-        """
-        Helper function to process containment for a single brunnel.
-        Modifies brunnel in-place and returns it.
-        """
-        # Only check containment for brunnels that weren't filtered by tags
-        if brunnel.filter_reason == FilterReason.NONE:
-            brunnel.contained_in_route = brunnel.is_contained_by(route_geometry)
-            if brunnel.contained_in_route:
-                # Check bearing alignment for contained brunnels
-                if brunnel.is_aligned_with_route(self, bearing_tolerance_degrees):
-                    # Calculate route span for aligned, contained brunnels
-                    try:
-                        brunnel.route_span = brunnel.calculate_route_span(
-                            self, cumulative_distances
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to calculate route span for brunnel {brunnel.get_id()}: {e}"
-                        )
-                        logger.warning(f"Evicting brunnel from contained set")
-                        brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
-                        brunnel.contained_in_route = False
-                        brunnel.route_span = None
-                else:
-                    # Mark as unaligned and remove from contained set
-                    brunnel.filter_reason = FilterReason.UNALIGNED
-                    brunnel.contained_in_route = False
-                    brunnel.route_span = None
-            else:
-                # Set filter reason for non-contained brunnels
-                brunnel.filter_reason = FilterReason.NOT_CONTAINED
-        else:
-            # Keep existing filter reason, don't check containment
-            brunnel.contained_in_route = False
-        return brunnel
-
     def find_contained_brunnels(
         self,
         brunnels: List[Brunnel],
@@ -169,7 +125,7 @@ class Route(Geometry):
     ) -> None:
         """
         Check which brunnels are completely contained within the buffered route and aligned with route bearing.
-        Updates their containment status and calculates route spans for contained brunnels using a ThreadPoolExecutor.
+        Updates their containment status and calculates route spans for contained brunnels.
 
         Args:
             brunnels: List of Brunnel objects to check (modified in-place)
@@ -180,96 +136,94 @@ class Route(Geometry):
             logger.warning("Cannot find contained brunnels for empty route")
             return
 
+        # Ensure minimum buffer for containment analysis
         if route_buffer < 1.0:
             logger.warning(
                 f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer}m"
             )
             route_buffer = 1.0
 
+        # Pre-calculate cumulative distances for route span calculations
         logger.debug("Pre-calculating route distances...")
         cumulative_distances = self.get_cumulative_distances()
         total_route_distance = cumulative_distances[-1] if cumulative_distances else 0.0
         logger.info(f"Total route distance: {total_route_distance:.2f} km")
 
+        # Get memoized LineString from route
         route_line = self.get_linestring()
         if route_line is None:
             logger.warning("Cannot create LineString for route")
             return
 
+        # Convert buffer from meters to approximate degrees
         avg_lat = self.positions[0].latitude
-        lat_buffer = route_buffer / 111000.0
+        lat_buffer = route_buffer / 111000.0  # 1 degree latitude ≈ 111 km
         lon_buffer = route_buffer / (111000.0 * abs(cos(radians(avg_lat))))
+
+        # Use the smaller of the two buffers to be conservative
         buffer_degrees = min(lat_buffer, lon_buffer)
         route_geometry = route_line.buffer(buffer_degrees)
 
+        # Check if buffered geometry is valid
         if not route_geometry.is_valid:
             logger.warning(
-                f"Buffered route geometry is invalid. Attempting to fix with buffer(0)"
+                f"Buffered route geometry is invalid (likely due to self-intersecting route). "
+                f"Attempting to fix with buffer(0)"
             )
             try:
                 route_geometry = route_geometry.buffer(0)
-                if not route_geometry.is_valid:
+                if route_geometry.is_valid:
+                    logger.warning("Successfully fixed invalid geometry")
+                else:
                     logger.warning(
                         "Could not fix invalid geometry - containment results may be unreliable"
                     )
             except Exception as e:
                 logger.warning(f"Failed to fix invalid geometry: {e}")
 
-        # Process brunnels in parallel
-        # We operate on a copy of the brunnel for thread safety if needed,
-        # but since we're updating attributes on the brunnel objects themselves,
-        # and those objects are unique in the list, direct modification should be fine
-        # as long as the helper function is designed to be idempotent or handles its own state.
-        # The helper function _process_brunnel_containment modifies the brunnel object directly.
-
-        brunnels_to_process = [b for b in brunnels if b.filter_reason == FilterReason.NONE]
-        other_brunnels = [b for b in brunnels if b.filter_reason != FilterReason.NONE]
-        for brunnel in other_brunnels: # Ensure contained_in_route is False for already filtered brunnels
-            brunnel.contained_in_route = False
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            # The map function will return an iterator of the results (the modified brunnels)
-            # However, since brunnels are modified in-place, we don't strictly need to reassign this
-            # But if the helper returned a new object, this would be essential.
-            # For clarity and to ensure changes are captured if the helper was changed later
-            # to return a new object, we can update the list.
-            processed_brunnels_iterator = executor.map(
-                self._process_brunnel_containment,
-                brunnels_to_process,
-                [route_geometry] * len(brunnels_to_process),
-                [cumulative_distances] * len(brunnels_to_process),
-                [bearing_tolerance_degrees] * len(brunnels_to_process),
-            )
-            # Update the original list with processed brunnels
-            # This step is tricky because map returns results in order,
-            # but we only processed a subset. We need to merge them back carefully.
-
-            # Let's re-think: the helper modifies brunnels in-place.
-            # So, we just need to execute the tasks.
-            # No need to collect results if modification is in-place.
-            # list(executor.map(...)) will ensure all tasks are completed.
-            list(executor.map(
-                self._process_brunnel_containment,
-                brunnels_to_process,
-                [route_geometry] * len(brunnels_to_process),
-                [cumulative_distances] * len(brunnels_to_process),
-                [bearing_tolerance_degrees] * len(brunnels_to_process),
-            ))
-
-
-        # Recalculate counts after parallel processing
         contained_count = 0
         unaligned_count = 0
+
+        # Check containment for each brunnel
         for brunnel in brunnels:
-            if brunnel.contained_in_route and brunnel.filter_reason == FilterReason.NONE:
-                contained_count +=1
-            elif brunnel.filter_reason == FilterReason.UNALIGNED:
-                unaligned_count +=1
+            # Only check containment for brunnels that weren't filtered by tags
+            if brunnel.filter_reason == FilterReason.NONE:
+                brunnel.contained_in_route = brunnel.is_contained_by(route_geometry)
+                if brunnel.contained_in_route:
+                    # Check bearing alignment for contained brunnels
+                    if brunnel.is_aligned_with_route(self, bearing_tolerance_degrees):
+                        # Calculate route span for aligned, contained brunnels
+                        try:
+                            brunnel.route_span = brunnel.calculate_route_span(
+                                self, cumulative_distances
+                            )
+                            contained_count += 1
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to calculate route span for brunnel {brunnel.get_id()}: {e}"
+                            )
+                            logger.warning(f"Evicting brunnel from contained set")
+                            brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
+                            brunnel.contained_in_route = False
+                            brunnel.route_span = None
+                    else:
+                        # Mark as unaligned and remove from contained set
+                        brunnel.filter_reason = FilterReason.UNALIGNED
+                        brunnel.contained_in_route = False
+                        brunnel.route_span = None
+                        unaligned_count += 1
+                else:
+                    # Set filter reason for non-contained brunnels
+                    brunnel.filter_reason = FilterReason.NOT_CONTAINED
+            else:
+                # Keep existing filter reason, don't check containment
+                brunnel.contained_in_route = False
 
         logger.debug(
             f"Found {contained_count} brunnels completely contained and aligned within the route buffer "
             f"out of {len(brunnels)} total (with {route_buffer}m buffer, {bearing_tolerance_degrees}° tolerance)"
         )
+
         if unaligned_count > 0:
             logger.debug(
                 f"Filtered {unaligned_count} brunnels due to bearing misalignment"
