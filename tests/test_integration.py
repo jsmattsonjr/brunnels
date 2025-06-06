@@ -224,23 +224,14 @@ def assert_in_range(actual: float, expected_range: str, metric_name: str):
         assert actual == expected, f"{metric_name}: expected {expected}, got {actual}"
 
 
-class TestTorontoWaterfrontRoute:
-    """Integration tests for Toronto Waterfront Recreation Trail"""
+class BaseRouteTest:
+    """Base class for route-specific integration tests."""
 
-    @pytest.fixture
-    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
-        """Load metadata JSON file matching the GPX basename"""
-        metadata_file = gpx_file.with_suffix(".json")
-        with open(metadata_file) as f:
-            return json.load(f)
-
-    @pytest.fixture
-    def gpx_file(self) -> Path:
-        """Path to Toronto GPX file"""
-        return Path(__file__).parent / "fixtures" / "Toronto.gpx"
+    # self.gpx_file and self.metadata are expected to be provided by subclasses
+    # through pytest fixtures.
 
     def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
-        """Test Toronto route with default settings"""
+        """Test route with default settings"""
         result = run_brunnels_cli(gpx_file)
 
         # Basic execution
@@ -294,6 +285,46 @@ class TestTorontoWaterfrontRoute:
                 assert_in_range(
                     result.filtering[reason], expected_range, f"filtered_{reason}"
                 )
+
+    def test_html_output_validity(self, gpx_file: Path):
+        """Test that generated HTML is valid and contains expected elements"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+        assert result.html_content is not None, "No HTML content generated"
+
+        html_content = result.html_content
+
+        # Basic HTML structure
+        assert "<html" in html_content
+        assert "</html>" in html_content
+        assert "folium" in html_content.lower()
+
+        # Map elements
+        assert "leaflet" in html_content.lower()
+        assert "polyline" in html_content.lower()
+
+        # Legend elements
+        assert "legend" in html_content.lower()
+        assert "bridge" in html_content.lower()
+
+        # Route markers
+        assert "marker" in html_content.lower()
+
+
+class TestTorontoWaterfrontRoute(BaseRouteTest):
+    """Integration tests for Toronto Waterfront Recreation Trail"""
+
+    @pytest.fixture
+    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
+        """Load metadata JSON file matching the GPX basename"""
+        metadata_file = gpx_file.with_suffix(".json")
+        with open(metadata_file) as f:
+            return json.load(f)
+
+    @pytest.fixture
+    def gpx_file(self) -> Path:
+        """Path to Toronto GPX file"""
+        return Path(__file__).parent / "fixtures" / "Toronto.gpx"
 
     def test_known_bridges_present(self, gpx_file: Path, metadata: Dict[str, Any]):
         """Test that known bridges are detected correctly"""
@@ -386,32 +417,8 @@ class TestTorontoWaterfrontRoute:
             memory_used < max_memory
         ), f"Memory usage {memory_used:.1f}MB exceeded {max_memory}MB"
 
-    def test_html_output_validity(self, gpx_file: Path):
-        """Test that generated HTML is valid and contains expected elements"""
-        result = run_brunnels_cli(gpx_file)
-        assert result.exit_code == 0
-        assert result.html_content is not None, "No HTML content generated"
 
-        html_content = result.html_content
-
-        # Basic HTML structure
-        assert "<html" in html_content
-        assert "</html>" in html_content
-        assert "folium" in html_content.lower()
-
-        # Map elements
-        assert "leaflet" in html_content.lower()
-        assert "polyline" in html_content.lower()
-
-        # Legend elements
-        assert "legend" in html_content.lower()
-        assert "bridge" in html_content.lower()
-
-        # Route markers
-        assert "marker" in html_content.lower()
-
-
-class TestTransfagarasanRoute:
+class TestTransfagarasanRoute(BaseRouteTest):
     """Integration tests for Transfăgărășan Mountain Pass"""
 
     @pytest.fixture
@@ -425,60 +432,6 @@ class TestTransfagarasanRoute:
     def gpx_file(self) -> Path:
         """Path to Transfăgărășan GPX file"""
         return Path(__file__).parent / "fixtures" / "Transfagarasan.gpx"
-
-    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
-        """Test Transfăgărășan route with default settings"""
-        result = run_brunnels_cli(gpx_file)
-
-        # Basic execution
-        assert result.exit_code == 0, f"CLI failed: {result.stderr}"
-        assert result.html_content is not None, "No HTML output generated"
-
-        expected = metadata["expected_results"]
-
-        # Validate core metrics
-        assert result.metrics["track_points"] == metadata["track_points"]
-        assert abs(result.metrics["total_distance_km"] - metadata["distance_km"]) < 0.1
-
-        # Validate brunnel counts
-        assert_in_range(
-            result.metrics["total_brunnels_found"],
-            expected["total_brunnels_found"],
-            "total_brunnels_found",
-        )
-        assert_in_range(
-            result.metrics["contained_bridges"],
-            expected["contained_bridges"],
-            "contained_bridges",
-        )
-        assert_in_range(
-            result.metrics["contained_tunnels"],
-            expected["contained_tunnels"],
-            "contained_tunnels",
-        )
-        assert_in_range(
-            result.metrics["final_included_total"],
-            expected["final_included_total"],
-            "final_included_total",
-        )
-        assert_in_range(
-            result.metrics["final_included_individual"],
-            expected["final_included_individual"],
-            "final_included_individual",
-        )
-        assert_in_range(
-            result.metrics["final_included_compound"],
-            expected["final_included_compound"],
-            "final_included_compound",
-        )
-
-        # Validate filtering
-        filtering_expected = expected["filtered_brunnels"]
-        for reason, expected_range in filtering_expected.items():
-            if reason in result.filtering:
-                assert_in_range(
-                    result.filtering[reason], expected_range, f"filtered_{reason}"
-                )
 
     def test_known_bridges_and_tunnels_present(
         self, gpx_file: Path, metadata: Dict[str, Any]
@@ -560,7 +513,7 @@ class TestTransfagarasanRoute:
         # Additional utility for manual testing/debugging
 
 
-class TestArea51Route:
+class TestArea51Route(BaseRouteTest):
     """Integration tests for Area 51 Desert Route (zero brunnels edge case)"""
 
     @pytest.fixture
@@ -574,36 +527,6 @@ class TestArea51Route:
     def gpx_file(self) -> Path:
         """Path to Area51 GPX file"""
         return Path(__file__).parent / "fixtures" / "Area51.gpx"
-
-    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
-        """Test Area51 route with default settings (zero brunnels case)"""
-        result = run_brunnels_cli(gpx_file)
-
-        # Basic execution
-        assert result.exit_code == 0, f"CLI failed: {result.stderr}"
-        assert result.html_content is not None, "No HTML output generated"
-
-        expected = metadata["expected_results"]
-
-        # Validate core metrics
-        assert result.metrics["track_points"] == metadata["track_points"]
-        assert abs(result.metrics["total_distance_km"] - metadata["distance_km"]) < 0.1
-
-        # Validate brunnel counts (all should be 0)
-        assert result.metrics["total_brunnels_found"] == 0
-        assert result.metrics["total_bridges_found"] == 0
-        assert result.metrics["total_tunnels_found"] == 0
-        assert result.metrics["contained_bridges"] == 0
-        assert result.metrics["contained_tunnels"] == 0
-        assert result.metrics["final_included_total"] == 0
-        assert result.metrics["final_included_individual"] == 0
-        assert result.metrics["final_included_compound"] == 0
-
-        # No brunnels should be included
-        assert len(result.included_brunnels) == 0
-
-        # No filtering should occur (no brunnels to filter)
-        assert len(result.filtering) == 0
 
     def test_zero_brunnels_html_output(self, gpx_file: Path):
         """Test that HTML output is valid when no brunnels are found"""
@@ -682,7 +605,7 @@ class TestArea51Route:
         assert result_strict.metrics["final_included_total"] == 0
 
 
-class TestPaulRevereRoute:
+class TestPaulRevereRoute(BaseRouteTest):
     """Integration tests for Paul Revere Trail (overlap filtering and urban density)"""
 
     @pytest.fixture
@@ -696,60 +619,6 @@ class TestPaulRevereRoute:
     def gpx_file(self) -> Path:
         """Path to PaulRevere GPX file"""
         return Path(__file__).parent / "fixtures" / "PaulRevere.gpx"
-
-    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
-        """Test Paul Revere route with default settings"""
-        result = run_brunnels_cli(gpx_file)
-
-        # Basic execution
-        assert result.exit_code == 0, f"CLI failed: {result.stderr}"
-        assert result.html_content is not None, "No HTML output generated"
-
-        expected = metadata["expected_results"]
-
-        # Validate core metrics
-        assert result.metrics["track_points"] == metadata["track_points"]
-        assert abs(result.metrics["total_distance_km"] - metadata["distance_km"]) < 0.1
-
-        # Validate brunnel counts
-        assert_in_range(
-            result.metrics["total_brunnels_found"],
-            expected["total_brunnels_found"],
-            "total_brunnels_found",
-        )
-        assert_in_range(
-            result.metrics["contained_bridges"],
-            expected["contained_bridges"],
-            "contained_bridges",
-        )
-        assert_in_range(
-            result.metrics["contained_tunnels"],
-            expected["contained_tunnels"],
-            "contained_tunnels",
-        )
-        assert_in_range(
-            result.metrics["final_included_total"],
-            expected["final_included_total"],
-            "final_included_total",
-        )
-        assert_in_range(
-            result.metrics["final_included_individual"],
-            expected["final_included_individual"],
-            "final_included_individual",
-        )
-        assert_in_range(
-            result.metrics["final_included_compound"],
-            expected["final_included_compound"],
-            "final_included_compound",
-        )
-
-        # Validate filtering
-        filtering_expected = expected["filtered_brunnels"]
-        for reason, expected_range in filtering_expected.items():
-            if reason in result.filtering:
-                assert_in_range(
-                    result.filtering[reason], expected_range, f"filtered_{reason}"
-                )
 
     def test_overlap_filtering_with_increased_buffer(
         self, gpx_file: Path, metadata: Dict[str, Any]
@@ -1032,72 +901,6 @@ def debug_route(gpx_filename: str):
 def debug_toronto_route():
     """Run Toronto route and print detailed comparison with expected values"""
     debug_route("Toronto.gpx")
-
-
-@pytest.mark.parametrize(
-    "gpx_filename",
-    [
-        "Area51.gpx",
-        "PaulRevere.gpx",
-        "Toronto.gpx",
-        "Transfagarasan.gpx",
-        # Add more routes here as you create them:
-        # "amsterdam_center.gpx",
-        # "rural_trail.gpx",
-        # "century_ride.gpx"
-    ],
-)
-def test_any_route_default_settings(gpx_filename: str):
-    """Generalized test that works with any GPX file that has matching JSON metadata"""
-    fixtures_dir = Path(__file__).parent / "fixtures"
-    gpx_file = fixtures_dir / gpx_filename
-    metadata_file = gpx_file.with_suffix(".json")
-
-    # Skip if files don't exist
-    if not gpx_file.exists() or not metadata_file.exists():
-        pytest.skip(f"Missing files: {gpx_file} or {metadata_file}")
-
-    with open(metadata_file) as f:
-        metadata = json.load(f)
-
-    result = run_brunnels_cli(gpx_file)
-    expected = metadata["expected_results"]
-
-    # Basic execution
-    assert result.exit_code == 0, f"CLI failed for {gpx_filename}: {result.stderr}"
-    assert result.html_content is not None, f"No HTML output for {gpx_filename}"
-
-    # Core metrics validation
-    assert result.metrics["track_points"] == metadata["track_points"]
-    assert abs(result.metrics["total_distance_km"] - metadata["distance_km"]) < 0.1
-
-    # Brunnel counts validation
-    assert_in_range(
-        result.metrics["total_brunnels_found"],
-        expected["total_brunnels_found"],
-        "total_brunnels",
-    )
-    assert_in_range(
-        result.metrics["contained_bridges"],
-        expected["contained_bridges"],
-        "contained_bridges",
-    )
-    assert_in_range(
-        result.metrics["final_included_total"],
-        expected["final_included_total"],
-        "final_included",
-    )
-
-    # Filtering validation - check individual reasons only
-    if "filtered_brunnels" in expected and result.filtering:
-        filtering_expected = expected["filtered_brunnels"]
-
-        # Check individual filtering reasons that were actually parsed
-        for reason, expected_range in filtering_expected.items():
-            if reason in result.filtering:
-                assert_in_range(
-                    result.filtering[reason], expected_range, f"filtered_{reason}"
-                )
 
 
 if __name__ == "__main__":
