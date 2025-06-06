@@ -107,14 +107,21 @@ def create_route_map(
     logger.debug(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
 
     # Initialize map (CartoDB positron will be the default base, but also explicitly added for control)
-    route_map = folium.Map(location=[center_lat, center_lon], tiles="CartoDB positron")
+    route_map = folium.Map(
+        location=[center_lat, center_lon],
+        tiles=None,
+    )
 
     # Add Standard layer (CartoDB positron)
     folium.TileLayer(
         tiles="CartoDB positron",
-        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        attr=(
+            "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> "
+            "contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>"
+        ),
         name="Standard",
         control=True,
+        show=True,  # Show by default
     ).add_to(route_map)
 
     # Add Satellite layer (Esri World Imagery)
@@ -126,6 +133,7 @@ def create_route_map(
         ),
         name="Satellite",
         control=True,
+        show=False,  # Initially hidden
     ).add_to(route_map)
 
     # Add LayerControl
