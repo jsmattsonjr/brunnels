@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock, call
 
+from src.brunnels.config import BrunnelsConfig
 from src.brunnels.route import Route
 # Brunnel import might not be strictly needed if brunnels list is empty and no methods are called
 # from src.brunnels.brunnel import Brunnel
@@ -48,17 +49,23 @@ class TestCreateRouteMapLayerControl(unittest.TestCase):
 
         brunnels = []
 
+        config = BrunnelsConfig()
+        config.bbox_buffer = 10.0
+        config.metrics = False
+        # Default log_level="INFO" is fine for this test
+
         create_route_map(
             route=mock_route,
             output_filename="test_map_layers.html",
             brunnels=brunnels,
-            buffer=10.0,
-            metrics=False
+            config=config
         )
 
         mock_folium_map.assert_called_once()
         _, map_kwargs = mock_folium_map.call_args
-        self.assertEqual(map_kwargs.get('tiles'), "CartoDB positron")
+        # The 'tiles' argument to folium.Map was removed in visualization.py, default is now None (then TileLayers are added)
+        # Check that it was called with location and tiles=None
+        self.assertEqual(map_kwargs.get('tiles'), None)
 
         self.assertEqual(mock_folium_tilelayer.call_count, 2)
 

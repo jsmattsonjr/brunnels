@@ -17,6 +17,7 @@ from .geometry_utils import (
     find_closest_point_on_route,
     haversine_distance,
 )
+from .config import BrunnelsConfig
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 from .brunnel_way import BrunnelWay
 from .overpass import query_overpass_brunnels
@@ -338,23 +339,12 @@ class Route(Geometry):
                 f"Filtered {filtered} overlapping brunnels, keeping nearest in each group"
             )
 
-    def find_brunnels(
-        self,
-        bbox_buffer: float,
-        route_buffer: float,
-        bearing_tolerance_degrees: float,
-        enable_tag_filtering: bool,
-        keep_polygons: bool,
-    ) -> List[BrunnelWay]:
+    def find_brunnels(self, config: BrunnelsConfig) -> List[BrunnelWay]:
         """
         Find all bridges and tunnels near this route and check for containment within route buffer.
 
         Args:
-            buffer: Buffer distance in meters to search around route
-            route_buffer: Buffer distance in meters to apply around route for containment detection
-            bearing_tolerance_degrees: Bearing alignment tolerance in degrees
-            enable_tag_filtering: Whether to apply tag-based filtering for cycling relevance
-            keep_polygons: Whether to keep closed ways (polygons) where first node equals last node
+            config: BrunnelsConfig object containing all settings
 
         Returns:
             List of BrunnelWay objects found near the route, with containment status set
@@ -363,7 +353,7 @@ class Route(Geometry):
             logger.warning("Cannot find brunnels for empty route")
             return []
 
-        bbox = self.get_bbox(bbox_buffer)
+        bbox = self.get_bbox(config.bbox_buffer)
 
         # Calculate and log query area before API call
         south, west, north, east = bbox
@@ -384,11 +374,11 @@ class Route(Geometry):
         for way_data in raw_ways:
             try:
                 brunnel = BrunnelWay.from_overpass_data(
-                    way_data, keep_polygons, enable_tag_filtering
+                    way_data, config.keep_polygons, config.enable_tag_filtering
                 )
 
                 # Count filtered brunnels but keep them for visualization
-                if enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
+                if config.enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
                     filtered_count += 1
 
                 brunnels.append(brunnel)
@@ -398,11 +388,13 @@ class Route(Geometry):
 
         logger.info(f"Found {len(brunnels)} brunnels near route")
 
-        if enable_tag_filtering and filtered_count > 0:
+        if config.enable_tag_filtering and filtered_count > 0:
             logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
 
         # Check for containment within the route buffer and bearing alignment
-        self.find_contained_brunnels(brunnels, route_buffer, bearing_tolerance_degrees)
+        self.find_contained_brunnels(
+            brunnels, config.route_buffer, config.bearing_tolerance
+        )
 
         # Count contained vs total brunnels
         bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
