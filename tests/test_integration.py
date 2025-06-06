@@ -682,6 +682,275 @@ class TestArea51Route:
         assert result_strict.metrics["final_included_total"] == 0
 
 
+class TestPaulRevereRoute:
+    """Integration tests for Paul Revere Trail (overlap filtering and urban density)"""
+
+    @pytest.fixture
+    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
+        """Load metadata JSON file matching the GPX basename"""
+        metadata_file = gpx_file.with_suffix(".json")
+        with open(metadata_file) as f:
+            return json.load(f)
+
+    @pytest.fixture
+    def gpx_file(self) -> Path:
+        """Path to PaulRevere GPX file"""
+        return Path(__file__).parent / "fixtures" / "PaulRevere.gpx"
+
+    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test Paul Revere route with default settings"""
+        result = run_brunnels_cli(gpx_file)
+
+        # Basic execution
+        assert result.exit_code == 0, f"CLI failed: {result.stderr}"
+        assert result.html_content is not None, "No HTML output generated"
+
+        expected = metadata["expected_results"]
+
+        # Validate core metrics
+        assert result.metrics["track_points"] == metadata["track_points"]
+        assert abs(result.metrics["total_distance_km"] - metadata["distance_km"]) < 0.1
+
+        # Validate brunnel counts
+        assert_in_range(
+            result.metrics["total_brunnels_found"],
+            expected["total_brunnels_found"],
+            "total_brunnels_found",
+        )
+        assert_in_range(
+            result.metrics["contained_bridges"],
+            expected["contained_bridges"],
+            "contained_bridges",
+        )
+        assert_in_range(
+            result.metrics["contained_tunnels"],
+            expected["contained_tunnels"],
+            "contained_tunnels",
+        )
+        assert_in_range(
+            result.metrics["final_included_total"],
+            expected["final_included_total"],
+            "final_included_total",
+        )
+        assert_in_range(
+            result.metrics["final_included_individual"],
+            expected["final_included_individual"],
+            "final_included_individual",
+        )
+        assert_in_range(
+            result.metrics["final_included_compound"],
+            expected["final_included_compound"],
+            "final_included_compound",
+        )
+
+        # Validate filtering
+        filtering_expected = expected["filtered_brunnels"]
+        for reason, expected_range in filtering_expected.items():
+            if reason in result.filtering:
+                assert_in_range(
+                    result.filtering[reason], expected_range, f"filtered_{reason}"
+                )
+
+    def test_overlap_filtering_with_increased_buffer(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test overlap filtering with increased route buffer (key feature of this route)"""
+        # Test with route_buffer=5.0 (required to detect overlapping brunnels)
+        result = run_brunnels_cli(gpx_file, route_buffer=5.0)
+        assert result.exit_code == 0
+
+        # Should have overlap filtering active
+        assert "not_nearest_among_overlapping_brunnels" in result.filtering
+        overlap_filtered = result.filtering["not_nearest_among_overlapping_brunnels"]
+        assert (
+            overlap_filtered >= 1
+        ), f"Expected >=1 overlap filtered, got {overlap_filtered}"
+
+        # Test without overlap filtering disabled
+        no_overlap_result = run_brunnels_cli(
+            gpx_file, route_buffer=5.0, no_overlap_filtering=True
+        )
+        assert no_overlap_result.exit_code == 0
+
+        # Should have same or more included brunnels when overlap filtering is disabled
+        assert (
+            no_overlap_result.metrics["final_included_total"]
+            >= result.metrics["final_included_total"]
+        ), "Disabling overlap filtering should not reduce included brunnels"
+
+    def test_known_bridges_present(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test that known bridges are detected correctly"""
+        result = run_brunnels_cli(gpx_file, route_buffer=5.0)  # Use increased buffer
+        assert result.exit_code == 0
+
+        known_bridges = metadata["known_bridges"]
+
+        # Collect all OSM IDs from both individual and compound brunnels
+        included_osm_ids = set()
+        for brunnel in result.included_brunnels:
+            if brunnel["type"] == "compound":
+                # For compound brunnels, split the semicolon-separated IDs
+                ids = brunnel["osm_id"].split(";")
+                included_osm_ids.update(ids)
+            else:
+                included_osm_ids.add(brunnel["osm_id"])
+
+        # Check that major known bridges are found
+        for bridge in known_bridges:
+            if "osm_way_id" in bridge:
+                assert (
+                    str(bridge["osm_way_id"]) in included_osm_ids
+                ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
+            elif "osm_way_ids" in bridge and bridge["type"] == "compound_bridge":
+                # For compound bridges, check if components are found
+                bridge_ids = {str(oid) for oid in bridge["osm_way_ids"]}
+                found_ids = bridge_ids & included_osm_ids
+                assert (
+                    len(found_ids) > 0
+                ), f"Compound bridge {bridge['name']} components not found. Expected: {bridge_ids}, Found: {included_osm_ids}"
+
+    def test_compound_brunnel_creation(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test that compound brunnels are created correctly"""
+        result = run_brunnels_cli(gpx_file, route_buffer=5.0)
+        assert result.exit_code == 0
+
+        # Should have at least one compound brunnel
+        compound_brunnels = [
+            b for b in result.included_brunnels if b["type"] == "compound"
+        ]
+        assert (
+            len(compound_brunnels) >= 1
+        ), f"Expected >=1 compound brunnel, found {len(compound_brunnels)}"
+
+        # Check the High Street compound bridge specifically
+        high_street_compound = next(
+            (b for b in compound_brunnels if "High Street" in b["name"]), None
+        )
+        assert high_street_compound is not None, "High Street compound bridge not found"
+        assert (
+            high_street_compound["segments"] == 2
+        ), "High Street compound should have 2 segments"
+
+    def test_minuteman_bikeway_bridges(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test that multiple Minuteman Bikeway bridges are detected"""
+        result = run_brunnels_cli(gpx_file, route_buffer=5.0)
+        assert result.exit_code == 0
+
+        # Count Minuteman Bikeway bridges
+        minuteman_bridges = [
+            b
+            for b in result.included_brunnels
+            if "Minuteman Bikeway" in b.get("name", "")
+        ]
+
+        # Should find multiple Minuteman Bikeway crossings
+        assert (
+            len(minuteman_bridges) >= 4
+        ), f"Expected >=4 Minuteman Bikeway bridges, found {len(minuteman_bridges)}"
+
+        # Verify they're spread along the route (should be in 15-23km range)
+        for bridge in minuteman_bridges:
+            assert (
+                15.0 <= bridge["start_km"] <= 23.0
+            ), f"Minuteman bridge at {bridge['start_km']}km outside expected range"
+
+    def test_urban_density_performance(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test performance with high-density urban brunnel data"""
+        import time
+        import psutil
+        import os
+
+        process = psutil.Process(os.getpid())
+        start_memory = process.memory_info().rss / 1024 / 1024  # MB
+        start_time = time.time()
+
+        result = run_brunnels_cli(gpx_file, route_buffer=5.0)
+
+        end_time = time.time()
+        end_memory = process.memory_info().rss / 1024 / 1024  # MB
+
+        processing_time = end_time - start_time
+        memory_used = end_memory - start_memory
+
+        benchmarks = metadata["performance_benchmarks"]
+
+        assert result.exit_code == 0
+
+        # Parse expected time range
+        time_range = benchmarks["processing_time_seconds"]
+        min_time, max_time = map(int, time_range.split("-"))
+
+        assert (
+            processing_time <= max_time
+        ), f"Processing took {processing_time:.1f}s, expected <{max_time}s"
+
+        # Memory should be reasonable for high-density route
+        max_memory = int(benchmarks["memory_usage_mb"].replace("<", ""))
+        assert (
+            memory_used < max_memory
+        ), f"Memory usage {memory_used:.1f}MB exceeded {max_memory}MB"
+
+    def test_historical_trail_characteristics(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test characteristics specific to historic trail routing"""
+        result = run_brunnels_cli(gpx_file, route_buffer=5.0)
+        assert result.exit_code == 0
+
+        # Should have good mix of named and unnamed bridges
+        named_bridges = [
+            b for b in result.included_brunnels if b.get("name", "unnamed") != "unnamed"
+        ]
+        unnamed_bridges = [
+            b for b in result.included_brunnels if b.get("name", "unnamed") == "unnamed"
+        ]
+
+        assert (
+            len(named_bridges) >= 6
+        ), f"Expected >=6 named bridges, found {len(named_bridges)}"
+        assert (
+            len(unnamed_bridges) >= 4
+        ), f"Expected >=4 unnamed bridges, found {len(unnamed_bridges)}"
+
+        # Should cross major infrastructure (Massachusetts Avenue, Main Street)
+        major_streets = ["Massachusetts Avenue", "Main Street"]
+        found_major_streets = [
+            street
+            for street in major_streets
+            if any(street in b.get("name", "") for b in result.included_brunnels)
+        ]
+
+        assert (
+            len(found_major_streets) >= 2
+        ), f"Expected major street crossings, found: {found_major_streets}"
+
+    def test_bearing_alignment_filtering(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test bearing alignment filtering effectiveness"""
+        # Test with default tolerance
+        default_result = run_brunnels_cli(gpx_file, route_buffer=5.0)
+        assert default_result.exit_code == 0
+
+        # Test with strict tolerance
+        strict_result = run_brunnels_cli(
+            gpx_file, route_buffer=5.0, bearing_tolerance=10.0
+        )
+        assert strict_result.exit_code == 0
+
+        # Stricter tolerance should result in same or fewer included brunnels
+        assert (
+            strict_result.metrics["final_included_total"]
+            <= default_result.metrics["final_included_total"]
+        ), "Stricter bearing tolerance should not increase included brunnels"
+
+        # Check that some brunnels were filtered for bearing misalignment
+        if "not_aligned_with_route" in default_result.filtering:
+            assert (
+                default_result.filtering["not_aligned_with_route"] >= 3
+            ), "Expected some bearing misalignment filtering"
+
+
 def debug_route(gpx_filename: str):
     """Run any route and print detailed comparison with expected values"""
     gpx_file = Path(f"tests/fixtures/{gpx_filename}")
@@ -769,6 +1038,7 @@ def debug_toronto_route():
     "gpx_filename",
     [
         "Area51.gpx",
+        "PaulRevere.gpx",
         "Toronto.gpx",
         "Transfagarasan.gpx",
         # Add more routes here as you create them:

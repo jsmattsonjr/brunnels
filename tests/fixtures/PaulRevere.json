@@ -1,0 +1,189 @@
+{
+  "route_name": "Paul Revere Trail",
+  "location": "Greater Boston Area, Massachusetts, USA",
+  "distance_km": 27.54,
+  "track_points": 4435,
+  "description": "Historic trail following Paul Revere's midnight ride through Boston area with numerous bridges and bike trails",
+  "test_purpose": "urban_historic_trail_overlap_filtering",
+  "bounding_box": {
+    "south": 42.3635,
+    "west": -71.2799,
+    "north": 42.4507,
+    "east": -71.0533,
+    "area_sq_km": 179.6
+  },
+  "expected_results": {
+    "total_brunnels_found": "1410-1430",
+    "total_bridges_found": "930-940",
+    "total_tunnels_found": "480-490",
+    "contained_bridges": "12-14",
+    "contained_tunnels": "0-1",
+    "final_included_individual": "11-13",
+    "final_included_compound": "1-2",
+    "final_included_total": "12-14",
+    "filtered_brunnels": {
+      "outwith_route_buffer": "940-950",
+      "railway_not_abandoned": "155-170",
+      "waterway": "170-185",
+      "bicycle_no": "80-90",
+      "closed_way": "35-45"
+    }
+  },
+  "known_bridges": [
+    {
+      "name": "unnamed",
+      "osm_way_id": 852560833,
+      "approximate_km": 1.46,
+      "length_km": 0.01
+    },
+    {
+      "name": "unnamed",
+      "osm_way_id": 1316061571,
+      "approximate_km": 1.61,
+      "length_km": 0.00
+    },
+    {
+      "name": "unnamed",
+      "osm_way_id": 1338748628,
+      "approximate_km": 3.90,
+      "length_km": 0.02
+    },
+    {
+      "name": "unnamed",
+      "osm_way_id": 845577316,
+      "approximate_km": 4.34,
+      "length_km": 0.13
+    },
+    {
+      "name": "Main Street",
+      "osm_way_id": 80989699,
+      "approximate_km": 10.10,
+      "length_km": 0.03
+    },
+    {
+      "name": "High Street",
+      "osm_way_ids": [
+        169505851,
+        591294837
+      ],
+      "approximate_km": 13.76,
+      "length_km": 0.03,
+      "type": "compound_bridge",
+      "segments": 2
+    },
+    {
+      "name": "Minuteman Bikeway",
+      "osm_way_id": 39452769,
+      "approximate_km": 15.98,
+      "length_km": 0.02
+    },
+    {
+      "name": "Minuteman Bikeway",
+      "osm_way_id": 39452749,
+      "approximate_km": 16.42,
+      "length_km": 0.01
+    },
+    {
+      "name": "Minuteman Bikeway",
+      "osm_way_id": 39452791,
+      "approximate_km": 17.15,
+      "length_km": 0.02
+    },
+    {
+      "name": "Minuteman Bikeway",
+      "osm_way_id": 310840479,
+      "approximate_km": 18.02,
+      "length_km": 0.00
+    },
+    {
+      "name": "Minuteman Bikeway",
+      "osm_way_id": 39452690,
+      "approximate_km": 22.32,
+      "length_km": 0.02
+    },
+    {
+      "name": "Massachusetts Avenue",
+      "osm_way_id": 24233775,
+      "approximate_km": 25.05,
+      "length_km": 0.08
+    }
+  ],
+  "test_scenarios": [
+    {
+      "name": "default_settings",
+      "args": {},
+      "expected_included": 12,
+      "expected_compounds": 1,
+      "notes": "Default 3.0m buffer finds 12 bridges, no overlap filtering"
+    },
+    {
+      "name": "overlap_filtering_test",
+      "args": {
+        "route_buffer": 5.0
+      },
+      "expected_final_included_total": "13-15",
+      "expected_overlap_filtered": "1-2",
+      "notes": "Increased buffer detects overlapping brunnels for filtering test"
+    },
+    {
+      "name": "strict_bearing_tolerance",
+      "args": {
+        "bearing_tolerance": 10.0,
+        "route_buffer": 5.0
+      },
+      "expected_final_included_total": "10-14",
+      "notes": "Urban trail with various bridge orientations"
+    },
+    {
+      "name": "disable_overlap_filtering",
+      "args": {
+        "no_overlap_filtering": true,
+        "route_buffer": 5.0
+      },
+      "expected_final_included_total": "14-16",
+      "notes": "Should include overlapping brunnels that would normally be filtered"
+    },
+    {
+      "name": "disable_tag_filtering",
+      "args": {
+        "no_tag_filtering": true,
+        "route_buffer": 5.0
+      },
+      "expected_total_brunnels": "1410+",
+      "notes": "Should include railway and waterway infrastructure"
+    }
+  ],
+  "performance_benchmarks": {
+    "processing_time_seconds": "4-8",
+    "memory_usage_mb": "<250",
+    "overpass_query_time_seconds": "1-3"
+  },
+  "test_categories": [
+    "urban_dense",
+    "historic_trail",
+    "compound_brunnel_testing",
+    "buffer_sensitivity_testing",
+    "bike_trail_infrastructure",
+    "mixed_named_unnamed"
+  ],
+  "notes": [
+    "Historic Paul Revere midnight ride trail through Greater Boston",
+    "Default settings find 12 bridges with 3.0m buffer (no overlap filtering)",
+    "Overlap filtering test requires route_buffer=5m to detect overlapping brunnels",
+    "Tests compound brunnel creation (High Street bridge with 2 segments)",
+    "Good mix of named (Minuteman Bikeway, Main Street) and unnamed bridges",
+    "High brunnel density urban area (1418 total brunnels)",
+    "Multiple Minuteman Bikeway crossings test bike trail infrastructure",
+    "Buffer sensitivity: 3.0m finds 12 bridges, 5.0m finds 14+ bridges"
+  ],
+  "osm_data_characteristics": {
+    "brunnel_density": "very_high",
+    "mapping_quality": "excellent",
+    "railway_infrastructure": "heavy",
+    "bike_infrastructure": "excellent",
+    "stability": "high"
+  },
+  "osm_data_date": "2024-12-17",
+  "baseline_established": "2024-12-17",
+  "stability": "high"
+}
