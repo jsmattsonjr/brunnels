@@ -692,3 +692,138 @@ class TestFindBrunnels:  # Using a class for grouping related tests
                 "brunnels filtered" in log_message
                 and "will show greyed out" in log_message
             )
+
+    @patch("brunnels.route.logger") # Mock logger in the route module
+    def test_find_contained_brunnels_parallelized(self, mock_route_logger):
+        # 1. Create a Route object
+        route_positions = [
+            Position(latitude=0.0, longitude=0.0),
+            Position(latitude=0.0, longitude=0.01), # Approx 1.11 km
+            Position(latitude=0.0, longitude=0.02),
+            Position(latitude=0.0, longitude=0.03),
+        ]
+        route = Route(positions=route_positions)
+        # Pre-calculate some route properties to avoid issues if they are not called explicitly
+        # or if their calculation depends on external factors not mocked here.
+        route.get_linestring() # Generates shapely.LineString
+        route.get_cumulative_distances()
+
+
+        # 2. Create mock BrunnelWay objects
+        mock_brunnel1 = MagicMock(spec=BrunnelWay)
+        mock_brunnel1.filter_reason = FilterReason.NONE
+        mock_brunnel1.coordinate_list = [Position(0.0, 0.005), Position(0.0, 0.006)] # Contained
+        mock_brunnel1.is_contained_by.return_value = True
+        mock_brunnel1.is_aligned_with_route.return_value = True
+        mock_brunnel1.calculate_route_span.return_value = RouteSpan(start_distance_km=0.5, end_distance_km=0.6)
+        mock_brunnel1.get_id.return_value = "brunnel1" # For logging
+
+        mock_brunnel2 = MagicMock(spec=BrunnelWay)
+        mock_brunnel2.filter_reason = FilterReason.NONE
+        mock_brunnel2.coordinate_list = [Position(0.0, 0.015), Position(0.0, 0.016)] # Contained
+        mock_brunnel2.is_contained_by.return_value = True
+        mock_brunnel2.is_aligned_with_route.return_value = False # Not aligned
+        mock_brunnel2.calculate_route_span.return_value = None # Should not be called if not aligned
+        mock_brunnel2.get_id.return_value = "brunnel2"
+
+        mock_brunnel3 = MagicMock(spec=BrunnelWay)
+        mock_brunnel3.filter_reason = FilterReason.NONE
+        mock_brunnel3.coordinate_list = [Position(1.0, 1.0), Position(1.0, 1.001)] # Not contained
+        mock_brunnel3.is_contained_by.return_value = False # Not contained
+        mock_brunnel3.is_aligned_with_route.return_value = True # Should not matter if not contained
+        mock_brunnel3.calculate_route_span.return_value = None # Should not be called
+        mock_brunnel3.get_id.return_value = "brunnel3"
+
+        mock_brunnel4 = MagicMock(spec=BrunnelWay)
+        mock_brunnel4.filter_reason = FilterReason.TAG_FILTER # Initially filtered
+        mock_brunnel4.coordinate_list = [Position(0.0, 0.025), Position(0.0, 0.026)]
+        # For already filtered brunnels, is_contained_by etc. should not be called by the parallel part.
+        # Their contained_in_route should be set to False by the main logic.
+        mock_brunnel4.get_id.return_value = "brunnel4"
+
+        # This brunnel will throw an error during route span calculation
+        mock_brunnel5 = MagicMock(spec=BrunnelWay)
+        mock_brunnel5.filter_reason = FilterReason.NONE
+        mock_brunnel5.coordinate_list = [Position(0.0, 0.007), Position(0.0, 0.008)] # Contained
+        mock_brunnel5.is_contained_by.return_value = True
+        mock_brunnel5.is_aligned_with_route.return_value = True
+        mock_brunnel5.calculate_route_span.side_effect = Exception("Route span calculation error")
+        mock_brunnel5.get_id.return_value = "brunnel5"
+
+
+        brunnels_list = [mock_brunnel1, mock_brunnel2, mock_brunnel3, mock_brunnel4, mock_brunnel5]
+
+        # 3. Call route.find_contained_brunnels()
+        route.find_contained_brunnels(
+            brunnels=brunnels_list,
+            route_buffer=10.0, # meters
+            bearing_tolerance_degrees=30.0
+        )
+
+        # 4. Assert attributes of mock brunnels
+
+        # Brunnel 1: Contained, aligned
+        assert mock_brunnel1.contained_in_route is True
+        assert mock_brunnel1.filter_reason == FilterReason.NONE
+        assert mock_brunnel1.route_span == RouteSpan(start_distance_km=0.5, end_distance_km=0.6)
+        mock_brunnel1.is_contained_by.assert_called_once()
+        mock_brunnel1.is_aligned_with_route.assert_called_once()
+        mock_brunnel1.calculate_route_span.assert_called_once()
+
+        # Brunnel 2: Contained, not aligned
+        assert mock_brunnel2.contained_in_route is False # Set to False because unaligned
+        assert mock_brunnel2.filter_reason == FilterReason.UNALIGNED
+        assert mock_brunnel2.route_span is None
+        mock_brunnel2.is_contained_by.assert_called_once()
+        mock_brunnel2.is_aligned_with_route.assert_called_once()
+        mock_brunnel2.calculate_route_span.assert_not_called() # Not called due to alignment fail
+
+        # Brunnel 3: Not contained
+        assert mock_brunnel3.contained_in_route is False
+        assert mock_brunnel3.filter_reason == FilterReason.NOT_CONTAINED
+        assert mock_brunnel3.route_span is None
+        mock_brunnel3.is_contained_by.assert_called_once()
+        mock_brunnel3.is_aligned_with_route.assert_not_called() # Not called due to containment fail
+        mock_brunnel3.calculate_route_span.assert_not_called()
+
+        # Brunnel 4: Initially filtered
+        assert mock_brunnel4.contained_in_route is False # Should be set to False
+        assert mock_brunnel4.filter_reason == FilterReason.TAG_FILTER # Unchanged
+        assert mock_brunnel4.route_span is None
+        mock_brunnel4.is_contained_by.assert_not_called()
+        mock_brunnel4.is_aligned_with_route.assert_not_called()
+        mock_brunnel4.calculate_route_span.assert_not_called()
+
+        # Brunnel 5: Contained, aligned, but error in route span calculation
+        assert mock_brunnel5.contained_in_route is False # Set to False due to error
+        assert mock_brunnel5.filter_reason == FilterReason.NO_ROUTE_SPAN
+        assert mock_brunnel5.route_span is None
+        mock_brunnel5.is_contained_by.assert_called_once()
+        mock_brunnel5.is_aligned_with_route.assert_called_once()
+        mock_brunnel5.calculate_route_span.assert_called_once()
+
+
+        # 5. Assert logger calls for counts
+        # Expected: 1 contained (brunnel1), 1 unaligned (brunnel2)
+        # Brunnel3 is NOT_CONTAINED, Brunnel4 is TAG_FILTER, Brunnel5 is NO_ROUTE_SPAN
+        # The log message for contained_count includes only those that are fully processed and kept.
+        # The log message for unaligned_count is specific.
+
+        # Looking for: f"Found {contained_count} brunnels completely contained and aligned..."
+        # And: f"Filtered {unaligned_count} brunnels due to bearing misalignment"
+
+        expected_contained_count = 1 # only brunnel1
+        expected_unaligned_count = 1 # only brunnel2
+
+        found_contained_log = False
+        found_unaligned_log = False
+
+        for call in mock_route_logger.debug.call_args_list:
+            log_message = call[0][0]
+            if f"Found {expected_contained_count} brunnels completely contained and aligned" in log_message:
+                found_contained_log = True
+            if f"Filtered {expected_unaligned_count} brunnels due to bearing misalignment" in log_message:
+                found_unaligned_log = True
+
+        assert found_contained_log, f"Log for contained_count ({expected_contained_count}) not found."
+        assert found_unaligned_log, f"Log for unaligned_count ({expected_unaligned_count}) not found."
