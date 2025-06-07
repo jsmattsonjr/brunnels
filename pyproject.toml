@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brunnels"
+dynamic = ["version"]
 authors = [
     {name = "Jim Mattson", email = "jsmattsonjr@gmail.com"},
 ]
@@ -67,6 +68,7 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [tool.setuptools_scm]
+write_to = "src/brunnels/_version.py"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
