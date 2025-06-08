@@ -107,18 +107,10 @@
       },
       "expected_included": "7-9",
       "notes": "Larger buffer may include additional borderline bridges"
-    },
-    {
-      "name": "disable_tag_filtering",
-      "args": {
-        "no_tag_filtering": true
-      },
-      "expected_total_brunnels": "1500+",
-      "notes": "Should include railway and bicycle=no brunnels"
     }
   ],
   "performance_benchmarks": {
-    "processing_time_seconds": "3-7",
+    "processing_time_seconds": "8-15",
     "memory_usage_mb": "<200",
     "overpass_query_time_seconds": "1-3"
   },

@@ -594,10 +594,10 @@ class TestArea51Route(BaseRouteTest):
         assert result_small_buffer.metrics["final_included_total"] == 0
         assert result_large_buffer.metrics["final_included_total"] == 0
 
-        # Test with disabled tag filtering
-        result_no_filter = run_brunnels_cli(gpx_file, no_tag_filtering=True)
-        assert result_no_filter.exit_code == 0
-        assert result_no_filter.metrics["final_included_total"] == 0
+        # Test with default tag filtering (always on)
+        result_default_filter = run_brunnels_cli(gpx_file)
+        assert result_default_filter.exit_code == 0
+        assert result_default_filter.metrics["final_included_total"] == 0
 
         # Test with strict bearing tolerance
         result_strict = run_brunnels_cli(gpx_file, bearing_tolerance=5.0)
