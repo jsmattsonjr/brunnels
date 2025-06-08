@@ -18,6 +18,7 @@ import os
 import gpxpy
 import gpxpy.gpx
 
+from . import __version__
 from . import visualization
 from .route import Route, RouteValidationError
 from .brunnel import Brunnel
@@ -99,6 +100,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--metrics",
         action="store_true",
         help="Output structured metrics after processing",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"brunnels {__version__}",
     )
     return parser
 
