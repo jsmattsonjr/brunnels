@@ -7,6 +7,7 @@ import logging  # Added for logger mocking
 from unittest.mock import patch, MagicMock  # Added for mocking
 import collections  # Added for Counter, though not directly used in assertions here
 
+from src.brunnels.config import BrunnelsConfig
 from brunnels.route import Route, RouteValidationError, route_spans_overlap
 from brunnels.geometry import Position  # Corrected import for RouteSpan
 from brunnels.brunnel import (
@@ -586,13 +587,13 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         # find_contained_brunnels only processes brunnels with FilterReason.NONE.
 
         # 3. Call find_brunnels
-        route.find_brunnels(
-            bbox_buffer=1000,  # meters, large enough to find ways from Overpass query
-            route_buffer=50,  # meters, for containment check
-            bearing_tolerance_degrees=30,
-            enable_tag_filtering=True,
-            keep_polygons=False,
-        )
+        config = BrunnelsConfig()
+        config.bbox_buffer = 1000
+        config.route_buffer = 50
+        config.bearing_tolerance = 30
+        config.enable_tag_filtering = True
+        config.keep_polygons = False
+        route.find_brunnels(config)
 
         # 4. Construct the expected log message string
         # Based on mock_way_data:
@@ -645,13 +646,13 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         ]
         mock_query_overpass.return_value = mock_way_data
 
-        route.find_brunnels(
-            bbox_buffer=1000,
-            route_buffer=50,
-            bearing_tolerance_degrees=30,
-            enable_tag_filtering=True,
-            keep_polygons=False,
-        )
+        config = BrunnelsConfig()
+        config.bbox_buffer = 1000
+        config.route_buffer = 50
+        config.bearing_tolerance = 30
+        config.enable_tag_filtering = True
+        config.keep_polygons = False
+        route.find_brunnels(config)
 
         # Assert that the specific log message about tag-filtered brunnels is NOT called
         for call_args in mock_logger.debug.call_args_list:
@@ -677,13 +678,13 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         ]
         mock_query_overpass.return_value = mock_way_data
 
-        route.find_brunnels(
-            bbox_buffer=1000,
-            route_buffer=50,
-            bearing_tolerance_degrees=30,
-            enable_tag_filtering=False,  # Tag filtering disabled
-            keep_polygons=False,
-        )
+        config = BrunnelsConfig()
+        config.bbox_buffer = 1000
+        config.route_buffer = 50
+        config.bearing_tolerance = 30
+        config.enable_tag_filtering = False  # Tag filtering disabled
+        config.keep_polygons = False
+        route.find_brunnels(config)
 
         # Assert that the specific log message about tag-filtered brunnels is NOT called
         for call_args in mock_logger.debug.call_args_list:
