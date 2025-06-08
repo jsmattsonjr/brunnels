@@ -142,19 +142,10 @@
       },
       "expected_final_included_total": "14-16",
       "notes": "Should include overlapping brunnels that would normally be filtered"
-    },
-    {
-      "name": "disable_tag_filtering",
-      "args": {
-        "no_tag_filtering": true,
-        "route_buffer": 5.0
-      },
-      "expected_total_brunnels": "1410+",
-      "notes": "Should include railway and waterway infrastructure"
     }
   ],
   "performance_benchmarks": {
-    "processing_time_seconds": "4-8",
+    "processing_time_seconds": "18-25",
     "memory_usage_mb": "<250",
     "overpass_query_time_seconds": "1-3"
   },

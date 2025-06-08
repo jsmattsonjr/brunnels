@@ -83,11 +83,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Don't automatically open the HTML file in browser",
     )
     parser.add_argument(
-        "--no-tag-filtering",
-        action="store_true",
-        help="Disable tag-based filtering for cycling relevance",
-    )
-    parser.add_argument(
         "--keep-polygons",
         action="store_true",
         help="Keep closed ways (polygons) where first node equals last node",
@@ -212,7 +207,6 @@ def main():
     config.route_buffer = args.route_buffer
     config.bearing_tolerance = args.bearing_tolerance
     config.log_level = args.log_level
-    config.enable_tag_filtering = not args.no_tag_filtering
     config.keep_polygons = args.keep_polygons
     config.no_overlap_filtering = args.no_overlap_filtering
     config.metrics = args.metrics

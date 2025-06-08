@@ -374,11 +374,11 @@ class Route(Geometry):
         for way_data in raw_ways:
             try:
                 brunnel = BrunnelWay.from_overpass_data(
-                    way_data, config.keep_polygons, config.enable_tag_filtering
+                    way_data, config.keep_polygons
                 )
 
                 # Count filtered brunnels but keep them for visualization
-                if config.enable_tag_filtering and brunnel.filter_reason != FilterReason.NONE:
+                if brunnel.filter_reason != FilterReason.NONE:
                     filtered_count += 1
 
                 brunnels.append(brunnel)
@@ -388,7 +388,7 @@ class Route(Geometry):
 
         logger.info(f"Found {len(brunnels)} brunnels near route")
 
-        if config.enable_tag_filtering and filtered_count > 0:
+        if filtered_count > 0:
             logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
 
         # Check for containment within the route buffer and bearing alignment

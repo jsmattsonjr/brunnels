@@ -591,7 +591,6 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         config.bbox_buffer = 1000
         config.route_buffer = 50
         config.bearing_tolerance = 30
-        config.enable_tag_filtering = True
         config.keep_polygons = False
         route.find_brunnels(config)
 
@@ -650,7 +649,6 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         config.bbox_buffer = 1000
         config.route_buffer = 50
         config.bearing_tolerance = 30
-        config.enable_tag_filtering = True
         config.keep_polygons = False
         route.find_brunnels(config)
 
@@ -664,15 +662,15 @@ class TestFindBrunnels:  # Using a class for grouping related tests
 
     @patch("brunnels.route.logger")
     @patch("brunnels.route.query_overpass_brunnels")
-    def test_find_brunnels_tag_filtering_disabled_logging(
+    def test_find_brunnels_tag_filtering_now_always_on_logging(
         self, mock_query_overpass, mock_logger
     ):
         route = Route(positions=[Position(0, 0, 0), Position(10, 10, 0)])
-        mock_way_data = [  # Same data that would be filtered if enabled
+        mock_way_data = [  # Data that will be filtered
             {
                 "id": 1,
                 "type": "way",
-                "tags": {"bicycle": "no"},
+                "tags": {"bicycle": "no"}, # This tag will cause filtering
                 "geometry": [{"lat": 0.1, "lon": 0.1}],
             },
         ]
@@ -682,14 +680,23 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         config.bbox_buffer = 1000
         config.route_buffer = 50
         config.bearing_tolerance = 30
-        config.enable_tag_filtering = False  # Tag filtering disabled
         config.keep_polygons = False
         route.find_brunnels(config)
 
-        # Assert that the specific log message about tag-filtered brunnels is NOT called
+        # Assert that the specific log message about tag-filtered brunnels IS called
+        # because filtering is now always on.
+        expected_total_filtered = 1 # Only one item, and it's filtered
+        found_log_call = False
         for call_args in mock_logger.debug.call_args_list:
-            log_message = call_args[0][0]
-            assert not (
+            log_message = call_args[0][0]  # First argument of the call
+            if (
                 "brunnels filtered" in log_message
                 and "will show greyed out" in log_message
-            )
+            ):
+                found_log_call = True
+                # Check total count
+                assert f"{expected_total_filtered} brunnels filtered" in log_message
+                break
+        assert (
+            found_log_call
+        ), "The expected debug log message for filtered brunnels was not found (it should be present as filtering is always on)."
