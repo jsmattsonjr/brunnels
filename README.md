@@ -125,30 +125,6 @@ If the output file already exists, numbered versions are automatically tried:
 - `my_route map (1).html` (if this exists, try...)
 - `my_route map (2).html` (and so on...)
 
-## Python API Usage
-
-You can also use brunnels as a Python library:
-
-```python
-from brunnels import Route, BrunnelWay
-
-# Load a route
-route = Route.from_file("my_route.gpx")
-
-# Find brunnels
-brunnels = route.find_brunnels(
-    buffer=10,  # Changed from buffer_km=0.1
-    route_buffer=3.0,
-    bearing_tolerance_degrees=20.0,
-    enable_tag_filtering=True,
-    keep_polygons=False
-)
-
-# Create visualization
-from brunnels import visualization
-visualization.create_route_map(route, "map.html", brunnels, 10) # Changed from 0.1
-```
-
 ## Understanding the Output
 
 ### Interactive Map
