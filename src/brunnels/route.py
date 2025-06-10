@@ -39,7 +39,7 @@ class Route(Geometry):
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
-    _bbox_buffer: Optional[float] = field(default=None, init=False, repr=False)
+    # _bbox_buffer field removed
     _cumulative_distances: Optional[List[float]] = field(
         default=None, init=False, repr=False
     )
@@ -57,12 +57,13 @@ class Route(Geometry):
             for tp in self.trackpoints
         ]
 
-    def get_bbox(self, buffer: float = 10.0) -> Tuple[float, float, float, float]:
+    def get_bbox(self, buffer: float = 0.0) -> Tuple[float, float, float, float]:
         """
-        Get memoized bounding box for this route with buffer.
+        Get bounding box for this route, optionally with a buffer.
+        The internally stored _bbox is always without a buffer.
 
         Args:
-            buffer: Buffer distance in meters (default: 1.0)
+            buffer: Buffer distance in meters (default: 0.0)
 
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
@@ -73,18 +74,43 @@ class Route(Geometry):
         if not self.trackpoints:
             raise ValueError("Cannot calculate bounding box for empty route")
 
-        if self._bbox is None or self._bbox_buffer != buffer:
-            self._bbox = self._calculate_bbox(buffer)
-            self._bbox_buffer = buffer
+        # Ensure the base bounding box (0 buffer) is calculated and memoized
+        if self._bbox is None:
+            self._bbox = self._calculate_bbox(0.0)
 
-        return self._bbox
+        # If no buffer is requested, return the memoized base bounding box
+        if buffer == 0.0:
+            return self._bbox
 
-    def _calculate_bbox(self, buffer: float) -> Tuple[float, float, float, float]:
+        # If a buffer is requested, calculate it based on the memoized _bbox
+        min_lat, min_lon, max_lat, max_lon = self._bbox
+
+        # Convert buffer from m to approximate degrees
+        # 1 degree latitude ≈ 111 km = 111000m
+        # longitude varies by latitude, use average of the base bbox
+        avg_lat = (min_lat + max_lat) / 2
+        lat_buffer = buffer / 111000.0
+        lon_buffer = buffer / (111000.0 * abs(cos(radians(avg_lat))))
+
+        # Apply buffer (ensure we don't exceed valid coordinate ranges)
+        buffered_south = max(-90.0, min_lat - lat_buffer)
+        buffered_north = min(90.0, max_lat + lat_buffer)
+        buffered_west = max(-180.0, min_lon - lon_buffer)
+        buffered_east = min(180.0, max_lon + lon_buffer)
+
+        logger.debug(
+            f"Returning on-the-fly buffered bounding box: ({buffered_south:.4f}, {buffered_west:.4f}, {buffered_north:.4f}, {buffered_east:.4f}) with {buffer}m buffer from base _bbox"
+        )
+        return (buffered_south, buffered_west, buffered_north, buffered_east)
+
+    def _calculate_bbox(self, ignored_buffer: float) -> Tuple[float, float, float, float]:
         """
-        Calculate bounding box for route with optional buffer.
+        Calculate bounding box for route, always with a 0 buffer.
+        The `ignored_buffer` parameter is kept for compatibility with previous calls
+        but is no longer used internally for calculations.
 
         Args:
-            buffer: Buffer distance in meters
+            ignored_buffer: This parameter is ignored. The calculation always uses a 0m buffer.
 
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
@@ -95,21 +121,20 @@ class Route(Geometry):
         min_lat, max_lat = min(latitudes), max(latitudes)
         min_lon, max_lon = min(longitudes), max(longitudes)
 
-        # Convert buffer from m to approximate degrees
-        # 1 degree latitude ≈ 111 km = 111000m
-        # longitude varies by latitude, use average
-        avg_lat = (min_lat + max_lat) / 2
-        lat_buffer = buffer / 111000.0
-        lon_buffer = buffer / (111000.0 * abs(cos(radians(avg_lat))))
+        # Buffer is always 0 for the base calculation.
+        # The actual `buffer` parameter passed to this method is ignored.
+        internal_buffer_value = 0.0
+        lat_buffer = 0.0  # Since internal_buffer_value is 0
+        lon_buffer = 0.0  # Since internal_buffer_value is 0
 
-        # Apply buffer (ensure we don't exceed valid coordinate ranges)
+        # Apply 0 buffer (effectively just taking min/max values)
         south = max(-90.0, min_lat - lat_buffer)
         north = min(90.0, max_lat + lat_buffer)
         west = max(-180.0, min_lon - lon_buffer)
         east = min(180.0, max_lon + lon_buffer)
 
         logger.debug(
-            f"Route bounding box: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {buffer}m buffer"
+            f"Base route bounding box calculated: ({south:.4f}, {west:.4f}, {north:.4f}, {east:.4f}) with {internal_buffer_value}m buffer"
         )
 
         return (south, west, north, east)
