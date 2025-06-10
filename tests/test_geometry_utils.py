@@ -189,12 +189,13 @@ def test_find_closest_point_on_route_point_on_segment():
         Position(latitude=0.0, longitude=1.0),
         Position(latitude=0.0, longitude=2.0)
     ]
-    route_obj = Route(positions=route)
+    trackpoints=[{"latitude": pos.latitude, "longitude": pos.longitude, "elevation": pos.elevation} for pos in route]
+    route_obj = Route(trackpoints=trackpoints)
     point = Position(latitude=0.0, longitude=0.5) # Point on the first segment
 
     dist_km, closest_pos = find_closest_point_on_route(point, route_obj)
 
-    expected_dist_on_segment = haversine_distance(route_obj.positions[0], point)
+    expected_dist_on_segment = haversine_distance(route_obj.coordinate_list[0], point)
     assert dist_km == pytest.approx(expected_dist_on_segment)
     assert closest_pos.latitude == pytest.approx(point.latitude)
     assert closest_pos.longitude == pytest.approx(point.longitude)
@@ -205,7 +206,8 @@ def test_find_closest_point_on_route_point_is_vertex():
         Position(latitude=0.0, longitude=1.0),
         Position(latitude=0.0, longitude=2.0)
     ]
-    route_obj = Route(positions=route)
+    trackpoints=[{"latitude": pos.latitude, "longitude": pos.longitude, "elevation": pos.elevation} for pos in route]
+    route_obj = Route(trackpoints=trackpoints)
     cumulative_distances = route_obj.get_cumulative_distances() # Still need this for assertion
     point = Position(latitude=0.0, longitude=1.0) # Point is a vertex
 
@@ -221,14 +223,15 @@ def test_find_closest_point_on_route_point_off_route():
         Position(latitude=0.0, longitude=1.0),
         Position(latitude=0.0, longitude=2.0)
     ]
-    route_obj = Route(positions=route)
+    trackpoints=[{"latitude": pos.latitude, "longitude": pos.longitude, "elevation": pos.elevation} for pos in route]
+    route_obj = Route(trackpoints=trackpoints)
     point = Position(latitude=0.1, longitude=0.5) # Point off the route
 
     dist_km, closest_pos = find_closest_point_on_route(point, route_obj)
 
     # Expected: projection onto the first segment
     expected_closest_on_segment = Position(latitude=0.0, longitude=0.5)
-    expected_cumulative_dist = haversine_distance(route_obj.positions[0], expected_closest_on_segment)
+    expected_cumulative_dist = haversine_distance(route_obj.coordinate_list[0], expected_closest_on_segment)
 
     assert dist_km == pytest.approx(expected_cumulative_dist)
     assert closest_pos.latitude == pytest.approx(expected_closest_on_segment.latitude)
@@ -236,7 +239,8 @@ def test_find_closest_point_on_route_point_off_route():
 
 def test_find_closest_point_on_route_empty_route():
     route_positions = []
-    route_obj = Route(positions=route_positions)
+    trackpoints=[{"latitude": pos.latitude, "longitude": pos.longitude, "elevation": pos.elevation} for pos in route_positions]
+    route_obj = Route(trackpoints=trackpoints)
     point = Position(latitude=0.0, longitude=0.0)
 
     with pytest.raises(ValueError):
@@ -244,14 +248,15 @@ def test_find_closest_point_on_route_empty_route():
 
 def test_find_closest_point_on_route_single_point_route():
     route_positions = [Position(latitude=10.0, longitude=10.0)]
-    route_obj = Route(positions=route_positions)
+    trackpoints=[{"latitude": pos.latitude, "longitude": pos.longitude, "elevation": pos.elevation} for pos in route_positions]
+    route_obj = Route(trackpoints=trackpoints)
     point = Position(latitude=0.0, longitude=0.0)
 
     dist_km, closest_pos = find_closest_point_on_route(point, route_obj)
 
     assert dist_km == 0.0
-    assert closest_pos.latitude == route_obj.positions[0].latitude
-    assert closest_pos.longitude == route_obj.positions[0].longitude
+    assert closest_pos.latitude == route_obj.coordinate_list[0].latitude
+    assert closest_pos.longitude == route_obj.coordinate_list[0].longitude
 
 def test_find_closest_point_on_route_complex_case():
     # A more complex route and a point requiring careful checking
@@ -261,7 +266,8 @@ def test_find_closest_point_on_route_complex_case():
         Position(41.8781, -87.6298),  # Chicago
         Position(29.7604, -95.3698)   # Houston
     ]
-    route_obj = Route(positions=route)
+    trackpoints=[{"latitude": pos.latitude, "longitude": pos.longitude, "elevation": pos.elevation} for pos in route]
+    route_obj = Route(trackpoints=trackpoints)
     cumulative_distances = route_obj.get_cumulative_distances() # Needed for assertion logic below
     # Point somewhere near the LA-Chicago segment, but closer to LA
     point = Position(latitude=35.0, longitude=-115.0)
@@ -279,9 +285,9 @@ def test_find_closest_point_on_route_complex_case():
     found_on_segment = False
     recalculated_cumulative_dist_for_closest_pos = -1.0
 
-    for i in range(len(route_obj.positions) - 1):
-        seg_start = route_obj.positions[i]
-        seg_end = route_obj.positions[i+1]
+    for i in range(len(route_obj.coordinate_list) - 1):
+        seg_start = route_obj.coordinate_list[i]
+        seg_end = route_obj.coordinate_list[i+1]
 
         # Project 'closest_pos' (the function's output) onto the current segment.
         # If it's already on the segment, the perpendicular distance will be ~0,

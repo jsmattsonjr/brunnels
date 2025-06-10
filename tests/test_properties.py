@@ -144,10 +144,13 @@ class TestBoundingBoxProperties:
         """Bounding box should contain all route points."""
         from brunnels.route import Route
         
-        route = Route(positions)
+        # Convert List[Position] to List[Dict[str, Any]] for Route constructor
+        trackpoints_data = [{"latitude": p.latitude, "longitude": p.longitude, "elevation": p.elevation} for p in positions]
+        route = Route(trackpoints_data)
         south, west, north, east = route.get_bbox(buffer_km)
         
         # All points should be within bbox
+        # Iterate over the original 'positions' (List[Position]) for checking
         for pos in positions:
             assert south <= pos.latitude <= north
             assert west <= pos.longitude <= east
@@ -157,7 +160,9 @@ class TestBoundingBoxProperties:
         """Larger buffer should never shrink bounding box."""
         from brunnels.route import Route
         
-        route = Route(positions)
+        # Convert List[Position] to List[Dict[str, Any]] for Route constructor
+        trackpoints_data = [{"latitude": p.latitude, "longitude": p.longitude, "elevation": p.elevation} for p in positions]
+        route = Route(trackpoints_data)
         
         bbox_small = route.get_bbox(0.1)  # Small buffer
         bbox_large = route.get_bbox(1.0)  # Large buffer

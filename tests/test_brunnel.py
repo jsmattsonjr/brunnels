@@ -299,7 +299,15 @@ def test_is_contained_by_single_point_brunnel(simple_route_geometry: Polygon):
 
 # Helper to create a simple mock route
 def create_mock_route(positions: list[Position]) -> Route:
-    return Route(positions=positions)
+    trackpoints = [
+        {
+            "latitude": pos.latitude,
+            "longitude": pos.longitude,
+            "elevation": pos.elevation,
+        }
+        for pos in positions
+    ]
+    return Route(trackpoints=trackpoints)
 
 
 @pytest.fixture
