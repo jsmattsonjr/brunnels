@@ -190,12 +190,13 @@ class Brunnel(Geometry, ABC):
             )
             return False
 
-        if not route.positions or len(route.positions) < 2:
+        if len(route) < 2: # Check length using Route's __len__
             logger.debug("Route has insufficient coordinates for bearing calculation")
             return False
 
         # Find closest segments between brunnel and route
-        brunnel_segment, route_segment = find_closest_segments(coords, route.positions)
+        # route.coordinate_list returns List[Position]
+        brunnel_segment, route_segment = find_closest_segments(coords, route.coordinate_list)
 
         if brunnel_segment is None or route_segment is None:
             logger.debug(

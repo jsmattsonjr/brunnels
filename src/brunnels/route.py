@@ -3,7 +3,7 @@
 Route data model for brunnel analysis.
 """
 
-from typing import Optional, Tuple, List, TextIO, Sequence
+from typing import Optional, Tuple, List, TextIO, Sequence, Dict, Any
 from dataclasses import dataclass, field
 import logging
 import math
@@ -35,7 +35,7 @@ class RouteValidationError(Exception):
 class Route(Geometry):
     """Represents a GPX route with memoized geometric operations."""
 
-    positions: List[Position]
+    trackpoints: List[Dict[str, Any]]
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
@@ -47,7 +47,15 @@ class Route(Geometry):
     @property
     def coordinate_list(self) -> List[Position]:
         """Return the list of Position objects for this geometry."""
-        return self.positions
+        # Convert trackpoints to Position objects
+        return [
+            Position(
+                latitude=tp["latitude"],
+                longitude=tp["longitude"],
+                elevation=tp.get("elevation") # Use .get for optional elevation
+            )
+            for tp in self.trackpoints
+        ]
 
     def get_bbox(self, buffer: float = 10.0) -> Tuple[float, float, float, float]:
         """
@@ -62,7 +70,7 @@ class Route(Geometry):
         Raises:
             ValueError: If route is empty
         """
-        if not self.positions:
+        if not self.trackpoints:
             raise ValueError("Cannot calculate bounding box for empty route")
 
         if self._bbox is None or self._bbox_buffer != buffer:
@@ -81,8 +89,8 @@ class Route(Geometry):
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
         """
-        latitudes = [pos.latitude for pos in self.positions]
-        longitudes = [pos.longitude for pos in self.positions]
+        latitudes = [tp["latitude"] for tp in self.trackpoints]
+        longitudes = [tp["longitude"] for tp in self.trackpoints]
 
         min_lat, max_lat = min(latitudes), max(latitudes)
         min_lon, max_lon = min(longitudes), max(longitudes)
@@ -111,10 +119,12 @@ class Route(Geometry):
         Get memoized cumulative distances along the route.
 
         Returns:
-            List of cumulative distances in kilometers, with same length as positions
+            List of cumulative distances in kilometers, with same length as trackpoints
         """
         if self._cumulative_distances is None:
-            self._cumulative_distances = calculate_cumulative_distances(self.positions)
+            # Convert trackpoints to Position objects for calculate_cumulative_distances
+            positions_for_calc = [Position(tp["latitude"], tp["longitude"], tp.get("elevation")) for tp in self.trackpoints]
+            self._cumulative_distances = calculate_cumulative_distances(positions_for_calc)
 
         return self._cumulative_distances
 
@@ -133,7 +143,7 @@ class Route(Geometry):
             route_buffer: Buffer distance in meters to apply around the route (minimum: 1.0)
             bearing_tolerance_degrees: Bearing alignment tolerance in degrees
         """
-        if not self.positions:
+        if not self.trackpoints:
             logger.warning("Cannot find contained brunnels for empty route")
             return
 
@@ -156,7 +166,7 @@ class Route(Geometry):
             return
 
         # Convert buffer from meters to approximate degrees
-        avg_lat = self.positions[0].latitude
+        avg_lat = self.trackpoints[0]["latitude"]
         lat_buffer = route_buffer / 111000.0  # 1 degree latitude ≈ 111 km
         lon_buffer = route_buffer / (111000.0 * abs(cos(radians(avg_lat))))
 
@@ -238,7 +248,7 @@ class Route(Geometry):
         Args:
             brunnels: List of Brunnel objects to filter (modified in-place)
         """
-        if not self.positions or not brunnels:
+        if not self.trackpoints or not brunnels:
             return
 
         cumulative_distances = self.get_cumulative_distances()
@@ -342,7 +352,7 @@ class Route(Geometry):
         Returns:
             List of BrunnelWay objects found near the route, with containment status set
         """
-        if not self.positions:
+        if not self.trackpoints:
             logger.warning("Cannot find brunnels for empty route")
             return []
 
@@ -411,7 +421,7 @@ class Route(Geometry):
         """
         geometry_coords = geometry.coordinate_list
 
-        if not geometry_coords or not self.positions:
+        if not geometry_coords or not self.trackpoints:
             return float("inf")
 
         # cumulative_distances is no longer needed here,
@@ -458,21 +468,21 @@ class Route(Geometry):
         except gpxpy.gpx.GPXException as e:
             raise gpxpy.gpx.GPXException(e)
 
-        positions = []
+        trackpoints_data = []
 
         # Extract all track points from all tracks and segments
         for track in gpx_data.tracks:
             for segment in track.segments:
                 for point in segment.points:
-                    positions.append(
-                        Position(
-                            latitude=point.latitude,
-                            longitude=point.longitude,
-                            elevation=point.elevation,
-                        )
+                    trackpoints_data.append(
+                        {
+                            "latitude": point.latitude,
+                            "longitude": point.longitude,
+                            "elevation": point.elevation,
+                        }
                     )
 
-        route = cls(positions)
+        route = cls(trackpoints_data)
 
         if not route:
             logger.warning("No track points found in GPX file")
@@ -481,7 +491,7 @@ class Route(Geometry):
         logger.debug(f"Parsed {len(route)} track points from GPX file")
 
         # Validate the route
-        cls._validate_route(route.positions)
+        cls._validate_route(route.trackpoints)
 
         return route
 
@@ -506,30 +516,30 @@ class Route(Geometry):
             return cls.from_gpx(f)
 
     @staticmethod
-    def _validate_route(positions: List[Position]) -> None:
+    def _validate_route(trackpoints: List[Dict[str, Any]]) -> None:
         """
         Validate route for antimeridian crossing and polar proximity.
 
         Args:
-            positions: List of Position objects to validate
+            trackpoints: List of trackpoint dictionaries to validate
 
         Raises:
             RouteValidationError: If validation fails
         """
-        if not positions:
+        if not trackpoints:
             return
 
         # Check for polar proximity (within 5 degrees of poles)
-        for i, pos in enumerate(positions):
-            if abs(pos.latitude) > 85.0:
+        for i, tp in enumerate(trackpoints):
+            if abs(tp["latitude"]) > 85.0:
                 raise RouteValidationError(
-                    f"Route point {i} at latitude {pos.latitude:.3f}° is within "
+                    f"Route point {i} at latitude {tp['latitude']:.3f}° is within "
                     f"5 degrees of a pole"
                 )
 
         # Check for antimeridian crossing
-        for i in range(1, len(positions)):
-            lon_diff = abs(positions[i].longitude - positions[i - 1].longitude)
+        for i in range(1, len(trackpoints)):
+            lon_diff = abs(trackpoints[i]["longitude"] - trackpoints[i-1]["longitude"])
             if lon_diff > 180.0:
                 raise RouteValidationError(
                     f"Route crosses antimeridian between points {i-1} and {i} "
@@ -537,16 +547,16 @@ class Route(Geometry):
                 )
 
     def __len__(self) -> int:
-        """Return number of positions in route."""
-        return len(self.positions)
+        """Return number of trackpoints in route."""
+        return len(self.trackpoints)
 
     def __getitem__(self, index):
-        """Allow indexing into positions."""
-        return self.positions[index]
+        """Allow indexing into trackpoints."""
+        return self.trackpoints[index]
 
     def __iter__(self):
-        """Allow iteration over positions."""
-        return iter(self.positions)
+        """Allow iteration over trackpoints."""
+        return iter(self.trackpoints)
 
 
 def route_spans_overlap(span1: RouteSpan, span2: RouteSpan) -> bool:

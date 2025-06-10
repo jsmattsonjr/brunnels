@@ -142,7 +142,7 @@ def find_closest_point_on_route(
         - cumulative_distance_km: Distance from route start to closest point
         - closest_position: Position of closest point on route
     """
-    route_positions = route_obj.positions
+    route_positions = route_obj.coordinate_list
     cumulative_distances = route_obj.get_cumulative_distances()
 
     if len(route_positions) < 2:

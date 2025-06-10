@@ -71,9 +71,9 @@ def gpx_content(points_data):
 def test_from_gpx_valid_single_track_single_segment():
     gpx_str = gpx_content([[(40.7128, -74.0060, 10.0), (40.7580, -73.9855, 12.0)]])
     route = Route.from_gpx(StringIO(gpx_str))
-    assert len(route.positions) == 2
-    assert route.positions[0] == Position(40.7128, -74.0060, 10.0)
-    assert route.positions[1] == Position(40.7580, -73.9855, 12.0)
+    assert len(route.trackpoints) == 2
+    assert route.trackpoints[0] == {'latitude': 40.7128, 'longitude': -74.0060, 'elevation': 10.0}
+    assert route.trackpoints[1] == {'latitude': 40.7580, 'longitude': -73.9855, 'elevation': 12.0}
 
 
 def test_from_gpx_valid_single_track_multi_segment():
@@ -84,10 +84,10 @@ def test_from_gpx_valid_single_track_multi_segment():
         ]
     )
     route = Route.from_gpx(StringIO(gpx_str))
-    assert len(route.positions) == 3
-    assert route.positions[0] == Position(40.7128, -74.0060, 10.0)
-    assert route.positions[1] == Position(40.7580, -73.9855, 12.0)
-    assert route.positions[2] == Position(40.7589, -73.9845, 13.0)
+    assert len(route.trackpoints) == 3
+    assert route.trackpoints[0] == {'latitude': 40.7128, 'longitude': -74.0060, 'elevation': 10.0}
+    assert route.trackpoints[1] == {'latitude': 40.7580, 'longitude': -73.9855, 'elevation': 12.0}
+    assert route.trackpoints[2] == {'latitude': 40.7589, 'longitude': -73.9845, 'elevation': 13.0}
 
 
 def test_from_gpx_valid_multi_track():
@@ -101,25 +101,25 @@ def test_from_gpx_valid_multi_track():
         ]
     )
     route = Route.from_gpx(StringIO(gpx_str))
-    assert len(route.positions) == 3
-    assert route.positions[0] == Position(40.7128, -74.0060, 10.0)
-    assert route.positions[1] == Position(40.7580, -73.9855, 12.0)
-    assert route.positions[2] == Position(40.7589, -73.9845, 13.0)
+    assert len(route.trackpoints) == 3
+    assert route.trackpoints[0] == {'latitude': 40.7128, 'longitude': -74.0060, 'elevation': 10.0}
+    assert route.trackpoints[1] == {'latitude': 40.7580, 'longitude': -73.9855, 'elevation': 12.0}
+    assert route.trackpoints[2] == {'latitude': 40.7589, 'longitude': -73.9845, 'elevation': 13.0}
 
 
 def test_from_gpx_point_without_elevation():
     gpx_str = gpx_content([[(40.7128, -74.0060, None), (40.7580, -73.9855, 12.0)]])
     route = Route.from_gpx(StringIO(gpx_str))
-    assert len(route.positions) == 2
-    assert route.positions[0] == Position(40.7128, -74.0060, None)
-    assert route.positions[1] == Position(40.7580, -73.9855, 12.0)
+    assert len(route.trackpoints) == 2
+    assert route.trackpoints[0] == {'latitude': 40.7128, 'longitude': -74.0060, 'elevation': None}
+    assert route.trackpoints[1] == {'latitude': 40.7580, 'longitude': -73.9855, 'elevation': 12.0}
 
 
 def test_from_gpx_empty_no_tracks():
     # GPX file with no tracks
     gpx_str = gpx_content([])  # Pass empty list to helper
     route = Route.from_gpx(StringIO(gpx_str))
-    assert len(route.positions) == 0
+    assert len(route.trackpoints) == 0
 
 
 def test_from_gpx_empty_track_no_segments():
@@ -129,7 +129,7 @@ def test_from_gpx_empty_track_no_segments():
 <trk></trk>
 </gpx>"""
     route = Route.from_gpx(StringIO(gpx_start))
-    assert len(route.positions) == 0
+    assert len(route.trackpoints) == 0
 
 
 def test_from_gpx_empty_segment_no_points():
@@ -143,10 +143,10 @@ def test_from_gpx_empty_segment_no_points():
 <trk><trkseg></trkseg></trk>
 </gpx>"""
     route = Route.from_gpx(StringIO(gpx_manual_str))
-    assert len(route.positions) == 0
+    assert len(route.trackpoints) == 0
     # Also test with helper if it produces valid empty segment
     route_helper = Route.from_gpx(StringIO(gpx_content([[[]]])))
-    assert len(route_helper.positions) == 0
+    assert len(route_helper.trackpoints) == 0
 
 
 def test_from_gpx_malformed_gpx():
@@ -173,9 +173,9 @@ def test_from_file_valid_gpx():
 
     try:
         route = Route.from_file(tmp_file_name)
-        assert len(route.positions) == 2
-        assert route.positions[0] == Position(40.7128, -74.0060, 10.0)
-        assert route.positions[1] == Position(40.7580, -73.9855, 12.0)
+        assert len(route.trackpoints) == 2
+        assert route.trackpoints[0] == {'latitude': 40.7128, 'longitude': -74.0060, 'elevation': 10.0}
+        assert route.trackpoints[1] == {'latitude': 40.7580, 'longitude': -73.9855, 'elevation': 12.0}
     finally:
         os.remove(tmp_file_name)  # Clean up the temporary file
 
@@ -234,7 +234,7 @@ def test_validate_route_empty_route_no_error():
     gpx_str = gpx_content([])
     try:
         route = Route.from_gpx(StringIO(gpx_str))
-        assert len(route.positions) == 0  # Route class handles empty positions list
+        assert len(route.trackpoints) == 0  # Route class handles empty trackpoints list
     except RouteValidationError:
         pytest.fail("RouteValidationError raised unexpectedly for an empty route.")
 
@@ -243,7 +243,7 @@ def test_validate_route_empty_route_no_error():
 
 
 def test_get_bbox_empty_route():
-    route = Route(positions=[])
+    route = Route(trackpoints=[])
     with pytest.raises(ValueError) as excinfo:
         route.get_bbox()
     assert "empty route" in str(excinfo.value).lower()
@@ -254,8 +254,8 @@ def test_get_bbox_single_point_route_default_buffer():
     # 1 deg lat ~ 111000 m. Buffer is 10 m by default.
     # So lat_buffer is 10/111000.0
     # lon_buffer depends on latitude. At lat 0, it's also 10/111000.0
-    pos = Position(latitude=0, longitude=0, elevation=0)
-    route = Route(positions=[pos])
+    trackpoint_data = {'latitude': 0, 'longitude': 0, 'elevation': 0}
+    route = Route(trackpoints=[trackpoint_data])
 
     # Expected buffer values
     buffer = 10.0
@@ -263,30 +263,30 @@ def test_get_bbox_single_point_route_default_buffer():
     lon_buffer_deg = buffer / (111000.0)  # cos(radians(0)) = 1
 
     expected_bbox = (
-        max(-90.0, pos.latitude - lat_buffer_deg),
-        max(-180.0, pos.longitude - lon_buffer_deg),
-        min(90.0, pos.latitude + lat_buffer_deg),
-        min(180.0, pos.longitude + lon_buffer_deg),
+        max(-90.0, trackpoint_data['latitude'] - lat_buffer_deg),
+        max(-180.0, trackpoint_data['longitude'] - lon_buffer_deg),
+        min(90.0, trackpoint_data['latitude'] + lat_buffer_deg),
+        min(180.0, trackpoint_data['longitude'] + lon_buffer_deg),
     )
 
-    bbox = route.get_bbox()  # Default buffer = 1.0
+    bbox = route.get_bbox()  # Default buffer = 10.0, as per current Route.get_bbox
     assert bbox == pytest.approx(expected_bbox)
 
 
 def test_get_bbox_single_point_route_custom_buffer():
-    pos = Position(latitude=45, longitude=45, elevation=0)  # Use a non-zero latitude
-    route = Route(positions=[pos])
+    trackpoint_data = {'latitude': 45, 'longitude': 45, 'elevation': 0}  # Use a non-zero latitude
+    route = Route(trackpoints=[trackpoint_data])
 
     buffer = 5.0
     lat_buffer_deg = buffer / 111000.0
     # cos(radians(45)) is math.cos(math.radians(45))
-    lon_buffer_deg = buffer / (111000.0 * abs(math.cos(math.radians(pos.latitude))))
+    lon_buffer_deg = buffer / (111000.0 * abs(math.cos(math.radians(trackpoint_data['latitude']))))
 
     expected_bbox = (
-        max(-90.0, pos.latitude - lat_buffer_deg),
-        max(-180.0, pos.longitude - lon_buffer_deg),
-        min(90.0, pos.latitude + lat_buffer_deg),
-        min(180.0, pos.longitude + lon_buffer_deg),
+        max(-90.0, trackpoint_data['latitude'] - lat_buffer_deg),
+        max(-180.0, trackpoint_data['longitude'] - lon_buffer_deg),
+        min(90.0, trackpoint_data['latitude'] + lat_buffer_deg),
+        min(180.0, trackpoint_data['longitude'] + lon_buffer_deg),
     )
 
     bbox = route.get_bbox(buffer=buffer)
@@ -298,11 +298,11 @@ def test_get_bbox_multi_point_route_no_buffer_implicitly_zero():
     # or provide a very small buffer if the API expects it.
     # The _calculate_bbox method is what takes buffer. get_bbox uses it.
     # Let's test with default buffer first.
-    positions = [
-        Position(latitude=0, longitude=0, elevation=0),
-        Position(latitude=1, longitude=1, elevation=0),
+    trackpoints_data = [
+        {'latitude': 0, 'longitude': 0, 'elevation': 0},
+        {'latitude': 1, 'longitude': 1, 'elevation': 0},
     ]
-    route = Route(positions=positions)
+    route = Route(trackpoints=trackpoints_data)
 
     # With default buffer = 10.0
     buffer = 10.0
@@ -321,13 +321,11 @@ def test_get_bbox_multi_point_route_no_buffer_implicitly_zero():
 
 
 def test_get_bbox_multi_point_route_larger_buffer():
-    positions = [
-        Position(latitude=10, longitude=10, elevation=0),
-        Position(
-            latitude=12, longitude=13, elevation=0
-        ),  # min_lat=10, max_lat=12, min_lon=10, max_lon=13
+    trackpoints_data = [
+        {'latitude': 10, 'longitude': 10, 'elevation': 0},
+        {'latitude': 12, 'longitude': 13, 'elevation': 0},  # min_lat=10, max_lat=12, min_lon=10, max_lon=13
     ]
-    route = Route(positions=positions)
+    route = Route(trackpoints=trackpoints_data)
 
     buffer = 100.0  # Larger buffer
     avg_lat = 11.0  # (10+12)/2
@@ -345,8 +343,8 @@ def test_get_bbox_multi_point_route_larger_buffer():
 
 
 def test_get_bbox_memoization():
-    positions = [Position(0, 0, 0), Position(1, 1, 0)]
-    route = Route(positions=positions)
+    trackpoints_data = [{'latitude':0, 'longitude':0, 'elevation':0}, {'latitude':1, 'longitude':1, 'elevation':0}]
+    route = Route(trackpoints=trackpoints_data)
     bbox1 = route.get_bbox(buffer=1.0)
     # Access internal attributes for testing memoization (with caution)
     assert route._bbox is not None
@@ -376,12 +374,12 @@ def test_get_bbox_memoization():
 
 
 def test_get_cumulative_distances_empty_route():
-    route = Route(positions=[])
+    route = Route(trackpoints=[])
     assert route.get_cumulative_distances() == []
 
 
 def test_get_cumulative_distances_single_point():
-    route = Route(positions=[Position(0, 0, 0)])
+    route = Route(trackpoints=[{'latitude': 0, 'longitude': 0, 'elevation': 0}])
     assert route.get_cumulative_distances() == [0.0]
 
 
@@ -389,37 +387,37 @@ def test_get_cumulative_distances_multi_points():
     # Points carefully chosen for easier distance checking if needed,
     # but we mostly rely on haversine_distance being correct.
     # For simplicity, let's use points where some distances are zero.
-    positions = [
-        Position(0, 0, 0),  # Point A
-        Position(0, 0, 0),  # Point B (same as A)
-        Position(1, 0, 0),  # Point C (approx 111000km from A/B)
-        Position(1, 1, 0),  # Point D
+    # The input to Route is now trackpoints (dicts), but the logic for expected_distances
+    # can still use Position objects if haversine_distance expects them.
+    # The Route.get_cumulative_distances itself handles the conversion from trackpoints.
+
+    trackpoints_for_route = [
+        {'latitude': 0, 'longitude': 0, 'elevation': 0},  # Point A
+        {'latitude': 0, 'longitude': 0, 'elevation': 0},  # Point B (same as A)
+        {'latitude': 1, 'longitude': 0, 'elevation': 0},  # Point C (approx 111.195 km from A/B)
+        {'latitude': 1, 'longitude': 1, 'elevation': 0},  # Point D
     ]
-    route = Route(positions=positions)
+    # route = Route(trackpoints=trackpoints_for_route) # This route object is not used directly in assertions for expected_distances
 
-    dist_ab = 0.0  # haversine_distance(positions[0], positions[1])
-    dist_bc = haversine_distance(positions[1], positions[2])  # Approx 111000.195 km
-    dist_cd = haversine_distance(
-        positions[2], positions[3]
-    )  # Approx 111000.035 km at lat 1
-    # (cos(radians(1)) * 111000.195) - more complex actually
-    # Let's use simpler points for exact known values or rely on internal haversine.
-    # For this test, we trust haversine_distance and check accumulation.
+    # For calculating expected_distances, we use the original Position objects
+    # as haversine_distance takes Position objects.
+    positions_for_expected_calc = [
+        Position(tp['latitude'], tp['longitude'], tp['elevation']) for tp in trackpoints_for_route
+    ]
 
-    # Re-evaluate points for easier manual verification if possible, or trust the internal function.
-    # Let's make points that are easier to reason about.
-    # P0: (0,0)
-    # P1: (0,0) -> dist = 0
-    # P2: (1,0) -> dist from P1 = haversine( (0,0), (1,0) ) approx 111000.195 km
-    # P3: (1,0) -> dist from P2 = 0
+    dist_ab = 0.0  # haversine_distance(positions_for_expected_calc[0], positions_for_expected_calc[1])
+    dist_bc = haversine_distance(positions_for_expected_calc[1], positions_for_expected_calc[2])
+    dist_cd = haversine_distance(positions_for_expected_calc[2], positions_for_expected_calc[3])
 
-    positions_simple = [
+    # The test for route_simple
+    positions_simple = [ # This list remains List[Position] for expected calculation
         Position(0, 0, 0),  # P0
         Position(0, 0, 0),  # P1
         Position(1, 0, 0),  # P2
         Position(1, 0, 0),  # P3
     ]
-    route_simple = Route(positions=positions_simple)
+    trackpoints_simple = [{'latitude':p.latitude, 'longitude':p.longitude, 'elevation':p.elevation} for p in positions_simple]
+    route_simple = Route(trackpoints=trackpoints_simple)
 
     d0 = 0.0
     d1 = d0 + haversine_distance(
@@ -431,19 +429,19 @@ def test_get_cumulative_distances_multi_points():
     )  # Should be 0
 
     expected_distances = [d0, d1, d2, d3]
-
     actual_distances = route_simple.get_cumulative_distances()
 
     assert len(actual_distances) == 4
     assert actual_distances == pytest.approx(expected_distances)
 
     # A slightly more complex case
-    positions_varied = [
+    positions_varied = [ # This list remains List[Position] for expected calculation
         Position(latitude=0, longitude=0, elevation=0),  # P1
         Position(latitude=1, longitude=0, elevation=0),  # P2
         Position(latitude=1, longitude=1, elevation=0),  # P3
     ]
-    route_varied = Route(positions=positions_varied)
+    trackpoints_varied = [{'latitude':p.latitude, 'longitude':p.longitude, 'elevation':p.elevation} for p in positions_varied]
+    route_varied = Route(trackpoints=trackpoints_varied)
 
     dist1 = 0.0
     dist2 = dist1 + haversine_distance(positions_varied[0], positions_varied[1])
@@ -456,7 +454,7 @@ def test_get_cumulative_distances_multi_points():
 
 
 def test_get_cumulative_distances_memoization():
-    route = Route(positions=[Position(0, 0, 0), Position(1, 1, 0)])
+    route = Route(trackpoints=[{'latitude':0, 'longitude':0, 'elevation':0}, {'latitude':1, 'longitude':1, 'elevation':0}])
 
     distances1 = route.get_cumulative_distances()
     assert route._cumulative_distances is not None  # Internal check
@@ -538,7 +536,7 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         # 1. Set up a simple Route
         # Making route points far apart to simplify containment logic for non-filtered items;
         # for this test, we mostly care about tag filtering log.
-        route = Route(positions=[Position(0, 0, 0), Position(10, 10, 0)])
+        route = Route(trackpoints=[{'latitude':0, 'longitude':0, 'elevation':0}, {'latitude':10, 'longitude':10, 'elevation':0}])
 
         # 2. Prepare mock way_data to trigger various FilterReasons
         mock_way_data = [
@@ -627,7 +625,7 @@ class TestFindBrunnels:  # Using a class for grouping related tests
     def test_find_brunnels_logging_no_tag_filtered_brunnels(
         self, mock_query_overpass, mock_logger
     ):
-        route = Route(positions=[Position(0, 0, 0), Position(10, 10, 0)])
+        route = Route(trackpoints=[{'latitude':0, 'longitude':0, 'elevation':0}, {'latitude':10, 'longitude':10, 'elevation':0}])
         mock_way_data = [
             {
                 "id": 1,
@@ -663,7 +661,7 @@ class TestFindBrunnels:  # Using a class for grouping related tests
     def test_find_brunnels_tag_filtering_now_always_on_logging(
         self, mock_query_overpass, mock_logger
     ):
-        route = Route(positions=[Position(0, 0, 0), Position(10, 10, 0)])
+        route = Route(trackpoints=[{'latitude':0, 'longitude':0, 'elevation':0}, {'latitude':10, 'longitude':10, 'elevation':0}])
         mock_way_data = [  # Data that will be filtered
             {
                 "id": 1,

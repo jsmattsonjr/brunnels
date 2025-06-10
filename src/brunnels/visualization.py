@@ -149,13 +149,13 @@ def create_route_map(
 
     # Add start and end markers
     folium.Marker(
-        [route[0].latitude, route[0].longitude],
+        [route[0]["latitude"], route[0]["longitude"]],
         popup="Start",
         icon=folium.Icon(color="green", icon="play"),
     ).add_to(route_map)
 
     folium.Marker(
-        [route[-1].latitude, route[-1].longitude],
+        [route[-1]["latitude"], route[-1]["longitude"]],
         popup="End",
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(route_map)
