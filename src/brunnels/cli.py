@@ -83,11 +83,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Don't automatically open the HTML file in browser",
     )
     parser.add_argument(
-        "--keep-polygons",
-        action="store_true",
-        help="Keep closed ways (polygons) where first node equals last node",
-    )
-    parser.add_argument(
         "--no-overlap-filtering",
         action="store_true",
         help="Disable filtering of overlapping brunnels (keep all overlapping brunnels)",
@@ -207,7 +202,6 @@ def main():
     config.route_buffer = args.route_buffer
     config.bearing_tolerance = args.bearing_tolerance
     config.log_level = args.log_level
-    config.keep_polygons = args.keep_polygons
     config.no_overlap_filtering = args.no_overlap_filtering
     config.metrics = args.metrics
 

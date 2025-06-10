@@ -37,7 +37,7 @@ class FilterReason(Enum):
     BICYCLE_NO = "bicycle_no"
     WATERWAY = "waterway"
     RAILWAY = "railway_not_abandoned"
-    POLYGON = "closed_way"
+    CLOSED_WAY = "closed_way"
     NOT_CONTAINED = "outwith_route_buffer"
     NO_ROUTE_SPAN = "no_route_span"
     UNALIGNED = "not_aligned_with_route"

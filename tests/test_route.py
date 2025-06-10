@@ -591,7 +591,6 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         config.bbox_buffer = 1000
         config.route_buffer = 50
         config.bearing_tolerance = 30
-        config.keep_polygons = False
         route.find_brunnels(config)
 
         # 4. Construct the expected log message string
@@ -649,7 +648,6 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         config.bbox_buffer = 1000
         config.route_buffer = 50
         config.bearing_tolerance = 30
-        config.keep_polygons = False
         route.find_brunnels(config)
 
         # Assert that the specific log message about tag-filtered brunnels is NOT called
@@ -680,7 +678,6 @@ class TestFindBrunnels:  # Using a class for grouping related tests
         config.bbox_buffer = 1000
         config.route_buffer = 50
         config.bearing_tolerance = 30
-        config.keep_polygons = False
         route.find_brunnels(config)
 
         # Assert that the specific log message about tag-filtered brunnels IS called

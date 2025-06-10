@@ -203,25 +203,21 @@ class BrunnelWay(Brunnel):
         return BrunnelType.BRIDGE
 
     @classmethod
-    def should_filter(
-        cls, metadata: Dict[str, Any], keep_polygons: bool = False
-    ) -> FilterReason:
+    def should_filter(cls, metadata: Dict[str, Any]) -> FilterReason:
         """
         Determine if a brunnel should be filtered out based on cycling relevance and geometry.
 
         Args:
             metadata: OSM metadata for the brunnel
-            keep_polygons: If False, filter out closed ways (first node == last node)
 
         Returns:
             FilterReason.NONE if the brunnel should be kept, otherwise returns
             the reason for filtering.
         """
-        # Check for polygon (closed way) if keep_polygons is False
-        if not keep_polygons:
-            nodes = metadata.get("nodes", [])
-            if len(nodes) >= 2 and nodes[0] == nodes[-1]:
-                return FilterReason.POLYGON
+        # Check for closed way
+        nodes = metadata.get("nodes", [])
+        if len(nodes) >= 2 and nodes[0] == nodes[-1]:
+            return FilterReason.CLOSED_WAY
 
         tags = metadata.get("tags", {})
 
@@ -250,15 +246,12 @@ class BrunnelWay(Brunnel):
         return FilterReason.NONE
 
     @classmethod
-    def from_overpass_data(
-        cls, way_data: Dict[str, Any], keep_polygons: bool = False
-    ) -> "BrunnelWay":
+    def from_overpass_data(cls, way_data: Dict[str, Any]) -> "BrunnelWay":
         """
         Parse a single way from Overpass response into BrunnelWay object.
 
         Args:
             way_data: Raw way data from Overpass API
-            keep_polygons: Whether to keep closed ways (polygons)
 
         Returns:
             BrunnelWay object
@@ -270,7 +263,7 @@ class BrunnelWay(Brunnel):
                 coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
 
         brunnel_type = cls.determine_type(way_data)
-        filter_reason = cls.should_filter(way_data, keep_polygons)
+        filter_reason = cls.should_filter(way_data)
 
         return cls(
             coords=coords,
