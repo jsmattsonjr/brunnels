@@ -329,33 +329,15 @@ def linear_route() -> Route:
     )
 
 
-@pytest.fixture
-def linear_route_cumulative_distances(linear_route: Route) -> list[float]:
-    # Manually set for this specific linear_route for testing without relying on live haversine
-    # In a real scenario, route.get_cumulative_distances() would be used.
-    # However, find_closest_point_on_route uses these distances.
-    # For this test, let's assume each segment is exactly 1km for simplicity.
-    # We can achieve this if haversine_distance is mocked or if we construct Route such that distances are simple.
-    # The Route class itself calculates these, so we should use its calculation.
-    return linear_route.get_cumulative_distances()
-
-
-def test_calculate_route_span_brunnel_along_route_segment(
-    linear_route: Route, linear_route_cumulative_distances: list[float]
-):
+def test_calculate_route_span_brunnel_along_route_segment(linear_route: Route):
     # Brunnel from (1,0) to (2,0) which is exactly the second segment of the route
     brunnel_coords = [Position(1, 0), Position(2, 0)]
     brunnel = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords)
 
-    # Expected span: from distance at (1,0) to distance at (2,0)
-    # linear_route_cumulative_distances should be [0, d1, d2, d3, d4, d5]
-    # We expect start_distance = d1, end_distance = d2
-    # For the simple linear_route, d1 is approx 111km, d2 is approx 222km.
-    # Let's make the route points closer for more manageable numbers.
     route_close = create_mock_route(
         [Position(0, 0), Position(0.001, 0), Position(0.002, 0)]
     )
-    cum_dist_close = route_close.get_cumulative_distances()  # Will be small numbers
+    route_close.calculate_distances()
 
     brunnel_coords_close = [Position(0.001, 0), Position(0.002, 0)]
     brunnel_close = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords_close)
@@ -364,14 +346,19 @@ def test_calculate_route_span_brunnel_along_route_segment(
     # The coords of the brunnel are exactly on the route points.
     # find_closest_point_on_route for Position(0.001,0) should give cum_dist_close[1]
     # find_closest_point_on_route for Position(0.002,0) should give cum_dist_close[2]
-    assert route_span.start_distance_km == pytest.approx(cum_dist_close[1])
-    assert route_span.end_distance_km == pytest.approx(cum_dist_close[2])
-    assert route_span.length_km == pytest.approx(cum_dist_close[2] - cum_dist_close[1])
+    assert route_span.start_distance_km == pytest.approx(
+        route_close.trackpoints[1]["track_distance"]
+    )
+    assert route_span.end_distance_km == pytest.approx(
+        route_close.trackpoints[2]["track_distance"]
+    )
+    assert route_span.length_km == pytest.approx(
+        route_close.trackpoints[2]["track_distance"]
+        - route_close.trackpoints[1]["track_distance"]
+    )
 
 
-def test_calculate_route_span_brunnel_offset_from_route(
-    linear_route: Route, linear_route_cumulative_distances: list[float]
-):
+def test_calculate_route_span_brunnel_offset_from_route(linear_route: Route):
     # Brunnel from (1, 0.1) to (2, 0.1) - offset from the route (0,0) to (5,0)
     # The closest points on the route will be (1,0) and (2,0)
     brunnel_coords = [
@@ -390,10 +377,7 @@ def test_calculate_route_span_brunnel_offset_from_route(
         Position(0, 0.02),
     ]  # Route along equator
     simple_route = create_mock_route(route_points)
-    simple_cum_dist = simple_route.get_cumulative_distances()
-    # simple_cum_dist[0] = 0
-    # simple_cum_dist[1] = haversine( (0,0), (0,0.01) ) approx 1.11km
-    # simple_cum_dist[2] = simple_cum_dist[1] + haversine( (0,0.01), (0,0.02) ) approx 2.22km
+    simple_route.calculate_distances()
 
     # Brunnel points: (0.0001, 0.01), (0.0001, 0.02) - slightly offset in latitude
     brunnel_coords_offset = [Position(0.0001, 0.01), Position(0.0001, 0.02)]
@@ -401,18 +385,21 @@ def test_calculate_route_span_brunnel_offset_from_route(
 
     route_span = brunnel_offset.calculate_route_span(simple_route)
 
-    # Closest point to (0.0001, 0.01) on route is (0, 0.01) -> distance simple_cum_dist[1]
-    # Closest point to (0.0001, 0.02) on route is (0, 0.02) -> distance simple_cum_dist[2]
-    assert route_span.start_distance_km == pytest.approx(simple_cum_dist[1])
-    assert route_span.end_distance_km == pytest.approx(simple_cum_dist[2])
+    # Closest point to (0.0001, 0.01) on route is (0, 0.01) -> distance simple_route.trackpoints[1]["track_distance"]
+    # Closest point to (0.0001, 0.02) on route is (0, 0.02) -> distance simple_route.trackpoints[2]["track_distance"]
+    assert route_span.start_distance_km == pytest.approx(
+        simple_route.trackpoints[1]["track_distance"]
+    )
+    assert route_span.end_distance_km == pytest.approx(
+        simple_route.trackpoints[2]["track_distance"]
+    )
     assert route_span.length_km == pytest.approx(
-        simple_cum_dist[2] - simple_cum_dist[1]
+        simple_route.trackpoints[2]["track_distance"]
+        - simple_route.trackpoints[1]["track_distance"]
     )
 
 
-def test_calculate_route_span_brunnel_partially_spans_segment(
-    linear_route: Route, linear_route_cumulative_distances: list[float]
-):
+def test_calculate_route_span_brunnel_partially_spans_segment(linear_route: Route):
     # Brunnel from (1.5, 0) to (2.5, 0)
     # Route: (0,0) -> (1,0) -> (2,0) -> (3,0) -> (4,0) -> (5,0) (lat,lon for Position)
     # Let's use the Position(lat,lon) convention
@@ -427,8 +414,7 @@ def test_calculate_route_span_brunnel_partially_spans_segment(
             Position(0, 5),
         ]
     )
-    test_cum_dist = test_route.get_cumulative_distances()
-    # test_cum_dist: [0, d(0,1), d(0,2), d(0,3), d(0,4), d(0,5)] where d(0,X) is cumulative dist to (0,X)
+    test_route.calculate_distances()
 
     brunnel_coords = [
         Position(0, 1.5),
@@ -448,14 +434,20 @@ def test_calculate_route_span_brunnel_partially_spans_segment(
     # Length of this segment is test_cum_dist[2] - test_cum_dist[1]
     # The point (0,1.5) is halfway along this segment in terms of coordinates.
     # Assuming linear mapping of distance, expected_start_dist = test_cum_dist[1] + 0.5 * (test_cum_dist[2] - test_cum_dist[1])
-    expected_start_dist = (test_cum_dist[1] + test_cum_dist[2]) / 2.0
+    expected_start_dist = (
+        test_route.trackpoints[1]["track_distance"]
+        + test_route.trackpoints[2]["track_distance"]
+    ) / 2.0
 
     # For (0, 2.5):
     # Segment is between route.positions[2] (0,2) and route.positions[3] (0,3)
     # Cumulative distance to route.positions[2] is test_cum_dist[2]
     # Length of this segment is test_cum_dist[3] - test_cum_dist[2]
     # Expected_end_dist = test_cum_dist[2] + 0.5 * (test_cum_dist[3] - test_cum_dist[2])
-    expected_end_dist = (test_cum_dist[2] + test_cum_dist[3]) / 2.0
+    expected_end_dist = (
+        test_route.trackpoints[2]["track_distance"]
+        + test_route.trackpoints[3]["track_distance"]
+    ) / 2.0
 
     assert route_span.start_distance_km == pytest.approx(expected_start_dist)
     assert route_span.end_distance_km == pytest.approx(expected_end_dist)
@@ -464,9 +456,7 @@ def test_calculate_route_span_brunnel_partially_spans_segment(
     )
 
 
-def test_calculate_route_span_brunnel_longer_than_route(
-    linear_route: Route, linear_route_cumulative_distances: list[float]
-):
+def test_calculate_route_span_brunnel_longer_than_route(linear_route: Route):
     # Brunnel from (-1, 0) to (6, 0) - extends beyond the route (0,0) to (5,0)
     # Using (lat,lon) for Position: Brunnel from (0,-1) to (0,6)
     # Route from (0,0) to (0,5)
@@ -480,7 +470,7 @@ def test_calculate_route_span_brunnel_longer_than_route(
             Position(0, 5),
         ]
     )
-    test_cum_dist = test_route.get_cumulative_distances()
+    test_route.calculate_distances()
 
     brunnel_coords = [Position(0, -1), Position(0, 6)]
     brunnel = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords)
@@ -488,44 +478,16 @@ def test_calculate_route_span_brunnel_longer_than_route(
 
     # Closest point to (0,-1) on route is (0,0) -> distance test_cum_dist[0] = 0
     # Closest point to (0,6) on route is (0,5) -> distance test_cum_dist[5] (last point)
-    assert route_span.start_distance_km == pytest.approx(test_cum_dist[0])
-    assert route_span.end_distance_km == pytest.approx(test_cum_dist[-1])
-    assert route_span.length_km == pytest.approx(test_cum_dist[-1] - test_cum_dist[0])
-
-
-def test_calculate_route_span_empty_brunnel_coords(
-    linear_route: Route, linear_route_cumulative_distances: list[float]
-):
-    brunnel = MockBrunnel(BrunnelType.BRIDGE, [])
-    route_span = brunnel.calculate_route_span(linear_route)
-    # The method returns a RouteSpan(0,0,0) if coords are empty.
-    # This was changed in brunnel.py: calculate_route_span to return RouteSpan(0.0, 0.0)
-    # and post_init calculates length. So it should be RouteSpan(0.0, 0.0, length_km=0.0)
-    assert route_span.start_distance_km == 0.0
-    assert route_span.end_distance_km == 0.0
-    assert route_span.length_km == 0.0
-
-
-def test_calculate_route_span_single_point_brunnel(
-    linear_route: Route, linear_route_cumulative_distances: list[float]
-):
-    # Route: (0,0) -> (0,1) -> (0,2) ... (0,5)
-    test_route = create_mock_route([Position(0, 0), Position(0, 1), Position(0, 2)])
-    test_cum_dist = test_route.get_cumulative_distances()
-
-    # Brunnel is a single point at (0, 1.5)
-    brunnel_coords = [Position(0, 1.5)]
-    brunnel = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords)
-    route_span = brunnel.calculate_route_span(test_route)
-
-    # Expected distance for (0,1.5) is halfway between d(0,1) and d(0,2)
-    expected_dist = (test_cum_dist[1] + test_cum_dist[2]) / 2.0
-
-    assert route_span.start_distance_km == pytest.approx(expected_dist)
+    assert route_span.start_distance_km == pytest.approx(
+        test_route.trackpoints[0]["track_distance"]
+    )
     assert route_span.end_distance_km == pytest.approx(
-        expected_dist
-    )  # Start and end are the same for a point
-    assert route_span.length_km == pytest.approx(0.0)
+        test_route.trackpoints[-1]["track_distance"]
+    )
+    assert route_span.length_km == pytest.approx(
+        test_route.trackpoints[-1]["track_distance"]
+        - test_route.trackpoints[0]["track_distance"]
+    )
 
 
 # Tests for Brunnel.is_aligned_with_route
@@ -993,6 +955,7 @@ def test_create_from_brunnels_all_form_one_compound():
     assert isinstance(result[0], CompoundBrunnelWay)
     compound_brunnel = result[0]
     assert len(compound_brunnel.components) == 3
+    assert compound_brunnel.route_span is not None
     assert compound_brunnel.route_span.start_distance_km == pytest.approx(0.0)
     assert compound_brunnel.route_span.end_distance_km == pytest.approx(3.0)
 
@@ -1039,11 +1002,13 @@ def test_create_from_brunnels_multiple_compounds_and_individuals():
 
     assert len(c1.components) == 2
     assert c1.components[0].metadata["id"] == 1
+    assert c1.route_span is not None
     assert c1.route_span.start_distance_km == pytest.approx(0.0)
     assert c1.route_span.end_distance_km == pytest.approx(2.0)
 
     assert len(c2.components) == 3
     assert c2.components[0].metadata["id"] == 4
+    assert c2.route_span is not None
     assert c2.route_span.start_distance_km == pytest.approx(3.0)
     assert c2.route_span.end_distance_km == pytest.approx(6.0)
 

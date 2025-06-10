@@ -152,22 +152,25 @@ class Brunnel(Geometry, ABC):
         Returns:
             RouteSpan object with start/end distances and length
         """
-        cumulative_distances = route.get_cumulative_distances()
         coords = self.coordinate_list
         if not coords:
-            return RouteSpan(0.0, 0.0)
+            raise ValueError(
+                f"{self.get_short_description()} has no coordinates to calculate route span"
+            )
+        if len(coords) < 2:
+            raise ValueError(
+                f"{self.get_short_description()} has insufficient coordinates to calculate route span"
+            )
 
         min_distance = float("inf")
         max_distance = -float("inf")
 
         # Find the closest route point for each brunnel coordinate
         for brunnel_point in coords:
-            cumulative_dist, _ = find_closest_point_on_route(
-                brunnel_point, route
-            )
+            distance, _ = find_closest_point_on_route(brunnel_point, route)
 
-            min_distance = min(min_distance, cumulative_dist)
-            max_distance = max(max_distance, cumulative_dist)
+            min_distance = min(min_distance, distance)
+            max_distance = max(max_distance, distance)
 
         return RouteSpan(min_distance, max_distance)
 
@@ -190,13 +193,15 @@ class Brunnel(Geometry, ABC):
             )
             return False
 
-        if len(route) < 2: # Check length using Route's __len__
+        if len(route) < 2:  # Check length using Route's __len__
             logger.debug("Route has insufficient coordinates for bearing calculation")
             return False
 
         # Find closest segments between brunnel and route
         # route.coordinate_list returns List[Position]
-        brunnel_segment, route_segment = find_closest_segments(coords, route.coordinate_list)
+        brunnel_segment, route_segment = find_closest_segments(
+            coords, route.coordinate_list
+        )
 
         if brunnel_segment is None or route_segment is None:
             logger.debug(

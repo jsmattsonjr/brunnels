@@ -231,7 +231,9 @@ def main():
     logger.info(f"Loaded GPX route with {len(route)} points")
 
     route.calculate_distances()
-    logger.info(f"Route length: {route.trackpoints[-1]['track_distance']:.2f} km")
+    logger.info(
+        f"Total route distance: {route.trackpoints[-1]['track_distance']:.2f} km"
+    )
 
     # Find bridges and tunnels near the route (containment detection included)
     try:

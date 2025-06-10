@@ -13,7 +13,6 @@ import gpxpy.gpx
 
 from .geometry import Position, Geometry
 from .geometry_utils import (
-    calculate_cumulative_distances,
     find_closest_point_on_route,
     haversine_distance,
 )
@@ -37,10 +36,6 @@ class Route(Geometry):
 
     trackpoints: List[Dict[str, Any]]
     _bbox: Optional[Tuple[float, float, float, float]] = field(
-        default=None, init=False, repr=False
-    )
-    # _bbox_buffer field removed
-    _cumulative_distances: Optional[List[float]] = field(
         default=None, init=False, repr=False
     )
 
@@ -141,25 +136,6 @@ class Route(Geometry):
 
         return (south, west, north, east)
 
-    def get_cumulative_distances(self) -> List[float]:
-        """
-        Get memoized cumulative distances along the route.
-
-        Returns:
-            List of cumulative distances in kilometers, with same length as trackpoints
-        """
-        if self._cumulative_distances is None:
-            # Convert trackpoints to Position objects for calculate_cumulative_distances
-            positions_for_calc = [
-                Position(tp["latitude"], tp["longitude"], tp.get("elevation"))
-                for tp in self.trackpoints
-            ]
-            self._cumulative_distances = calculate_cumulative_distances(
-                positions_for_calc
-            )
-
-        return self._cumulative_distances
-
     def find_contained_brunnels(
         self,
         brunnels: List[Brunnel],
@@ -185,15 +161,6 @@ class Route(Geometry):
                 f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer}m"
             )
             route_buffer = 1.0
-
-        # Pre-calculate cumulative distances for route span calculations
-        logger.debug("Pre-calculating route distances...")
-        total_route_distance = (
-            self.get_cumulative_distances()[-1]
-            if self.get_cumulative_distances()
-            else 0.0
-        )
-        logger.info(f"Total route distance: {total_route_distance:.2f} km")
 
         # Get memoized LineString from route
         route_line = self.get_linestring()
@@ -286,8 +253,6 @@ class Route(Geometry):
         """
         if not self.trackpoints or not brunnels:
             return
-
-        cumulative_distances = self.get_cumulative_distances()
 
         # Only consider contained brunnels with route spans
         contained_brunnels = [
@@ -460,9 +425,6 @@ class Route(Geometry):
         if not geometry_coords or not self.trackpoints:
             return float("inf")
 
-        # cumulative_distances is no longer needed here,
-        # find_closest_point_on_route will get it from the Route object (self)
-
         total_distance = 0.0
         valid_points = 0
 
@@ -583,6 +545,36 @@ class Route(Geometry):
         logger.debug(f"Reading GPX file: {filename}")
         with open(filename, "r", encoding="utf-8") as f:
             return cls.from_gpx(f)
+
+    @classmethod
+    def from_positions(cls, positions: List[Position]) -> "Route":
+        """
+        Create a Route from a list of Position objects.
+
+        Args:
+            positions: List of Position objects
+
+        Returns:
+            Route object representing the route
+        """
+        if not positions:
+            return cls([])
+
+        trackpoints_data = [
+            {
+                "latitude": pos.latitude,
+                "longitude": pos.longitude,
+                "elevation": pos.elevation,
+            }
+            for pos in positions
+        ]
+
+        route = cls(trackpoints_data)
+
+        # Validate the route
+        cls._validate_route(route.trackpoints)
+
+        return route
 
     @staticmethod
     def _validate_route(trackpoints: List[Dict[str, Any]]) -> None:
