@@ -257,117 +257,161 @@ def test_get_bbox_single_point_route_default_buffer():
     trackpoint_data = {'latitude': 0, 'longitude': 0, 'elevation': 0}
     route = Route(trackpoints=[trackpoint_data])
 
-    # Expected buffer values
-    buffer = 10.0
-    lat_buffer_deg = buffer / 111000.0
-    lon_buffer_deg = buffer / (111000.0)  # cos(radians(0)) = 1
-
-    expected_bbox = (
-        max(-90.0, trackpoint_data['latitude'] - lat_buffer_deg),
-        max(-180.0, trackpoint_data['longitude'] - lon_buffer_deg),
-        min(90.0, trackpoint_data['latitude'] + lat_buffer_deg),
-        min(180.0, trackpoint_data['longitude'] + lon_buffer_deg),
+    # Expected buffer values for 0.0 buffer (new default)
+    # For a single point, min_lat=max_lat=tp_lat, min_lon=max_lon=tp_lon
+    expected_bbox_0_buffer = (
+        trackpoint_data['latitude'],
+        trackpoint_data['longitude'],
+        trackpoint_data['latitude'],
+        trackpoint_data['longitude'],
     )
 
-    bbox = route.get_bbox()  # Default buffer = 10.0, as per current Route.get_bbox
-    assert bbox == pytest.approx(expected_bbox)
+    bbox = route.get_bbox()  # Default buffer is now 0.0
+    assert bbox == pytest.approx(expected_bbox_0_buffer)
+
+    # Test with a specific buffer (e.g., 10.0m, which was the old default)
+    buffer_10m = 10.0
+    lat_buffer_deg_10m = buffer_10m / 111000.0
+    lon_buffer_deg_10m = buffer_10m / (111000.0)  # cos(radians(0)) = 1
+
+    expected_bbox_10m_buffer = (
+        max(-90.0, trackpoint_data['latitude'] - lat_buffer_deg_10m),
+        max(-180.0, trackpoint_data['longitude'] - lon_buffer_deg_10m),
+        min(90.0, trackpoint_data['latitude'] + lat_buffer_deg_10m),
+        min(180.0, trackpoint_data['longitude'] + lon_buffer_deg_10m),
+    )
+    bbox_10m = route.get_bbox(buffer=buffer_10m)
+    assert bbox_10m == pytest.approx(expected_bbox_10m_buffer)
 
 
 def test_get_bbox_single_point_route_custom_buffer():
     trackpoint_data = {'latitude': 45, 'longitude': 45, 'elevation': 0}  # Use a non-zero latitude
     route = Route(trackpoints=[trackpoint_data])
 
-    buffer = 5.0
-    lat_buffer_deg = buffer / 111000.0
-    # cos(radians(45)) is math.cos(math.radians(45))
-    lon_buffer_deg = buffer / (111000.0 * abs(math.cos(math.radians(trackpoint_data['latitude']))))
-
-    expected_bbox = (
-        max(-90.0, trackpoint_data['latitude'] - lat_buffer_deg),
-        max(-180.0, trackpoint_data['longitude'] - lon_buffer_deg),
-        min(90.0, trackpoint_data['latitude'] + lat_buffer_deg),
-        min(180.0, trackpoint_data['longitude'] + lon_buffer_deg),
+    # Base 0-buffer bbox for this single point
+    min_lat, min_lon, max_lat, max_lon = (
+        trackpoint_data['latitude'],
+        trackpoint_data['longitude'],
+        trackpoint_data['latitude'],
+        trackpoint_data['longitude'],
     )
 
-    bbox = route.get_bbox(buffer=buffer)
-    assert bbox == pytest.approx(expected_bbox)
+    buffer_m = 5.0
+    # avg_lat for buffer calculation is from the 0-buffer bbox
+    avg_lat_for_buffer_calc = (min_lat + max_lat) / 2
+    lat_buffer_deg = buffer_m / 111000.0
+    lon_buffer_deg = buffer_m / (111000.0 * abs(math.cos(math.radians(avg_lat_for_buffer_calc))))
+
+    expected_bbox_custom = (
+        max(-90.0, min_lat - lat_buffer_deg),
+        max(-180.0, min_lon - lon_buffer_deg),
+        min(90.0, max_lat + lat_buffer_deg),
+        min(180.0, max_lon + lon_buffer_deg),
+    )
+
+    bbox = route.get_bbox(buffer=buffer_m)
+    assert bbox == pytest.approx(expected_bbox_custom)
 
 
 def test_get_bbox_multi_point_route_no_buffer_implicitly_zero():
-    # Note: get_bbox always applies a buffer. To test without, we'd need to check _calculate_bbox
-    # or provide a very small buffer if the API expects it.
-    # The _calculate_bbox method is what takes buffer. get_bbox uses it.
-    # Let's test with default buffer first.
     trackpoints_data = [
-        {'latitude': 0, 'longitude': 0, 'elevation': 0},
-        {'latitude': 1, 'longitude': 1, 'elevation': 0},
+        {'latitude': 0, 'longitude': 0, 'elevation': 0}, # min_lat=0, max_lat=1
+        {'latitude': 1, 'longitude': 1, 'elevation': 0}, # min_lon=0, max_lon=1
     ]
     route = Route(trackpoints=trackpoints_data)
 
-    # With default buffer = 10.0
-    buffer = 10.0
-    avg_lat = 0.5  # (0+1)/2
-    lat_buffer_deg = buffer / 111000.0
-    lon_buffer_deg = buffer / (111000.0 * abs(math.cos(math.radians(avg_lat))))
+    # Expected 0-buffer bbox
+    expected_bbox_0_buffer = (0.0, 0.0, 1.0, 1.0)
 
-    expected_bbox = (
-        max(-90.0, 0.0 - lat_buffer_deg),  # min_lat - lat_buffer
-        max(-180.0, 0.0 - lon_buffer_deg),  # min_lon - lon_buffer
-        min(90.0, 1.0 + lat_buffer_deg),  # max_lat + lat_buffer
-        min(180.0, 1.0 + lon_buffer_deg),  # max_lon + lon_buffer
-    )
-    bbox = route.get_bbox()  # Default buffer
-    assert bbox == pytest.approx(expected_bbox)
+    bbox = route.get_bbox() # Default buffer is 0.0
+    assert bbox == pytest.approx(expected_bbox_0_buffer)
+
+    # Also test explicitly with buffer=0.0
+    bbox_explicit_0 = route.get_bbox(buffer=0.0)
+    assert bbox_explicit_0 == pytest.approx(expected_bbox_0_buffer)
 
 
 def test_get_bbox_multi_point_route_larger_buffer():
     trackpoints_data = [
         {'latitude': 10, 'longitude': 10, 'elevation': 0},
-        {'latitude': 12, 'longitude': 13, 'elevation': 0},  # min_lat=10, max_lat=12, min_lon=10, max_lon=13
+        {'latitude': 12, 'longitude': 13, 'elevation': 0},
     ]
     route = Route(trackpoints=trackpoints_data)
 
-    buffer = 100.0  # Larger buffer
-    avg_lat = 11.0  # (10+12)/2
-    lat_buffer_deg = buffer / 111000.0
-    lon_buffer_deg = buffer / (111000.0 * abs(math.cos(math.radians(avg_lat))))
+    # Base 0-buffer bbox
+    min_lat, min_lon, max_lat, max_lon = (10.0, 10.0, 12.0, 13.0)
 
-    expected_bbox = (
-        max(-90.0, 10.0 - lat_buffer_deg),
-        max(-180.0, 10.0 - lon_buffer_deg),
-        min(90.0, 12.0 + lat_buffer_deg),
-        min(180.0, 13.0 + lon_buffer_deg),
+    buffer_m = 100.0  # Larger buffer
+    avg_lat_for_buffer_calc = (min_lat + max_lat) / 2 # (10+12)/2 = 11.0
+    lat_buffer_deg = buffer_m / 111000.0
+    lon_buffer_deg = buffer_m / (111000.0 * abs(math.cos(math.radians(avg_lat_for_buffer_calc))))
+
+    expected_bbox_custom = (
+        max(-90.0, min_lat - lat_buffer_deg),
+        max(-180.0, min_lon - lon_buffer_deg),
+        min(90.0, max_lat + lat_buffer_deg),
+        min(180.0, max_lon + lon_buffer_deg),
     )
-    bbox = route.get_bbox(buffer=buffer)
-    assert bbox == pytest.approx(expected_bbox)
+    bbox = route.get_bbox(buffer=buffer_m)
+    assert bbox == pytest.approx(expected_bbox_custom)
 
 
 def test_get_bbox_memoization():
     trackpoints_data = [{'latitude':0, 'longitude':0, 'elevation':0}, {'latitude':1, 'longitude':1, 'elevation':0}]
     route = Route(trackpoints=trackpoints_data)
-    bbox1 = route.get_bbox(buffer=1.0)
-    # Access internal attributes for testing memoization (with caution)
-    assert route._bbox is not None
-    assert route._bbox_buffer == 1.0
 
-    bbox2 = route.get_bbox(buffer=1.0)  # Same buffer, should be memoized
-    assert bbox1 is bbox2  # Should be the exact same object
+    # Expected 0-buffer (base) bbox
+    expected_base_bbox = (0.0, 0.0, 1.0, 1.0)
 
-    bbox3 = route.get_bbox(buffer=2.0)  # Different buffer, should recompute
-    assert bbox3 is not bbox1  # Should be a new object
-    assert route._bbox_buffer == 2.0
+    # Call get_bbox with a buffer. _bbox should store the 0-buffer version.
+    buffer1_val = 1.0
+    # Calculate expected for buffer1_val based on expected_base_bbox
+    avg_lat_base = (expected_base_bbox[0] + expected_base_bbox[2]) / 2.0
+    lat_buf1_deg = buffer1_val / 111000.0
+    lon_buf1_deg = buffer1_val / (111000.0 * abs(math.cos(math.radians(avg_lat_base))))
+    expected_bbox_buffer1 = (
+        max(-90.0, expected_base_bbox[0] - lat_buf1_deg),
+        max(-180.0, expected_base_bbox[1] - lon_buf1_deg),
+        min(90.0, expected_base_bbox[2] + lat_buf1_deg),
+        min(180.0, expected_base_bbox[3] + lon_buf1_deg),
+    )
 
-    # Test that after recomputation, asking for the original buffer again recomputes (or retrieves if we cached multiple)
-    # Current implementation only caches the last one.
-    bbox4 = route.get_bbox(buffer=1.0)
-    assert bbox4 is not bbox3
-    # Depending on implementation, bbox4 might be == bbox1 if it recomputes to the same values,
-    # but the key is that _calculate_bbox was called again.
-    # The current implementation will recompute if buffer changes from the stored _bbox_buffer
-    # So bbox4 will be a new tuple object, but its values will be same as bbox1.
-    assert bbox4 == bbox1
-    assert bbox4 is not bbox1  # It recomputes because _bbox_buffer was 2.0
-    assert route._bbox_buffer == 1.0
+    bbox_buffer1 = route.get_bbox(buffer=buffer1_val)
+    assert bbox_buffer1 == pytest.approx(expected_bbox_buffer1)
+    assert route._bbox == pytest.approx(expected_base_bbox) # _bbox is always 0-buffer
+
+    # Call get_bbox with the same buffer, should return an equal result (on-the-fly calculation)
+    bbox_buffer1_again = route.get_bbox(buffer=buffer1_val)
+    assert bbox_buffer1_again == pytest.approx(expected_bbox_buffer1)
+    assert route._bbox == pytest.approx(expected_base_bbox) # _bbox remains 0-buffer
+
+    # Call get_bbox with a different buffer.
+    buffer2_val = 2.0
+    lat_buf2_deg = buffer2_val / 111000.0
+    lon_buf2_deg = buffer2_val / (111000.0 * abs(math.cos(math.radians(avg_lat_base))))
+    expected_bbox_buffer2 = (
+        max(-90.0, expected_base_bbox[0] - lat_buf2_deg),
+        max(-180.0, expected_base_bbox[1] - lon_buf2_deg),
+        min(90.0, expected_base_bbox[2] + lat_buf2_deg),
+        min(180.0, expected_base_bbox[3] + lon_buf2_deg),
+    )
+    bbox_buffer2 = route.get_bbox(buffer=buffer2_val)
+    assert bbox_buffer2 == pytest.approx(expected_bbox_buffer2)
+    assert route._bbox == pytest.approx(expected_base_bbox) # _bbox still 0-buffer
+    assert bbox_buffer2 != pytest.approx(bbox_buffer1)
+
+    # Call get_bbox with 0 buffer. Should return the memoized route._bbox.
+    bbox_0_buffer = route.get_bbox(buffer=0.0)
+    assert bbox_0_buffer == pytest.approx(expected_base_bbox)
+    assert bbox_0_buffer is route._bbox # Should be the same object
+
+    # Call get_bbox with default buffer (which is 0). Should also return memoized route._bbox.
+    bbox_default_buffer = route.get_bbox()
+    assert bbox_default_buffer == pytest.approx(expected_base_bbox)
+    assert bbox_default_buffer is route._bbox # Should be the same object
+
+    # Ensure _bbox_buffer field does not exist
+    assert not hasattr(route, '_bbox_buffer')
 
 
 # Tests for Route.get_cumulative_distances
