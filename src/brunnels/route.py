@@ -52,7 +52,7 @@ class Route(Geometry):
             Position(
                 latitude=tp["latitude"],
                 longitude=tp["longitude"],
-                elevation=tp.get("elevation") # Use .get for optional elevation
+                elevation=tp.get("elevation"),  # Use .get for optional elevation
             )
             for tp in self.trackpoints
         ]
@@ -103,7 +103,9 @@ class Route(Geometry):
         )
         return (buffered_south, buffered_west, buffered_north, buffered_east)
 
-    def _calculate_bbox(self, ignored_buffer: float) -> Tuple[float, float, float, float]:
+    def _calculate_bbox(
+        self, ignored_buffer: float
+    ) -> Tuple[float, float, float, float]:
         """
         Calculate bounding box for route, always with a 0 buffer.
         The `ignored_buffer` parameter is kept for compatibility with previous calls
@@ -148,8 +150,13 @@ class Route(Geometry):
         """
         if self._cumulative_distances is None:
             # Convert trackpoints to Position objects for calculate_cumulative_distances
-            positions_for_calc = [Position(tp["latitude"], tp["longitude"], tp.get("elevation")) for tp in self.trackpoints]
-            self._cumulative_distances = calculate_cumulative_distances(positions_for_calc)
+            positions_for_calc = [
+                Position(tp["latitude"], tp["longitude"], tp.get("elevation"))
+                for tp in self.trackpoints
+            ]
+            self._cumulative_distances = calculate_cumulative_distances(
+                positions_for_calc
+            )
 
         return self._cumulative_distances
 
@@ -181,7 +188,11 @@ class Route(Geometry):
 
         # Pre-calculate cumulative distances for route span calculations
         logger.debug("Pre-calculating route distances...")
-        total_route_distance = self.get_cumulative_distances()[-1] if self.get_cumulative_distances() else 0.0
+        total_route_distance = (
+            self.get_cumulative_distances()[-1]
+            if self.get_cumulative_distances()
+            else 0.0
+        )
         logger.info(f"Total route distance: {total_route_distance:.2f} km")
 
         # Get memoized LineString from route
@@ -473,6 +484,39 @@ class Route(Geometry):
 
         return total_distance / valid_points
 
+    def calculate_distances(self) -> None:
+        """
+        Calculate and set track_distance for each trackpoint.
+
+        Sets trackpoint[0]["track_distance"] to 0 and trackpoint[i]["track_distance"]
+        to trackpoint[i-1]["track_distance"] plus the haversine distance from
+        trackpoint[i-1] to trackpoint[i].
+        """
+        if not self.trackpoints:
+            return
+
+        # Set first trackpoint distance to 0
+        self.trackpoints[0]["track_distance"] = 0.0
+
+        # Calculate cumulative distances for remaining trackpoints
+        for i in range(1, len(self.trackpoints)):
+            prev_point = Position(
+                latitude=self.trackpoints[i - 1]["latitude"],
+                longitude=self.trackpoints[i - 1]["longitude"],
+                elevation=self.trackpoints[i - 1].get("elevation"),
+            )
+            curr_point = Position(
+                latitude=self.trackpoints[i]["latitude"],
+                longitude=self.trackpoints[i]["longitude"],
+                elevation=self.trackpoints[i].get("elevation"),
+            )
+
+            # Calculate distance from previous point and add to cumulative distance
+            segment_distance = haversine_distance(prev_point, curr_point)
+            self.trackpoints[i]["track_distance"] = (
+                self.trackpoints[i - 1]["track_distance"] + segment_distance
+            )
+
     @classmethod
     def from_gpx(cls, file_input: TextIO) -> "Route":
         """
@@ -564,7 +608,9 @@ class Route(Geometry):
 
         # Check for antimeridian crossing
         for i in range(1, len(trackpoints)):
-            lon_diff = abs(trackpoints[i]["longitude"] - trackpoints[i-1]["longitude"])
+            lon_diff = abs(
+                trackpoints[i]["longitude"] - trackpoints[i - 1]["longitude"]
+            )
             if lon_diff > 180.0:
                 raise RouteValidationError(
                     f"Route crosses antimeridian between points {i-1} and {i} "
