@@ -3,12 +3,15 @@
 Geometry and distance calculation utilities for route analysis.
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, TYPE_CHECKING
 import math
 import logging
 from geopy.distance import geodesic
 
 from .geometry import Position
+
+if TYPE_CHECKING:
+    from .route import Route  # Use for type hinting to avoid circular import
 
 logger = logging.getLogger(__name__)
 
@@ -125,35 +128,37 @@ def point_to_line_segment_distance_and_projection(
 
 
 def find_closest_point_on_route(
-    point: Position, route: List[Position], cumulative_distances: List[float]
+    point: Position, route_obj: 'Route'
 ) -> Tuple[float, Position]:
     """
     Find the closest point on a route to a given point and return the cumulative distance.
 
     Args:
         point: Point to find closest route point for
-        route: List of Position objects representing the route
-        cumulative_distances: Pre-calculated cumulative distances along route
+        route_obj: Route object representing the route
 
     Returns:
         Tuple of (cumulative_distance_km, closest_position) where:
         - cumulative_distance_km: Distance from route start to closest point
         - closest_position: Position of closest point on route
     """
-    if len(route) < 2:
-        if route:
-            return 0.0, route[0]
+    route_positions = route_obj.positions
+    cumulative_distances = route_obj.get_cumulative_distances()
+
+    if len(route_positions) < 2:
+        if route_positions:
+            return 0.0, route_positions[0]
         else:
             raise ValueError("Cannot find closest point on empty route")
 
     min_distance = float("inf")
     best_cumulative_distance = 0.0
-    best_position = route[0]
+    best_position = route_positions[0]
 
     # Check each segment of the route
-    for i in range(len(route) - 1):
-        seg_start = route[i]
-        seg_end = route[i + 1]
+    for i in range(len(route_positions) - 1):
+        seg_start = route_positions[i]
+        seg_end = route_positions[i + 1]
 
         distance, t, closest_point = point_to_line_segment_distance_and_projection(
             point, seg_start, seg_end

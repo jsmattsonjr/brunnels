@@ -351,7 +351,7 @@ def test_calculate_route_span_brunnel_along_route_segment(
 
     brunnel_coords_close = [Position(0.001, 0), Position(0.002, 0)]
     brunnel_close = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords_close)
-    route_span = brunnel_close.calculate_route_span(route_close, cum_dist_close)
+    route_span = brunnel_close.calculate_route_span(route_close)
 
     # The coords of the brunnel are exactly on the route points.
     # find_closest_point_on_route for Position(0.001,0) should give cum_dist_close[1]
@@ -391,7 +391,7 @@ def test_calculate_route_span_brunnel_offset_from_route(
     brunnel_coords_offset = [Position(0.0001, 0.01), Position(0.0001, 0.02)]
     brunnel_offset = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords_offset)
 
-    route_span = brunnel_offset.calculate_route_span(simple_route, simple_cum_dist)
+    route_span = brunnel_offset.calculate_route_span(simple_route)
 
     # Closest point to (0.0001, 0.01) on route is (0, 0.01) -> distance simple_cum_dist[1]
     # Closest point to (0.0001, 0.02) on route is (0, 0.02) -> distance simple_cum_dist[2]
@@ -427,7 +427,7 @@ def test_calculate_route_span_brunnel_partially_spans_segment(
         Position(0, 2.5),
     ]  # Brunnel from (0,1.5) to (0,2.5)
     brunnel = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords)
-    route_span = brunnel.calculate_route_span(test_route, test_cum_dist)
+    route_span = brunnel.calculate_route_span(test_route)
 
     # Closest to (0,1.5) is on segment (0,1)-(0,2). dist_on_route will be d(0,1) + 0.5 * d_segment(1,2)
     # Closest to (0,2.5) is on segment (0,2)-(0,3). dist_on_route will be d(0,2) + 0.5 * d_segment(2,3)
@@ -476,7 +476,7 @@ def test_calculate_route_span_brunnel_longer_than_route(
 
     brunnel_coords = [Position(0, -1), Position(0, 6)]
     brunnel = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords)
-    route_span = brunnel.calculate_route_span(test_route, test_cum_dist)
+    route_span = brunnel.calculate_route_span(test_route)
 
     # Closest point to (0,-1) on route is (0,0) -> distance test_cum_dist[0] = 0
     # Closest point to (0,6) on route is (0,5) -> distance test_cum_dist[5] (last point)
@@ -489,9 +489,7 @@ def test_calculate_route_span_empty_brunnel_coords(
     linear_route: Route, linear_route_cumulative_distances: list[float]
 ):
     brunnel = MockBrunnel(BrunnelType.BRIDGE, [])
-    route_span = brunnel.calculate_route_span(
-        linear_route, linear_route_cumulative_distances
-    )
+    route_span = brunnel.calculate_route_span(linear_route)
     # The method returns a RouteSpan(0,0,0) if coords are empty.
     # This was changed in brunnel.py: calculate_route_span to return RouteSpan(0.0, 0.0)
     # and post_init calculates length. So it should be RouteSpan(0.0, 0.0, length_km=0.0)
@@ -510,7 +508,7 @@ def test_calculate_route_span_single_point_brunnel(
     # Brunnel is a single point at (0, 1.5)
     brunnel_coords = [Position(0, 1.5)]
     brunnel = MockBrunnel(BrunnelType.BRIDGE, brunnel_coords)
-    route_span = brunnel.calculate_route_span(test_route, test_cum_dist)
+    route_span = brunnel.calculate_route_span(test_route)
 
     # Expected distance for (0,1.5) is halfway between d(0,1) and d(0,2)
     expected_dist = (test_cum_dist[1] + test_cum_dist[2]) / 2.0

@@ -146,8 +146,7 @@ class Route(Geometry):
 
         # Pre-calculate cumulative distances for route span calculations
         logger.debug("Pre-calculating route distances...")
-        cumulative_distances = self.get_cumulative_distances()
-        total_route_distance = cumulative_distances[-1] if cumulative_distances else 0.0
+        total_route_distance = self.get_cumulative_distances()[-1] if self.get_cumulative_distances() else 0.0
         logger.info(f"Total route distance: {total_route_distance:.2f} km")
 
         # Get memoized LineString from route
@@ -195,9 +194,7 @@ class Route(Geometry):
                     if brunnel.is_aligned_with_route(self, bearing_tolerance_degrees):
                         # Calculate route span for aligned, contained brunnels
                         try:
-                            brunnel.route_span = brunnel.calculate_route_span(
-                                self, cumulative_distances
-                            )
+                            brunnel.route_span = brunnel.calculate_route_span(self)
                             contained_count += 1
                         except Exception as e:
                             logger.warning(
@@ -233,7 +230,6 @@ class Route(Geometry):
     def filter_overlapping_brunnels(
         self,
         brunnels: Sequence[Brunnel],
-        cumulative_distances: Optional[List[float]] = None,
     ) -> None:
         """
         Filter overlapping brunnels, keeping only the nearest one for each overlapping group.
@@ -241,14 +237,11 @@ class Route(Geometry):
 
         Args:
             brunnels: List of Brunnel objects to filter (modified in-place)
-            cumulative_distances: Pre-calculated cumulative distances along route (optional)
         """
         if not self.positions or not brunnels:
             return
 
-        # Use provided cumulative distances or calculate them
-        if cumulative_distances is None:
-            cumulative_distances = self.get_cumulative_distances()
+        cumulative_distances = self.get_cumulative_distances()
 
         # Only consider contained brunnels with route spans
         contained_brunnels = [
@@ -421,8 +414,8 @@ class Route(Geometry):
         if not geometry_coords or not self.positions:
             return float("inf")
 
-        # Use cached cumulative distances
-        cumulative_distances = self.get_cumulative_distances()
+        # cumulative_distances is no longer needed here,
+        # find_closest_point_on_route will get it from the Route object (self)
 
         total_distance = 0.0
         valid_points = 0
@@ -430,7 +423,7 @@ class Route(Geometry):
         for geometry_point in geometry_coords:
             try:
                 _, closest_route_point = find_closest_point_on_route(
-                    geometry_point, self.positions, cumulative_distances
+                    geometry_point, self
                 )
                 # Calculate direct distance between geometry point and closest route point
                 distance = haversine_distance(geometry_point, closest_route_point)

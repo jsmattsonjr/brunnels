@@ -142,19 +142,17 @@ class Brunnel(Geometry, ABC):
             )
             return False
 
-    def calculate_route_span(
-        self, route, cumulative_distances: List[float]
-    ) -> RouteSpan:
+    def calculate_route_span(self, route) -> RouteSpan:
         """
         Calculate the span of this brunnel along the route.
 
         Args:
             route: Route object representing the route
-            cumulative_distances: Pre-calculated cumulative distances along route
 
         Returns:
             RouteSpan object with start/end distances and length
         """
+        cumulative_distances = route.get_cumulative_distances()
         coords = self.coordinate_list
         if not coords:
             return RouteSpan(0.0, 0.0)
@@ -165,7 +163,7 @@ class Brunnel(Geometry, ABC):
         # Find the closest route point for each brunnel coordinate
         for brunnel_point in coords:
             cumulative_dist, _ = find_closest_point_on_route(
-                brunnel_point, route.positions, cumulative_distances
+                brunnel_point, route
             )
 
             min_distance = min(min_distance, cumulative_dist)
