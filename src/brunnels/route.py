@@ -3,6 +3,7 @@
 Route data model for brunnel analysis.
 """
 
+from collections import defaultdict
 from typing import Optional, Tuple, List, TextIO, Sequence, Dict, Any
 from dataclasses import dataclass, field
 import logging
@@ -18,7 +19,6 @@ from .geometry_utils import (
 )
 from .config import BrunnelsConfig
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
-from .brunnel_way import BrunnelWay
 from .overpass import query_overpass_brunnels
 
 logger = logging.getLogger(__name__)
@@ -138,7 +138,7 @@ class Route(Geometry):
 
     def find_contained_brunnels(
         self,
-        brunnels: List[Brunnel],
+        brunnels: Dict[str, Brunnel],
         route_buffer: float,
         bearing_tolerance_degrees: float,
     ) -> None:
@@ -147,7 +147,7 @@ class Route(Geometry):
         Updates their containment status and calculates route spans for contained brunnels.
 
         Args:
-            brunnels: List of Brunnel objects to check (modified in-place)
+            brunnels: Dictionary of Brunnel objects to check (modified in-place)
             route_buffer: Buffer distance in meters to apply around the route (minimum: 1.0)
             bearing_tolerance_degrees: Bearing alignment tolerance in degrees
         """
@@ -198,11 +198,10 @@ class Route(Geometry):
         unaligned_count = 0
 
         # Check containment for each brunnel
-        for brunnel in brunnels:
+        for brunnel in brunnels.values():
             # Only check containment for brunnels that weren't filtered by tags
             if brunnel.filter_reason == FilterReason.NONE:
-                brunnel.contained_in_route = brunnel.is_contained_by(route_geometry)
-                if brunnel.contained_in_route:
+                if brunnel.is_contained_by(route_geometry):
                     # Check bearing alignment for contained brunnels
                     if brunnel.is_aligned_with_route(self, bearing_tolerance_degrees):
                         # Calculate route span for aligned, contained brunnels
@@ -215,20 +214,13 @@ class Route(Geometry):
                             )
                             logger.warning(f"Evicting brunnel from contained set")
                             brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
-                            brunnel.contained_in_route = False
-                            brunnel.route_span = None
                     else:
                         # Mark as unaligned and remove from contained set
                         brunnel.filter_reason = FilterReason.UNALIGNED
-                        brunnel.contained_in_route = False
-                        brunnel.route_span = None
                         unaligned_count += 1
                 else:
                     # Set filter reason for non-contained brunnels
                     brunnel.filter_reason = FilterReason.NOT_CONTAINED
-            else:
-                # Keep existing filter reason, don't check containment
-                brunnel.contained_in_route = False
 
         logger.debug(
             f"Found {contained_count} brunnels completely contained and aligned within the route buffer "
@@ -242,14 +234,14 @@ class Route(Geometry):
 
     def filter_overlapping_brunnels(
         self,
-        brunnels: Sequence[Brunnel],
+        brunnels: Dict[str, Brunnel],
     ) -> None:
         """
         Filter overlapping brunnels, keeping only the nearest one for each overlapping group.
         Supports both regular and compound brunnels.
 
         Args:
-            brunnels: List of Brunnel objects to filter (modified in-place)
+            brunnels: Dictionary of Brunnel objects to filter (modified in-place)
         """
         if not self.trackpoints or not brunnels:
             return
@@ -257,8 +249,8 @@ class Route(Geometry):
         # Only consider contained brunnels with route spans
         contained_brunnels = [
             b
-            for b in brunnels
-            if b.contained_in_route
+            for b in brunnels.values()
+            if b.is_representative()
             and b.route_span is not None
             and b.filter_reason == FilterReason.NONE
         ]
@@ -331,7 +323,6 @@ class Route(Geometry):
 
             for brunnel, distance in brunnel_distances[1:]:
                 brunnel.filter_reason = FilterReason.NOT_NEAREST
-                brunnel.contained_in_route = False
                 filtered += 1
 
                 logger.debug(
@@ -343,7 +334,7 @@ class Route(Geometry):
                 f"Filtered {filtered} overlapping brunnels, keeping nearest in each group"
             )
 
-    def find_brunnels(self, config: BrunnelsConfig) -> List[BrunnelWay]:
+    def find_brunnels(self, config: BrunnelsConfig) -> Dict[str, Brunnel]:
         """
         Find all bridges and tunnels near this route and check for containment within route buffer.
 
@@ -351,11 +342,11 @@ class Route(Geometry):
             config: BrunnelsConfig object containing all settings
 
         Returns:
-            List of BrunnelWay objects found near the route, with containment status set
+            List of Brunnel objects found near the route, with containment status set
         """
         if not self.trackpoints:
             logger.warning("Cannot find brunnels for empty route")
-            return []
+            return {}
 
         bbox = self.get_bbox(config.bbox_buffer)
 
@@ -373,17 +364,16 @@ class Route(Geometry):
         )
         raw_ways = query_overpass_brunnels(bbox)
 
-        brunnels = []
+        brunnels = {}
         filtered_count = 0
         for way_data in raw_ways:
             try:
-                brunnel = BrunnelWay.from_overpass_data(way_data)
-
+                brunnel = Brunnel.from_overpass_data(way_data)
                 # Count filtered brunnels but keep them for visualization
                 if brunnel.filter_reason != FilterReason.NONE:
                     filtered_count += 1
 
-                brunnels.append(brunnel)
+                brunnels[brunnel.get_id()] = brunnel
             except (KeyError, ValueError) as e:
                 logger.warning(f"Failed to parse brunnel way: {e}")
                 continue
@@ -399,10 +389,10 @@ class Route(Geometry):
         )
 
         # Count contained vs total brunnels
-        bridges = [b for b in brunnels if b.brunnel_type == BrunnelType.BRIDGE]
-        tunnels = [b for b in brunnels if b.brunnel_type == BrunnelType.TUNNEL]
-        contained_bridges = [b for b in bridges if b.contained_in_route]
-        contained_tunnels = [b for b in tunnels if b.contained_in_route]
+        bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
+        tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
+        contained_bridges = [b for b in bridges if b.filter_reason == FilterReason.NONE]
+        contained_tunnels = [b for b in tunnels if b.filter_reason == FilterReason.NONE]
 
         logger.debug(
             f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
@@ -415,7 +405,7 @@ class Route(Geometry):
         Calculate the average distance from all points in a geometry to the closest points on this route.
 
         Args:
-            geometry: Any Geometry object (BrunnelWay, CompoundBrunnelWay, etc.)
+            geometry: Any Geometry object (Brunnel, CompoundBrunnel, etc.)
 
         Returns:
             Average distance in kilometers, or float('inf') if calculation fails
@@ -634,6 +624,6 @@ def route_spans_overlap(span1: RouteSpan, span2: RouteSpan) -> bool:
         True if the spans overlap, False otherwise
     """
     return (
-        span1.start_distance_km <= span2.end_distance_km
-        and span2.start_distance_km <= span1.end_distance_km
+        span1.start_distance <= span2.end_distance
+        and span2.start_distance <= span1.end_distance
     )

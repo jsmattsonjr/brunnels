@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Route visualization using folium maps with polymorphic brunnel handling.
+Route visualization using folium maps.
 """
 
-from typing import Sequence
+from typing import Dict
 import collections
 import logging
 import folium
@@ -80,7 +80,7 @@ class BrunnelLegend(folium.MacroElement):
 def create_route_map(
     route: Route,
     output_filename: str,
-    brunnels: Sequence[Brunnel],
+    brunnels: Dict[str, Brunnel],
     config: BrunnelsConfig,
 ) -> None:
     """
@@ -89,7 +89,7 @@ def create_route_map(
     Args:
         route: Route object representing the route
         output_filename: Path where HTML map file should be saved
-        brunnels: Sequence of Brunnel objects to display on map
+        brunnels: Dictionary of Brunnel objects to display on map
         config: BrunnelsConfig object containing settings like buffer and metrics flag
 
     Raises:
@@ -169,30 +169,30 @@ def create_route_map(
     individual_count = 0
     filter_reason_counts = collections.Counter()
 
-    for brunnel in brunnels:
-        # Use polymorphic interface - all brunnels have these properties
+    for brunnel in brunnels.values():
         brunnel_coords = brunnel.get_visualization_coordinates()
         if not brunnel_coords:
             continue
 
         brunnel_type = brunnel.brunnel_type
-        contained = brunnel.contained_in_route
         filter_reason = brunnel.filter_reason
-        route_span = brunnel.route_span
+        route_span = brunnel.get_route_span()
 
         if filter_reason != FilterReason.NONE:
             filter_reason_counts[filter_reason] += 1
 
         # Determine color and opacity based on containment status and filtering
-        if contained:
+        if filter_reason == FilterReason.NONE:
             opacity = 0.9
             weight = 4
             if brunnel_type == BrunnelType.BRIDGE:
                 color = "blue"
-                contained_bridge_count += 1
+                if brunnel.is_representative():
+                    contained_bridge_count += 1
             else:  # TUNNEL
                 color = "brown"
-                contained_tunnel_count += 1
+                if brunnel.is_representative():
+                    contained_tunnel_count += 1
         else:
             # Use muted colors for filtered or non-contained brunnels
             opacity = 0.3
@@ -202,24 +202,25 @@ def create_route_map(
             else:  # TUNNEL
                 color = "rosybrown"  # grey-brown for tunnels
 
-        # Count all brunnels
-        if brunnel_type == BrunnelType.BRIDGE:
-            bridge_count += 1
-        else:
-            tunnel_count += 1
-
-        if brunnel.contained_in_route:
-            if hasattr(brunnel, "components"):  # CompoundBrunnelWay
-                compound_count += 1
+        # Count all representative brunnels
+        if brunnel.is_representative():
+            if brunnel_type == BrunnelType.BRIDGE:
+                bridge_count += 1
             else:
-                individual_count += 1
+                tunnel_count += 1
+
+            if filter_reason == FilterReason.NONE:
+                if brunnel.is_compound_brunnel():
+                    compound_count += 1
+                else:
+                    individual_count += 1
 
         # Create popup text with full metadata
-        if contained:
+        if filter_reason == FilterReason.NONE:
             if route_span:
                 status = (
-                    f"{route_span.start_distance_km:.2f} - {route_span.end_distance_km:.2f} km; "
-                    f"length: {route_span.length_km:.2f} km"
+                    f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
+                    f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
                 )
             else:
                 status = "contained in route buffer"
@@ -230,7 +231,6 @@ def create_route_map(
 
         popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
 
-        # Use polymorphic to_html() method - both classes implement this
         metadata_html = brunnel.to_html()
         popup_text = popup_header + metadata_html
 

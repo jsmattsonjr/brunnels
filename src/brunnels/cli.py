@@ -9,7 +9,7 @@ Requirements:
 
 """
 
-from typing import Sequence, Optional
+from typing import Dict, Optional
 import webbrowser
 import argparse
 import logging
@@ -22,8 +22,7 @@ from . import __version__
 from . import visualization
 from .config import BrunnelsConfig
 from .route import Route, RouteValidationError
-from .brunnel import Brunnel
-from .compound_brunnel_way import CompoundBrunnelWay, find_compound_brunnelways
+from .brunnel import Brunnel, FilterReason, find_compound_brunnels
 from .file_utils import generate_output_filename
 
 # Configure logging
@@ -167,7 +166,7 @@ def setup_logging(config: BrunnelsConfig) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def log_final_included_brunnels(brunnels: Sequence[Brunnel]) -> None:
+def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     """
     Log the final list of brunnels that are included in the route (after all processing).
     This shows the actual brunnels that will appear on the map.
@@ -176,7 +175,9 @@ def log_final_included_brunnels(brunnels: Sequence[Brunnel]) -> None:
         brunnels: Sequence of all brunnels to check (including compound brunnels)
     """
     # Find final included brunnels (those that are contained and not filtered)
-    included_brunnels = [b for b in brunnels if b.contained_in_route]
+    included_brunnels = [
+        b for b in brunnels.values() if b.filter_reason == FilterReason.NONE
+    ]
 
     if not included_brunnels:
         logger.info("No brunnels included in final map")
@@ -184,12 +185,13 @@ def log_final_included_brunnels(brunnels: Sequence[Brunnel]) -> None:
 
     # Sort by start distance along route
     included_brunnels.sort(
-        key=lambda b: (b.route_span.start_distance_km if b.route_span else 0.0)
+        key=lambda b: (b.route_span.start_distance if b.route_span else 0.0)
     )
 
     logger.info(f"Included brunnels ({len(included_brunnels)}):")
     for brunnel in included_brunnels:
-        logger.info(f"  {brunnel.get_log_description()}")
+        if brunnel.is_representative():
+            logger.info(f"  {brunnel.get_log_description()}")
 
 
 def main():
@@ -237,15 +239,14 @@ def main():
 
     # Find bridges and tunnels near the route (containment detection included)
     try:
-        brunnels: Sequence[Brunnel] = route.find_brunnels(config)
+        brunnels = route.find_brunnels(config)
     except Exception as e:
         logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
 
-    find_compound_brunnelways(brunnels)
     # Create compound brunnels from adjacent segments
     try:
-        brunnels = CompoundBrunnelWay.create_from_brunnels(brunnels)
+        find_compound_brunnels(brunnels)
     except Exception as e:
         logger.error(f"Failed to create compound brunnels: {e}")
         sys.exit(1)

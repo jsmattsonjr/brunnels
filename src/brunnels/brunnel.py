@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""
-Base Brunnel class and related enums/data classes for bridge and tunnel objects.
-"""
+""" """
 
-from abc import ABC, abstractmethod
-from typing import Optional, List
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any, Sequence, Set
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
 import logging
 
-from .geometry import Geometry
+from .geometry import Position, Geometry
 from .geometry_utils import (
     find_closest_point_on_route,
     find_closest_segments,
@@ -47,75 +46,203 @@ class FilterReason(Enum):
         return self.value
 
 
-class Direction(Enum):
-    """Enumeration for brunnel direction relative to route."""
-
-    FORWARD = "forward"
-    REVERSE = "reverse"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-from dataclasses import dataclass, field
-
-
 @dataclass
 class RouteSpan:
     """Information about where a brunnel spans along a route."""
 
-    start_distance_km: float  # Distance from route start where brunnel begins
-    end_distance_km: float  # Distance from route start where brunnel ends
-    length_km: float = field(init=False)  # Length of route spanned by brunnel
-
-    def __post_init__(self):
-        """Calculate length after initialization."""
-        self.length_km = self.end_distance_km - self.start_distance_km
+    start_distance: float  # Distance from route start where brunnel begins
+    end_distance: float  # Distance from route start where brunnel ends
 
 
-class Brunnel(Geometry, ABC):
-    """Abstract base class for bridge and tunnel objects."""
+@dataclass
+class Brunnel(Geometry):
+    """A single bridge or tunnel way from OpenStreetMap."""
+
+    coords: List[Position]
+    metadata: Dict[str, Any]
 
     def __init__(
         self,
+        coords: List[Position],
+        metadata: Dict[str, Any],
         brunnel_type: BrunnelType,
-        contained_in_route: bool = False,
         filter_reason: FilterReason = FilterReason.NONE,
         route_span: Optional[RouteSpan] = None,
     ):
         super().__init__()
+        self.coords = coords
+        self.metadata = metadata
         self.brunnel_type = brunnel_type
-        self.contained_in_route = contained_in_route
         self.filter_reason = filter_reason
         self.route_span = route_span
 
-    @abstractmethod
-    def to_html(self) -> str:
-        """Format brunnel metadata into HTML for popup display."""
-        pass
+    @property
+    def coordinate_list(self) -> List[Position]:
+        """Return the list of Position objects for this geometry."""
+        return self.coords
 
-    @abstractmethod
+    def is_compound_brunnel(self) -> bool:
+        """
+        Check if this brunnel is part of a compound group.
+        """
+        return "compound_group" in self.metadata
+
+    def is_representative(self) -> bool:
+        if not self.is_compound_brunnel():
+            return True
+        compound_group = self.metadata.get("compound_group", [])
+        return compound_group.index(self) == 0
+
     def get_id(self) -> str:
         """Get a string identifier for this brunnel."""
-        pass
+        if self.is_compound_brunnel():
+            return f"{";".join(str(component.metadata.get('id', 'unknown')) for component in self.metadata.get('compound_group', []))}"
+        return str(self.metadata.get("id", "unknown"))
 
-    @abstractmethod
     def get_display_name(self) -> str:
-        """Get the display name for this brunnel (e.g., 'Main Street' or 'unnamed')."""
-        pass
+        """Get the display name for this brunnel."""
+        return self.metadata.get("tags", {}).get("name", "unnamed")
 
-    @abstractmethod
     def get_short_description(self) -> str:
-        """Get a short description for logging (e.g., 'Bridge: Main Street (123456)')."""
-        pass
+        """Get a short description for logging."""
+        brunnel_type = self.brunnel_type.value.capitalize()
+        name = self.get_display_name()
+        if self.is_compound_brunnel():
+            component_count = len(self.metadata.get("compound_group", []))
+            return f"Compound {brunnel_type}: {name} ({self.get_id()}) [{component_count} segments]"
+        return f"{brunnel_type}: {name} ({self.get_id()})"
 
     def get_log_description(self) -> str:
         """Get a standardized description for logging with route span info."""
-        if self.route_span:
-            span_info = f"{self.route_span.start_distance_km:.2f}-{self.route_span.end_distance_km:.2f} km (length: {self.route_span.length_km:.2f} km)"
+        route_span = self.get_route_span()
+        if route_span is not None:
+            span_info = f"{route_span.start_distance:.2f}-{route_span.end_distance:.2f} km (length: {route_span.end_distance - route_span.start_distance:.2f} km)"
             return f"{self.get_short_description()} {span_info}"
         else:
             return f"{self.get_short_description()} (no route span)"
+
+    def get_route_span(self) -> Optional[RouteSpan]:
+        if self.is_compound_brunnel():
+            compound_group = self.metadata.get("compound_group", [])
+            return RouteSpan(
+                compound_group[0].route_span.start_distance,
+                compound_group[-1].route_span.end_distance,
+            )
+        return self.route_span
+
+    def to_html(self) -> str:
+        """
+        Format this brunnel's metadata into HTML for popup display.
+
+        Returns:
+            HTML-formatted string with metadata
+        """
+        html_parts = []
+
+        if self.is_compound_brunnel():
+            compound_group = self.metadata.get("compound_group", [])
+            html_parts.append(
+                f"Segment {compound_group.index(self)+1} of {len(compound_group)} in compound group<br>"
+            )
+        tags = self.metadata.get("tags", {})
+
+        # Add name most prominently if present
+        if "name" in tags:
+            html_parts.append(f"<b>{tags['name']}</b>")
+
+        # Add alt_name next if present
+        if "alt_name" in tags:
+            html_parts.append(f"<br><b>AKA:</b> {tags['alt_name']}")
+
+        # Add OSM ID
+        html_parts.append(f"<br><b>OSM ID:</b> {self.get_id()}")
+
+        # Add remaining OSM tags (excluding name and alt_name which we already showed)
+        remaining_tags = {
+            k: v for k, v in tags.items() if k not in ["name", "alt_name"]
+        }
+        if remaining_tags:
+            html_parts.append("<br><b>Tags:</b>")
+            for key, value in sorted(remaining_tags.items()):
+                html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value}")
+
+        # Add other metadata (excluding tags and id which we already handled,
+        # geometry which is very long, and type which is always "way")
+        other_data = {
+            k: v
+            for k, v in self.metadata.items()
+            if k not in ["tags", "id", "geometry", "type"]
+        }
+        if other_data:
+            html_parts.append("<br><b>Other:</b>")
+            for key, value in sorted(other_data.items()):
+                # Handle nested dictionaries or lists
+                if isinstance(value, (dict, list)):
+                    # Use structured formatting for nodes and bounds
+                    if key in ["nodes", "bounds"]:
+                        formatted_value = self._format_complex_value(key, value, 0)
+                        # Add proper indentation for the "Other:" section
+                        indented_lines = []
+                        for line in formatted_value.split("<br>"):
+                            if line.strip():  # Skip empty lines
+                                indented_lines.append(f"&nbsp;&nbsp;{line}")
+                        html_parts.append("<br>" + "<br>".join(indented_lines))
+                    else:
+                        # Keep truncation for other long nested data
+                        value_str = str(value)
+                        if len(value_str) > 50:
+                            value_str = value_str[:47] + "..."
+                        html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
+                else:
+                    value_str = str(value)
+                    html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
+
+        return "".join(html_parts)
+
+    def _format_complex_value(self, key: str, value: Any, indent_level: int = 0) -> str:
+        """
+        Format complex values (dicts, lists) into readable HTML with proper indentation.
+
+        Args:
+            key: The key name
+            value: The value to format
+            indent_level: Current indentation level
+
+        Returns:
+            Formatted HTML string
+        """
+        indent = "&nbsp;" * (indent_level * 4)
+
+        if isinstance(value, dict):
+            if not value:
+                return f"{indent}<i>{key}:</i> {{}}"
+
+            parts = [f"{indent}<i>{key}:</i>"]
+            for k, v in value.items():
+                if isinstance(v, (dict, list)):
+                    parts.append(self._format_complex_value(k, v, indent_level + 1))
+                else:
+                    nested_indent = "&nbsp;" * ((indent_level + 1) * 4)
+                    parts.append(f"{nested_indent}<i>{k}:</i> {v}")
+            return "<br>".join(parts)
+
+        elif isinstance(value, list):
+            if not value:
+                return f"{indent}<i>{key}:</i> []"
+
+            parts = [f"{indent}<i>{key}:</i>"]
+            for i, item in enumerate(value):
+                if isinstance(item, (dict, list)):
+                    parts.append(
+                        self._format_complex_value(f"[{i}]", item, indent_level + 1)
+                    )
+                else:
+                    nested_indent = "&nbsp;" * ((indent_level + 1) * 4)
+                    parts.append(f"{nested_indent}[{i}]: {item}")
+            return "<br>".join(parts)
+
+        else:
+            return f"{indent}<i>{key}:</i> {value}"
 
     def is_contained_by(self, route_geometry) -> bool:
         """
@@ -225,3 +352,176 @@ class Brunnel(Geometry, ABC):
         )
 
         return aligned
+
+    @classmethod
+    def determine_type(cls, metadata: Dict[str, Any]) -> BrunnelType:
+        """
+        Determine brunnel type from OSM metadata.
+
+        Args:
+            metadata: OSM metadata for the brunnel
+
+        Returns:
+            BrunnelType enum value
+        """
+        tags = metadata.get("tags", {})
+
+        # Check for tunnel first (tunnels are often more specific)
+        if "tunnel" in tags and tags["tunnel"] not in ["no", "false"]:
+            return BrunnelType.TUNNEL
+
+        # Otherwise, assume it's a bridge
+        return BrunnelType.BRIDGE
+
+    @classmethod
+    def should_filter(cls, metadata: Dict[str, Any]) -> FilterReason:
+        """
+        Determine if a brunnel should be filtered out based on cycling relevance and geometry.
+
+        Args:
+            metadata: OSM metadata for the brunnel
+
+        Returns:
+            FilterReason.NONE if the brunnel should be kept, otherwise returns
+            the reason for filtering.
+        """
+        # Check for closed way
+        nodes = metadata.get("nodes", [])
+        if len(nodes) >= 2 and nodes[0] == nodes[-1]:
+            return FilterReason.CLOSED_WAY
+
+        tags = metadata.get("tags", {})
+
+        # Check bicycle tag first - highest priority
+        if "bicycle" in tags:
+            if tags["bicycle"] == "no":
+                return FilterReason.BICYCLE_NO
+            else:
+                # bicycle=* (anything other than "no") - keep and skip other checks
+                return FilterReason.NONE
+
+        # Check for cycleway - keep and skip other checks
+        if tags.get("highway") == "cycleway":
+            return FilterReason.NONE
+
+        # Check for waterway - filter out
+        if "waterway" in tags:
+            return FilterReason.WATERWAY
+
+        # Check for railway - filter out unless abandoned
+        if "railway" in tags:
+            if tags["railway"] != "abandoned":
+                return FilterReason.RAILWAY
+
+        # Default: keep the brunnel
+        return FilterReason.NONE
+
+    @classmethod
+    def from_overpass_data(cls, way_data: Dict[str, Any]) -> "Brunnel":
+        """
+        Parse a single way from Overpass response into Brunnel object.
+
+        Args:
+            way_data: Raw way data from Overpass API
+
+        Returns:
+            Brunnel object
+        """
+        # Extract coordinates from geometry
+        coords = []
+        if "geometry" in way_data:
+            for node in way_data["geometry"]:
+                coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
+
+        brunnel_type = cls.determine_type(way_data)
+        filter_reason = cls.should_filter(way_data)
+
+        return cls(
+            coords=coords,
+            metadata=way_data,
+            brunnel_type=brunnel_type,
+            filter_reason=filter_reason,
+        )
+
+
+def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
+    """
+    Identify connected components of brunnels and mark compound groups.
+
+    This function analyzes the graph formed by brunnels sharing nodes and identifies
+    connected components. For components with more than one way, it adds compound_group
+    metadata to mark them as part of the same logical structure.
+
+    Args:
+        brunnels: Dictionary of Brunnel objects to analyze
+    """
+    # Step 1: Build edges dictionary mapping node IDs to collections of way IDs
+    edges: Dict[str, Set[str]] = defaultdict(set)
+    way_ids = []
+
+    for brunnel in brunnels.values():
+        # Only process brunnels that are not filtered
+        if brunnel.filter_reason != FilterReason.NONE:
+            continue
+
+        way_id = brunnel.get_id()
+        way_ids.append(way_id)
+
+        # Get nodes from metadata
+        nodes = brunnel.metadata.get("nodes", [])
+
+        # Add this way ID to the edge list for each of its nodes
+        for node_id in nodes:
+            edges[node_id].add(way_id)
+
+    # Step 2: Find connected components using breadth-first search
+    visited_ways: Set[str] = set()
+    connected_components: List[Set[str]] = []
+
+    # Process each way that hasn't been visited
+    for way_id in way_ids:
+        if way_id in visited_ways:
+            continue
+
+        # Start BFS from this way to find its connected component
+        component: Set[str] = set()
+        queue: deque[str] = deque([way_id])
+
+        while queue:
+            current_way = queue.popleft()
+
+            if current_way in visited_ways:
+                continue
+
+            visited_ways.add(current_way)
+            component.add(current_way)
+
+            # Find all ways connected to this way through shared nodes
+            brunnel = brunnels[current_way]
+            current_nodes = brunnel.metadata.get("nodes", [])
+
+            for node_id in current_nodes:
+                # Find all other ways that share this node
+                connected_ways = edges[node_id]
+                for connected_way in connected_ways:
+                    if connected_way not in visited_ways:
+                        queue.append(connected_way)
+
+        connected_components.append(component)
+
+    # Step 3: Mark compound groups
+    for component in connected_components:
+        # Only mark components with more than one way as compound groups
+        if len(component) > 1:
+            # Add compound_group metadata to all brunnels in this component
+            logger.debug(
+                f"Marking compound group with {len(component)} ways: {', '.join(component)}"
+            )
+            compound_group = [brunnels[way_id] for way_id in component]
+            # Sort by start distance for consistent ordering
+            compound_group.sort(
+                key=lambda b: b.route_span.start_distance if b.route_span else 0.0
+            )
+            for way_id in component:
+                brunnel = brunnels[way_id]
+                brunnel.metadata["compound_group"] = compound_group
