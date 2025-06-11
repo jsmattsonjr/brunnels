@@ -74,6 +74,12 @@ class BrunnelWay(Brunnel):
 
         return bool(nodes1_set & nodes2_set)
 
+    def is_compound_brunnelway(self) -> bool:
+        """
+        Check if this brunnel is part of a compound group.
+        """
+        return "compound_group" in self.metadata
+
     def to_html(self) -> str:
         """
         Format this brunnel's metadata into HTML for popup display.

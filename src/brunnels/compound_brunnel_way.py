@@ -3,7 +3,8 @@
 Compound BrunnelWay implementation for handling adjacent brunnel segments.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Sequence, Set
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 import logging
 
@@ -443,3 +444,83 @@ class CompoundBrunnelWay(Brunnel):
     def __iter__(self):
         """Allow iteration over components."""
         return iter(self.components)
+
+
+def find_compound_brunnelways(brunnelways: Sequence[BrunnelWay]) -> None:
+    """
+    Identify connected components of brunnelways and mark compound groups.
+
+    This function analyzes the graph formed by brunnelways sharing nodes and identifies
+    connected components. For components with more than one way, it adds compound_group
+    metadata to mark them as part of the same logical structure.
+
+    Args:
+        brunnelways: Sequence of BrunnelWay objects to analyze
+    """
+    # Step 1: Build edges dictionary mapping node IDs to collections of way IDs
+    edges: Dict[int, Set[str]] = defaultdict(set)
+
+    # Map way IDs to their corresponding BrunnelWay objects for later lookup
+    way_id_to_brunnel: Dict[str, BrunnelWay] = {}
+
+    for brunnelway in brunnelways:
+        # Only process brunnelways that are not filtered
+        if brunnelway.filter_reason != FilterReason.NONE:
+            continue
+
+        way_id = brunnelway.get_id()
+        way_id_to_brunnel[way_id] = brunnelway
+
+        # Get nodes from metadata
+        nodes = brunnelway.metadata.get("nodes", [])
+
+        # Add this way ID to the edge list for each of its nodes
+        for node_id in nodes:
+            edges[node_id].add(way_id)
+
+    # Step 2: Find connected components using breadth-first search
+    visited_ways: Set[str] = set()
+    connected_components: List[Set[str]] = []
+
+    # Process each way that hasn't been visited
+    for way_id in way_id_to_brunnel.keys():
+        if way_id in visited_ways:
+            continue
+
+        # Start BFS from this way to find its connected component
+        component: Set[str] = set()
+        queue: deque[str] = deque([way_id])
+
+        while queue:
+            current_way = queue.popleft()
+
+            if current_way in visited_ways:
+                continue
+
+            visited_ways.add(current_way)
+            component.add(current_way)
+
+            # Find all ways connected to this way through shared nodes
+            brunnel = way_id_to_brunnel[current_way]
+            current_nodes = brunnel.metadata.get("nodes", [])
+
+            for node_id in current_nodes:
+                # Find all other ways that share this node
+                connected_ways = edges[node_id]
+                for connected_way in connected_ways:
+                    if connected_way not in visited_ways:
+                        queue.append(connected_way)
+
+        connected_components.append(component)
+
+    # Step 3: Mark compound groups
+    for component in connected_components:
+        # Only mark components with more than one way as compound groups
+        if len(component) > 1:
+            # Add compound_group metadata to all brunnelways in this component
+            logger.debug(
+                f"Marking compound group with {len(component)} ways: {', '.join(component)}"
+            )
+            for way_id in component:
+                brunnel = way_id_to_brunnel[way_id]
+                brunnel.metadata["compound_group"] = component.copy()

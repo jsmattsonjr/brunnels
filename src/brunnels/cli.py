@@ -23,7 +23,7 @@ from . import visualization
 from .config import BrunnelsConfig
 from .route import Route, RouteValidationError
 from .brunnel import Brunnel
-from .compound_brunnel_way import CompoundBrunnelWay
+from .compound_brunnel_way import CompoundBrunnelWay, find_compound_brunnelways
 from .file_utils import generate_output_filename
 
 # Configure logging
@@ -242,6 +242,7 @@ def main():
         logger.error(f"Failed to query bridges and tunnels: {e}")
         sys.exit(1)
 
+    find_compound_brunnelways(brunnels)
     # Create compound brunnels from adjacent segments
     try:
         brunnels = CompoundBrunnelWay.create_from_brunnels(brunnels)
