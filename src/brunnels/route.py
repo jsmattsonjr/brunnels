@@ -3,8 +3,7 @@
 Route data model for brunnel analysis.
 """
 
-from collections import defaultdict
-from typing import Optional, Tuple, List, TextIO, Sequence, Dict, Any
+from typing import Optional, Tuple, List, TextIO, Dict, Any
 from dataclasses import dataclass, field
 import logging
 import math
@@ -13,12 +12,8 @@ import gpxpy
 import gpxpy.gpx
 
 from .geometry import Position, Geometry
-from .geometry_utils import (
-    find_closest_point_on_route,
-    haversine_distance,
-)
 from .config import BrunnelsConfig
-from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
+from .brunnel import Brunnel, BrunnelType, FilterReason
 from .overpass import query_overpass_brunnels
 
 logger = logging.getLogger(__name__)
@@ -71,7 +66,7 @@ class Route(Geometry):
 
         # Ensure the base bounding box (0 buffer) is calculated and memoized
         if self._bbox is None:
-            self._bbox = self._calculate_bbox(0.0)
+            self._bbox = self._calculate_bbox()
 
         # If no buffer is requested, return the memoized base bounding box
         if buffer == 0.0:
@@ -98,16 +93,9 @@ class Route(Geometry):
         )
         return (buffered_south, buffered_west, buffered_north, buffered_east)
 
-    def _calculate_bbox(
-        self, ignored_buffer: float
-    ) -> Tuple[float, float, float, float]:
+    def _calculate_bbox(self) -> Tuple[float, float, float, float]:
         """
         Calculate bounding box for route, always with a 0 buffer.
-        The `ignored_buffer` parameter is kept for compatibility with previous calls
-        but is no longer used internally for calculations.
-
-        Args:
-            ignored_buffer: This parameter is ignored. The calculation always uses a 0m buffer.
 
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
@@ -205,15 +193,8 @@ class Route(Geometry):
                     # Check bearing alignment for contained brunnels
                     if brunnel.is_aligned_with_route(self, bearing_tolerance_degrees):
                         # Calculate route span for aligned, contained brunnels
-                        try:
-                            brunnel.route_span = brunnel.calculate_route_span(self)
-                            contained_count += 1
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to calculate route span for brunnel {brunnel.get_id()}: {e}"
-                            )
-                            logger.warning(f"Evicting brunnel from contained set")
-                            brunnel.filter_reason = FilterReason.NO_ROUTE_SPAN
+                        brunnel.route_span = brunnel.calculate_route_span(self)
+                        contained_count += 1
                     else:
                         # Mark as unaligned and remove from contained set
                         brunnel.filter_reason = FilterReason.UNALIGNED
@@ -280,9 +261,12 @@ class Route(Geometry):
 
                     # Check if brunnel2 overlaps with any brunnel in current group
                     for brunnel_in_group in current_group:
-                        if route_spans_overlap(
-                            brunnel_in_group.route_span,  # type: ignore
-                            brunnel2.route_span,  # type: ignore
+                        if (
+                            brunnel_in_group.route_span is not None
+                            and brunnel2.route_span is not None
+                            and brunnel_in_group.route_span.overlaps_with(
+                                brunnel2.route_span
+                            )
                         ):
                             current_group.append(brunnel2)
                             processed.add(j)
@@ -420,11 +404,9 @@ class Route(Geometry):
 
         for geometry_point in geometry_coords:
             try:
-                _, closest_route_point = find_closest_point_on_route(
-                    geometry_point, self
-                )
+                _, closest_route_point = self.closest_point_to(geometry_point)
                 # Calculate direct distance between geometry point and closest route point
-                distance = haversine_distance(geometry_point, closest_route_point)
+                distance = geometry_point.distance_to(closest_route_point)
                 total_distance += distance
                 valid_points += 1
             except Exception as e:
@@ -464,10 +446,53 @@ class Route(Geometry):
             )
 
             # Calculate distance from previous point and add to cumulative distance
-            segment_distance = haversine_distance(prev_point, curr_point)
+            segment_distance = prev_point.distance_to(curr_point)
             self.trackpoints[i]["track_distance"] = (
                 self.trackpoints[i - 1]["track_distance"] + segment_distance
             )
+
+    def closest_point_to(self: "Route", point: Position) -> Tuple[float, Position]:
+        """
+        Find the closest point on a route to a given point and return the cumulative distance.
+
+        Args:
+            point: Point to find closest route point for
+
+        Returns:
+            Tuple of (distance, closest_position) where:
+            - distance: Distance from route start to closest point
+            - closest_position: Position of closest point on route
+        """
+        route_positions = self.coordinate_list
+
+        if len(route_positions) < 2:
+            raise ValueError(
+                "Route must have at least two positions to calculate distance."
+            )
+
+        min_distance = float("inf")
+        best_distance = 0.0
+        best_position = route_positions[0]
+
+        # Check each segment of the route
+        for i in range(len(route_positions) - 1):
+            seg_start = route_positions[i]
+            seg_end = route_positions[i + 1]
+
+            distance, t, closest_point = point.to_line_segment_distance_and_projection(
+                seg_start, seg_end
+            )
+
+            if distance < min_distance:
+                min_distance = distance
+                best_position = closest_point
+
+                # Calculate cumulative distance to this point
+                best_distance = self.trackpoints[i][
+                    "track_distance"
+                ] + seg_start.distance_to(best_position)
+
+        return best_distance, best_position
 
     @classmethod
     def from_gpx(cls, file_input: TextIO) -> "Route":
@@ -610,20 +635,3 @@ class Route(Geometry):
     def __iter__(self):
         """Allow iteration over trackpoints."""
         return iter(self.trackpoints)
-
-
-def route_spans_overlap(span1: RouteSpan, span2: RouteSpan) -> bool:
-    """
-    Check if two route spans overlap.
-
-    Args:
-        span1: First route span
-        span2: Second route span
-
-    Returns:
-        True if the spans overlap, False otherwise
-    """
-    return (
-        span1.start_distance <= span2.end_distance
-        and span2.start_distance <= span1.end_distance
-    )

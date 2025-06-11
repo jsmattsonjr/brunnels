@@ -5,7 +5,6 @@ Filename utilities for generating output filenames.
 
 import os
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ def generate_output_filename(input_filename: str) -> str:
     try:
         with open(candidate, "x") as f:
             pass  # File created successfully and is kept
-        return candidate # Found and reserved a good filename
+        return candidate  # Found and reserved a good filename
     except FileExistsError:
         pass  # File already exists, proceed to numbered variants
     except (PermissionError, OSError) as e:
@@ -62,7 +61,7 @@ def generate_output_filename(input_filename: str) -> str:
         try:
             with open(candidate, "x") as f:
                 pass  # File created successfully and is kept
-            return candidate # Found and reserved a good filename
+            return candidate  # Found and reserved a good filename
         except FileExistsError:
             continue  # File already exists, try next number
         except (PermissionError, OSError) as e:

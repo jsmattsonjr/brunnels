@@ -3,196 +3,13 @@
 Geometry and distance calculation utilities for route analysis.
 """
 
-from typing import List, Tuple, Optional, TYPE_CHECKING
-import math
+from typing import List, Tuple, Optional
 import logging
-from geopy.distance import geodesic
 
 from .geometry import Position
 
-if TYPE_CHECKING:
-    from .route import Route  # Use for type hinting to avoid circular import
 
 logger = logging.getLogger(__name__)
-
-
-def haversine_distance(pos1: Position, pos2: Position) -> float:
-    """
-    Calculate the geodesic distance between two positions using geopy.
-
-    Args:
-        pos1: First position
-        pos2: Second position
-
-    Returns:
-        Distance in kilometers
-    """
-    return geodesic(
-        (pos1.latitude, pos1.longitude), (pos2.latitude, pos2.longitude)
-    ).kilometers
-
-
-def point_to_line_segment_distance_and_projection(
-    point: Position, seg_start: Position, seg_end: Position
-) -> Tuple[float, float, Position]:
-    """
-    Calculate the distance from a point to a line segment and find the closest point on the segment.
-
-    Args:
-        point: Point to measure distance from
-        seg_start: Start of line segment
-        seg_end: End of line segment
-
-    Returns:
-        Tuple of (distance_km, parameter_t, closest_point) where:
-        - distance_km: Shortest distance from point to segment in km
-        - parameter_t: Parameter (0-1) indicating position along segment (0=start, 1=end)
-        - closest_point: Position of closest point on the segment
-    """
-    # Convert to radians for calculation
-    lat_p, lon_p = math.radians(point.latitude), math.radians(point.longitude)
-    lat_a, lon_a = math.radians(seg_start.latitude), math.radians(seg_start.longitude)
-    lat_b, lon_b = math.radians(seg_end.latitude), math.radians(seg_end.longitude)
-
-    # For small distances, we can approximate using projected coordinates
-    # This is much simpler than spherical geometry and adequate for local calculations
-
-    # Project to approximate Cartesian coordinates (meters)
-    earth_radius = 6371000  # meters
-    cos_lat_avg = math.cos((lat_a + lat_b) / 2)
-
-    # Convert to meters from start point
-    x_p = (lon_p - lon_a) * earth_radius * cos_lat_avg
-    y_p = (lat_p - lat_a) * earth_radius
-
-    x_a = 0.0
-    y_a = 0.0
-
-    x_b = (lon_b - lon_a) * earth_radius * cos_lat_avg
-    y_b = (lat_b - lat_a) * earth_radius
-
-    # Vector from A to B
-    dx = x_b - x_a
-    dy = y_b - y_a
-
-    # Handle degenerate case where segment has zero length
-    if dx == 0 and dy == 0:
-        distance_m = math.sqrt(x_p**2 + y_p**2)
-        return distance_m / 1000.0, 0.0, seg_start
-
-    # Project point onto line defined by segment
-    # t = ((P-A) · (B-A)) / |B-A|²
-    t = ((x_p - x_a) * dx + (y_p - y_a) * dy) / (dx**2 + dy**2)
-
-    # Clamp t to [0, 1] to stay within segment
-    t = max(0.0, min(1.0, t))
-
-    # Find closest point on segment
-    x_closest = x_a + t * dx
-    y_closest = y_a + t * dy
-
-    # Calculate distance
-    distance_m = math.sqrt((x_p - x_closest) ** 2 + (y_p - y_closest) ** 2)
-
-    # Convert closest point back to lat/lon
-    lat_closest = lat_a + (y_closest / earth_radius)
-    lon_closest = lon_a + (x_closest / (earth_radius * cos_lat_avg))
-
-    closest_point = Position(
-        latitude=math.degrees(lat_closest), longitude=math.degrees(lon_closest)
-    )
-
-    return distance_m / 1000.0, t, closest_point
-
-
-def find_closest_point_on_route(
-    point: Position, route: "Route"
-) -> Tuple[float, Position]:
-    """
-    Find the closest point on a route to a given point and return the cumulative distance.
-
-    Args:
-        point: Point to find closest route point for
-        route: Route object representing the route
-
-    Returns:
-        Tuple of (distance, closest_position) where:
-        - distance: Distance from route start to closest point
-        - closest_position: Position of closest point on route
-    """
-    route_positions = route.coordinate_list
-
-    if len(route_positions) < 2:
-        raise ValueError(
-            "Route must have at least two positions to calculate distance."
-        )
-
-    min_distance = float("inf")
-    best_distance = 0.0
-    best_position = route_positions[0]
-
-    # Check each segment of the route
-    for i in range(len(route_positions) - 1):
-        seg_start = route_positions[i]
-        seg_end = route_positions[i + 1]
-
-        distance, t, closest_point = point_to_line_segment_distance_and_projection(
-            point, seg_start, seg_end
-        )
-
-        if distance < min_distance:
-            min_distance = distance
-            best_position = closest_point
-
-            # Calculate cumulative distance to this point
-            best_distance = route.trackpoints[i]["track_distance"] + haversine_distance(
-                seg_start, best_position
-            )
-
-    return best_distance, best_position
-
-
-def calculate_bearing(start_pos: Position, end_pos: Position) -> float:
-    """
-    Calculate the bearing from start_pos to end_pos in degrees (0-360, where 0 is north).
-
-    Args:
-        start_pos: Starting position
-        end_pos: Ending position
-
-    Returns:
-        Bearing in degrees (0-360, where 0° is north, 90° is east)
-    """
-    if start_pos == end_pos:
-        return 0.0
-
-    # Handle polar cases
-    if math.isclose(start_pos.latitude, 90.0):  # Start is North Pole
-        return 180.0
-    if math.isclose(start_pos.latitude, -90.0):  # Start is South Pole
-        return 0.0
-    if math.isclose(end_pos.latitude, 90.0):  # End is North Pole
-        return 0.0
-    if math.isclose(end_pos.latitude, -90.0):  # End is South Pole
-        return 180.0
-
-    lat1 = math.radians(start_pos.latitude)
-    lat2 = math.radians(end_pos.latitude)
-    lon1 = math.radians(start_pos.longitude)
-    lon2 = math.radians(end_pos.longitude)
-
-    dlon = lon2 - lon1
-
-    y = math.sin(dlon) * math.cos(lat2)
-    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(
-        dlon
-    )
-
-    bearing = math.atan2(y, x)
-    bearing = math.degrees(bearing)
-    bearing = (bearing + 360) % 360  # Normalize to 0-360
-
-    return bearing
 
 
 def find_closest_segments(
@@ -229,20 +46,20 @@ def find_closest_segments(
 
             # Find closest points between segments
             # Check distance from seg1_start to seg2
-            dist1, _, _ = point_to_line_segment_distance_and_projection(
-                seg1_start, seg2_start, seg2_end
+            dist1, _, _ = seg1_start.to_line_segment_distance_and_projection(
+                seg2_start, seg2_end
             )
             # Check distance from seg1_end to seg2
-            dist2, _, _ = point_to_line_segment_distance_and_projection(
-                seg1_end, seg2_start, seg2_end
+            dist2, _, _ = seg1_end.to_line_segment_distance_and_projection(
+                seg2_start, seg2_end
             )
             # Check distance from seg2_start to seg1
-            dist3, _, _ = point_to_line_segment_distance_and_projection(
-                seg2_start, seg1_start, seg1_end
+            dist3, _, _ = seg2_start.to_line_segment_distance_and_projection(
+                seg1_start, seg1_end
             )
             # Check distance from seg2_end to seg1
-            dist4, _, _ = point_to_line_segment_distance_and_projection(
-                seg2_end, seg1_start, seg1_end
+            dist4, _, _ = seg2_end.to_line_segment_distance_and_projection(
+                seg1_start, seg1_end
             )
 
             # Use minimum distance between all combinations

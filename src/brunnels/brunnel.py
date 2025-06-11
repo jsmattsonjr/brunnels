@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """ """
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Sequence, Set
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any, Set
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
@@ -10,9 +10,7 @@ import logging
 
 from .geometry import Position, Geometry
 from .geometry_utils import (
-    find_closest_point_on_route,
     find_closest_segments,
-    calculate_bearing,
     bearings_aligned,
 )
 
@@ -33,12 +31,11 @@ class FilterReason(Enum):
     """Enumeration for brunnel filtering reasons."""
 
     NONE = "none"
+    CLOSED_WAY = "closed_way"
     BICYCLE_NO = "bicycle_no"
     WATERWAY = "waterway"
     RAILWAY = "railway_not_abandoned"
-    CLOSED_WAY = "closed_way"
     NOT_CONTAINED = "outwith_route_buffer"
-    NO_ROUTE_SPAN = "no_route_span"
     UNALIGNED = "not_aligned_with_route"
     NOT_NEAREST = "not_nearest_among_overlapping_brunnels"
 
@@ -52,6 +49,21 @@ class RouteSpan:
 
     start_distance: float  # Distance from route start where brunnel begins
     end_distance: float  # Distance from route start where brunnel ends
+
+    def overlaps_with(self, other: "RouteSpan") -> bool:
+        """
+        Check if this route span overlaps with another route span.
+
+        Args:
+            other: Another route span
+
+        Returns:
+            True if the spans overlap, False otherwise
+        """
+        return (
+            self.start_distance <= other.end_distance
+            and other.start_distance <= self.end_distance
+        )
 
 
 @dataclass
@@ -294,7 +306,7 @@ class Brunnel(Geometry):
 
         # Find the closest route point for each brunnel coordinate
         for brunnel_point in coords:
-            distance, _ = find_closest_point_on_route(brunnel_point, route)
+            distance, _ = route.closest_point_to(brunnel_point)
 
             min_distance = min(min_distance, distance)
             max_distance = max(max_distance, distance)
@@ -341,8 +353,8 @@ class Brunnel(Geometry):
         _, route_start, route_end = route_segment
 
         # Calculate bearings for both segments
-        brunnel_bearing = calculate_bearing(brunnel_start, brunnel_end)
-        route_bearing = calculate_bearing(route_start, route_end)
+        brunnel_bearing = brunnel_start.bearing_to(brunnel_end)
+        route_bearing = route_start.bearing_to(route_end)
 
         # Check if bearings are aligned
         aligned = bearings_aligned(brunnel_bearing, route_bearing, tolerance_degrees)
