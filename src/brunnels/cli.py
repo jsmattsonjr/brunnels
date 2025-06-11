@@ -176,7 +176,9 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     """
     # Find final included brunnels (those that are contained and not filtered)
     included_brunnels = [
-        b for b in brunnels.values() if b.filter_reason == FilterReason.NONE
+        b
+        for b in brunnels.values()
+        if b.filter_reason == FilterReason.NONE and b.is_representative()
     ]
 
     if not included_brunnels:
@@ -190,8 +192,7 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
 
     logger.info(f"Included brunnels ({len(included_brunnels)}):")
     for brunnel in included_brunnels:
-        if brunnel.is_representative():
-            logger.info(f"  {brunnel.get_log_description()}")
+        logger.info(f"  {brunnel.get_log_description()}")
 
 
 def main():
