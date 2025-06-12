@@ -22,7 +22,6 @@ from shapely.geometry.base import BaseGeometry
 
 from . import __version__
 from . import visualization
-from .config import BrunnelsConfig
 from .route import Route, UnsupportedRouteError
 from .brunnel import Brunnel, BrunnelType, FilterReason, find_compound_brunnels
 from .file_utils import generate_output_filename
@@ -144,9 +143,9 @@ def open_file_in_browser(filename: str) -> None:
         logger.warning(f"Please manually open {abs_path}")
 
 
-def setup_logging(config: BrunnelsConfig) -> None:
+def setup_logging(args: argparse.Namespace) -> None:
     """Setup logging configuration."""
-    level = getattr(logging, config.log_level)
+    level = getattr(logging, args.log_level)
 
     # Create formatter
     formatter = logging.Formatter(
@@ -252,17 +251,8 @@ def main():
     parser = create_argument_parser()
     args = parser.parse_args()
 
-    # Create config instance
-    config = BrunnelsConfig()
-    config.bbox_buffer = args.bbox_buffer
-    config.route_buffer = args.route_buffer
-    config.bearing_tolerance = args.bearing_tolerance
-    config.log_level = args.log_level
-    config.no_overlap_filtering = args.no_overlap_filtering
-    config.metrics = args.metrics
-
     # Setup logging
-    setup_logging(config)
+    setup_logging(args)
 
     # Determine output filename
     try:
@@ -292,7 +282,7 @@ def main():
     )
 
     # Find bridges and tunnels near the route
-    brunnels = route.find_brunnels(config)
+    brunnels = route.find_brunnels(args)
 
     logger.info(f"Found {len(brunnels)} brunnels near route")
 
@@ -305,14 +295,14 @@ def main():
     if filtered_count > 0:
         logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
 
-    route_geometry = route.calculate_buffered_route_geometry(config.route_buffer)
+    route_geometry = route.calculate_buffered_route_geometry(args.route_buffer)
 
     # Check for containment within the route buffer
     filter_uncontained_brunnels(route_geometry, brunnels)
 
     # Filter misaligned brunnels based on bearing tolerance
-    if config.bearing_tolerance > 0:
-        route.filter_misaligned_brunnels(brunnels, config.bearing_tolerance)
+    if args.bearing_tolerance > 0:
+        route.filter_misaligned_brunnels(brunnels, args.bearing_tolerance)
 
     # Count contained vs total brunnels
     bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
@@ -326,7 +316,7 @@ def main():
 
     route.calculate_route_spans(brunnels)
     find_compound_brunnels(brunnels)
-    if not config.no_overlap_filtering:
+    if not args.no_overlap_filtering:
         route.filter_overlapping_brunnels(brunnels)
 
     # Log the final list of included brunnels (what will actually appear on the map)
@@ -334,7 +324,7 @@ def main():
 
     # Create visualization map
     try:
-        visualization.create_route_map(route, output_filename, brunnels, config)
+        visualization.create_route_map(route, output_filename, brunnels, args)
     except Exception as e:
         logger.error(f"Failed to create map: {e}")
         sys.exit(1)

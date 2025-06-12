@@ -6,10 +6,10 @@ Route visualization using folium maps.
 from typing import Dict
 import collections
 import logging
+import argparse
 import folium
 from folium.template import Template
 
-from .config import BrunnelsConfig
 from .brunnel import Brunnel, BrunnelType, FilterReason
 from .route import Route
 
@@ -81,7 +81,7 @@ def create_route_map(
     route: Route,
     output_filename: str,
     brunnels: Dict[str, Brunnel],
-    config: BrunnelsConfig,
+    args: argparse.Namespace,
 ) -> None:
     """
     Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
@@ -90,7 +90,7 @@ def create_route_map(
         route: Route object representing the route
         output_filename: Path where HTML map file should be saved
         brunnels: Dictionary of Brunnel objects to display on map
-        config: BrunnelsConfig object containing settings like buffer and metrics flag
+        args: argparse.Namespace object containing settings like buffer and metrics flag
 
     Raises:
         ValueError: If route is empty
@@ -99,7 +99,7 @@ def create_route_map(
         raise ValueError("Cannot create map for empty route")
 
     # Calculate buffered bounding box using existing function
-    south, west, north, east = route.get_bbox(config.bbox_buffer)
+    south, west, north, east = route.get_bbox(args.bbox_buffer)
 
     center_lat = (south + north) / 2
     center_lon = (west + east) / 2
@@ -280,7 +280,7 @@ def create_route_map(
         f"Map saved to {output_filename} with {contained_bridge_count}/{bridge_count} bridges and {contained_tunnel_count}/{tunnel_count} tunnels contained in route buffer"
     )
 
-    if config.metrics:
+    if args.metrics:
         # Log detailed filtering metrics
         logger.debug("=== BRUNNELS_METRICS ===")
         logger.debug(f"total_brunnels_found={len(brunnels)}")

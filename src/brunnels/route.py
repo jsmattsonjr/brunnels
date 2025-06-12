@@ -8,12 +8,12 @@ from dataclasses import dataclass, field
 import logging
 import math
 from math import cos, radians
+import argparse
 import gpxpy
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 
 from .geometry import Position, Geometry
-from .config import BrunnelsConfig
 from .brunnel import Brunnel, FilterReason
 from .overpass import query_overpass_brunnels
 
@@ -230,12 +230,12 @@ class Route(Geometry):
                 f"Filtered {filtered} overlapping brunnels, keeping nearest in each group"
             )
 
-    def find_brunnels(self, config: BrunnelsConfig) -> Dict[str, Brunnel]:
+    def find_brunnels(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
         """
         Find all bridges and tunnels near this route and check for containment within route buffer.
 
         Args:
-            config: BrunnelsConfig object containing all settings
+            args: argparse.Namespace object containing all settings
 
         Returns:
             List of Brunnel objects found near the route, with containment status set
@@ -243,7 +243,7 @@ class Route(Geometry):
         if not self.trackpoints:
             raise ValueError("Cannot find brunnels for empty route")
 
-        bbox = self.get_bbox(config.bbox_buffer)
+        bbox = self.get_bbox(args.bbox_buffer)
 
         # Calculate and log query area before API call
         south, west, north, east = bbox
