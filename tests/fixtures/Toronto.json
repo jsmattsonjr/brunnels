@@ -13,20 +13,16 @@
     "area_sq_km": 107.4
   },
   "expected_results": {
-    "total_brunnels_found": "1500-1530",
-    "total_bridges_found": "650-680",
-    "total_tunnels_found": "830-860",
+    "total_brunnels_found": "950-1000",
+    "total_bridges_found": "425-475",
+    "total_tunnels_found": "500-550",
     "contained_bridges": "6-8",
     "contained_tunnels": "0-1",
     "final_included_individual": "4-6",
     "final_included_compound": "1-3",
     "final_included_total": "6-8",
     "filtered_brunnels": {
-      "outwith_route_buffer": "900-970",
-      "railway_not_abandoned": "320-350",
-      "bicycle_no": "180-210",
-      "waterway": "10-20",
-      "closed_way": "8-15"
+      "outwith_route_buffer": "900-970"
     }
   },
   "known_bridges": [

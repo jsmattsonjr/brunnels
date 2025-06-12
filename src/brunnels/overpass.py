@@ -13,34 +13,22 @@ logger = logging.getLogger(__name__)
 def query_overpass_brunnels(
     bbox: Tuple[float, float, float, float],
 ) -> List[Dict[str, Any]]:
-    """Query Overpass API for bridge and tunnel ways within bounding box."""
+    """Query Overpass API for bridge and tunnel ways within bounding box with cycling-relevant filtering."""
     south, west, north, east = bbox
 
-    # Overpass QL query for both bridge and tunnel ways with geometry
+    # Overpass QL query with metadata filtering applied server-side
+    # This filters out closed ways, non-cycling infrastructure, waterways, and active railways
     query = f"""
-[out:json][timeout:{DEFAULT_API_TIMEOUT}];
+[out:json][timeout:{DEFAULT_API_TIMEOUT}][bbox:{south},{west},{north},{east}];
 (
-  way[bridge]({south},{west},{north},{east});
-  way[tunnel]({south},{west},{north},{east});
+way[bridge][!waterway]["bicycle"!="no"](if:!is_closed() && (!t["railway"] || t["railway"] == "abandoned"));
+way[tunnel][!waterway]["bicycle"!="no"](if:!is_closed() && (!t["railway"] || t["railway"] == "abandoned"));
 );
 out geom qt;
 """
 
     url = OVERPASS_API_URL
 
-    try:
-        response = requests.post(url, data=query.strip(), timeout=DEFAULT_API_TIMEOUT)
-        response.raise_for_status()
-        return response.json().get("elements", [])
-    except requests.ConnectionError:
-        logger.error("Network connection error. Check your internet connection.")
-        return []
-    except requests.Timeout:
-        logger.error("API request timed out. Try again later.")
-        return []
-    except requests.HTTPError as e:
-        logger.error(f"HTTP error {e.response.status_code}: {e}")
-        return []
-    except ValueError as e:  # JSON decode error
-        logger.error(f"Invalid response format: {e}")
-        return []
+    response = requests.post(url, data=query.strip(), timeout=DEFAULT_API_TIMEOUT)
+    response.raise_for_status()
+    return response.json().get("elements", [])

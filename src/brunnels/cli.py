@@ -196,38 +196,6 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         logger.info(f"  {brunnel.get_log_description()}")
 
 
-def filter_brunnels_by_metadata(brunnels: Dict[str, Brunnel]) -> None:
-    """
-    Filter brunnels based on metadata and configuration options.
-
-    Args:
-        brunnels: Dictionary of all brunnels to filter
-    """
-    for brunnel in brunnels.values():
-        # Check for closed way
-        nodes = brunnel.metadata.get("nodes", [])
-        if len(nodes) >= 2 and nodes[0] == nodes[-1]:
-            brunnel.filter_reason = FilterReason.CLOSED_WAY
-            continue
-
-        tags = brunnel.metadata.get("tags", {})
-
-        if "bicycle" in tags:
-            if tags["bicycle"] == "no":
-                brunnel.filter_reason = FilterReason.BICYCLE_NO
-            continue
-
-        if tags.get("highway") == "cycleway":
-            continue
-
-        if "waterway" in tags:
-            brunnel.filter_reason = FilterReason.WATERWAY
-            continue
-
-        if tags.get("railway", "abandoned") != "abandoned":
-            brunnel.filter_reason = FilterReason.RAILWAY
-
-
 def filter_uncontained_brunnels(
     route_geometry: BaseGeometry, brunnels: Dict[str, Brunnel]
 ) -> None:
@@ -285,8 +253,6 @@ def main():
     brunnels = route.find_brunnels(args)
 
     logger.info(f"Found {len(brunnels)} brunnels near route")
-
-    filter_brunnels_by_metadata(brunnels)
 
     filtered_count = len(
         [b for b in brunnels.values() if b.filter_reason != FilterReason.NONE]

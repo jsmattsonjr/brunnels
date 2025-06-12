@@ -31,10 +31,6 @@ class FilterReason(Enum):
     """Enumeration for brunnel filtering reasons."""
 
     NONE = "none"
-    CLOSED_WAY = "closed_way"
-    BICYCLE_NO = "bicycle_no"
-    WATERWAY = "waterway"
-    RAILWAY = "railway_not_abandoned"
     NOT_CONTAINED = "outwith_route_buffer"
     UNALIGNED = "not_aligned_with_route"
     NOT_NEAREST = "not_nearest_among_overlapping_brunnels"
