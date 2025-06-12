@@ -239,26 +239,11 @@ def main():
     )
 
     # Find bridges and tunnels near the route (containment detection included)
-    try:
-        brunnels = route.find_brunnels(config)
-    except Exception as e:
-        logger.error(f"Failed to query bridges and tunnels: {e}")
-        sys.exit(1)
-
-    # Create compound brunnels from adjacent segments
-    try:
-        find_compound_brunnels(brunnels)
-    except Exception as e:
-        logger.error(f"Failed to create compound brunnels: {e}")
-        sys.exit(1)
-
-    # Filter overlapping brunnels (keep only nearest in each overlapping group)
+    brunnels = route.find_brunnels(config)
+    route.calculate_route_spans(brunnels)
+    find_compound_brunnels(brunnels)
     if not config.no_overlap_filtering:
-        try:
-            route.filter_overlapping_brunnels(brunnels)
-        except Exception as e:
-            logger.error(f"Failed to filter overlapping brunnels: {e}")
-            sys.exit(1)
+        route.filter_overlapping_brunnels(brunnels)
 
     # Log the final list of included brunnels (what will actually appear on the map)
     log_final_included_brunnels(brunnels)

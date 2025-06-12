@@ -10,6 +10,7 @@ import math
 from math import cos, radians
 import gpxpy
 import gpxpy.gpx
+from shapely.geometry.base import BaseGeometry
 
 from .geometry import Position, Geometry
 from .config import BrunnelsConfig
@@ -123,95 +124,6 @@ class Route(Geometry):
         )
 
         return (south, west, north, east)
-
-    def find_contained_brunnels(
-        self,
-        brunnels: Dict[str, Brunnel],
-        route_buffer: float,
-        bearing_tolerance_degrees: float,
-    ) -> None:
-        """
-        Check which brunnels are completely contained within the buffered route and aligned with route bearing.
-        Updates their containment status and calculates route spans for contained brunnels.
-
-        Args:
-            brunnels: Dictionary of Brunnel objects to check (modified in-place)
-            route_buffer: Buffer distance in meters to apply around the route (minimum: 1.0)
-            bearing_tolerance_degrees: Bearing alignment tolerance in degrees
-        """
-        if not self.trackpoints:
-            logger.warning("Cannot find contained brunnels for empty route")
-            return
-
-        # Ensure minimum buffer for containment analysis
-        if route_buffer < 1.0:
-            logger.warning(
-                f"Minimum buffer of 1.0m required for containment analysis, using 1.0m instead of {route_buffer}m"
-            )
-            route_buffer = 1.0
-
-        # Get memoized LineString from route
-        route_line = self.get_linestring()
-        if route_line is None:
-            logger.warning("Cannot create LineString for route")
-            return
-
-        # Convert buffer from meters to approximate degrees
-        avg_lat = self.trackpoints[0]["latitude"]
-        lat_buffer = route_buffer / 111000.0  # 1 degree latitude ≈ 111 km
-        lon_buffer = route_buffer / (111000.0 * abs(cos(radians(avg_lat))))
-
-        # Use the smaller of the two buffers to be conservative
-        buffer_degrees = min(lat_buffer, lon_buffer)
-        route_geometry = route_line.buffer(buffer_degrees)
-
-        # Check if buffered geometry is valid
-        if not route_geometry.is_valid:
-            logger.warning(
-                f"Buffered route geometry is invalid (likely due to self-intersecting route). "
-                f"Attempting to fix with buffer(0)"
-            )
-            try:
-                route_geometry = route_geometry.buffer(0)
-                if route_geometry.is_valid:
-                    logger.warning("Successfully fixed invalid geometry")
-                else:
-                    logger.warning(
-                        "Could not fix invalid geometry - containment results may be unreliable"
-                    )
-            except Exception as e:
-                logger.warning(f"Failed to fix invalid geometry: {e}")
-
-        contained_count = 0
-        unaligned_count = 0
-
-        # Check containment for each brunnel
-        for brunnel in brunnels.values():
-            # Only check containment for brunnels that weren't filtered by tags
-            if brunnel.filter_reason == FilterReason.NONE:
-                if brunnel.is_contained_by(route_geometry):
-                    # Check bearing alignment for contained brunnels
-                    if brunnel.is_aligned_with_route(self, bearing_tolerance_degrees):
-                        # Calculate route span for aligned, contained brunnels
-                        brunnel.route_span = brunnel.calculate_route_span(self)
-                        contained_count += 1
-                    else:
-                        # Mark as unaligned and remove from contained set
-                        brunnel.filter_reason = FilterReason.UNALIGNED
-                        unaligned_count += 1
-                else:
-                    # Set filter reason for non-contained brunnels
-                    brunnel.filter_reason = FilterReason.NOT_CONTAINED
-
-        logger.debug(
-            f"Found {contained_count} brunnels completely contained and aligned within the route buffer "
-            f"out of {len(brunnels)} total (with {route_buffer}m buffer, {bearing_tolerance_degrees}° tolerance)"
-        )
-
-        if unaligned_count > 0:
-            logger.debug(
-                f"Filtered {unaligned_count} brunnels due to bearing misalignment"
-            )
 
     def filter_overlapping_brunnels(
         self,
@@ -329,8 +241,7 @@ class Route(Geometry):
             List of Brunnel objects found near the route, with containment status set
         """
         if not self.trackpoints:
-            logger.warning("Cannot find brunnels for empty route")
-            return {}
+            raise ValueError("Cannot find brunnels for empty route")
 
         bbox = self.get_bbox(config.bbox_buffer)
 
@@ -367,10 +278,14 @@ class Route(Geometry):
         if filtered_count > 0:
             logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
 
+        route_geometry = self._calculate_buffered_route_geometry(config.route_buffer)
+
         # Check for containment within the route buffer and bearing alignment
-        self.find_contained_brunnels(
-            brunnels, config.route_buffer, config.bearing_tolerance
-        )
+        filter_uncontained_brunnels(route_geometry, brunnels)
+
+        # Filter misaligned brunnels based on bearing tolerance
+        if config.bearing_tolerance > 0:
+            self.filter_misaligned_brunnels(brunnels, config.bearing_tolerance)
 
         # Count contained vs total brunnels
         bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
@@ -531,13 +446,12 @@ class Route(Geometry):
         route = cls(trackpoints_data)
 
         if not route:
-            logger.warning("No track points found in GPX file")
-            return route
+            raise ValueError("No track points found in GPX file")
 
         logger.debug(f"Parsed {len(route)} track points from GPX file")
 
-        # Validate the route
-        cls._validate_route(route.trackpoints)
+        # Check the route
+        cls._check_route(route.trackpoints)
 
         return route
 
@@ -586,21 +500,21 @@ class Route(Geometry):
 
         route = cls(trackpoints_data)
 
-        # Validate the route
-        cls._validate_route(route.trackpoints)
+        # Check the route
+        cls._check_route(route.trackpoints)
 
         return route
 
     @staticmethod
-    def _validate_route(trackpoints: List[Dict[str, Any]]) -> None:
+    def _check_route(trackpoints: List[Dict[str, Any]]) -> None:
         """
-        Validate route for antimeridian crossing and polar proximity.
+        Check route for antimeridian crossing and polar proximity.
 
         Args:
-            trackpoints: List of trackpoint dictionaries to validate
+            trackpoints: List of trackpoint dictionaries to check
 
         Raises:
-            UnsupprtedRouteError: If validation fails
+            UnsupportedRouteError: If route is unsupported
         """
         if not trackpoints:
             return
@@ -635,3 +549,119 @@ class Route(Geometry):
     def __iter__(self):
         """Allow iteration over trackpoints."""
         return iter(self.trackpoints)
+
+    def _calculate_buffered_route_geometry(self, route_buffer: float) -> BaseGeometry:
+        """
+        Calculate the buffered Shapely geometry for the route.
+
+        Args:
+            route_buffer: Buffer distance in meters.
+
+        Returns:
+            Shapely geometry object or None if it could not be created.
+        """
+        if not self.trackpoints:
+            raise ValueError(
+                "Cannot calculate buffered geometry for empty route, trackpoints are empty"
+            )
+
+        route_line = self.get_linestring()
+        if route_line is None:
+            raise ValueError(
+                "Cannot calculate buffered geometry because LineString is None"
+            )
+
+        # Convert buffer from meters to approximate degrees
+
+        avg_lat = self.trackpoints[0]["latitude"]
+        # 1 degree latitude ≈ 111 km = 111000m
+        lat_buffer_deg = route_buffer / 111000.0
+        # Longitude conversion depends on latitude
+        lon_buffer_deg = route_buffer / (111000.0 * abs(cos(radians(avg_lat))))
+
+        # Use the smaller of the two buffers to be conservative,
+        # as buffering is generally isotropic in projected coordinate systems
+        # but here we are using geographic coordinates.
+        buffer_degrees = min(lat_buffer_deg, lon_buffer_deg)
+
+        if buffer_degrees <= 0:
+            raise ValueError(
+                f"Calculated buffer in degrees is {buffer_degrees:.6f}. "
+                "This might lead to unexpected behavior or invalid geometry. "
+                "Ensure route_buffer is positive and trackpoints are valid."
+            )
+
+        route_geometry = route_line.buffer(buffer_degrees)
+
+        if not route_geometry.is_valid:
+            logger.warning(
+                "Initial buffered route geometry is invalid. Attempting to fix with buffer(0)."
+            )
+            fixed_geometry = route_geometry.buffer(0)
+            if fixed_geometry.is_valid:
+                logger.warning("Successfully fixed invalid buffered geometry.")
+                return fixed_geometry
+            else:
+                raise ValueError(
+                    "Could not fix invalid buffered geometry after attempting buffer(0). "
+                    "The geometry remains invalid."
+                )
+        return route_geometry
+
+    def filter_misaligned_brunnels(
+        self,
+        brunnels: Dict[str, Brunnel],
+        bearing_tolerance_degrees: float,
+    ) -> None:
+        """
+        Filters a list of brunnels by their alignment with the route.
+
+        Args:
+
+            bearing_tolerance_degrees: Bearing alignment tolerance in degrees.
+            self: The Route instance.
+
+        """
+        unaligned_count = 0
+
+        for brunnel in brunnels.values():
+
+            if (
+                brunnel.filter_reason == FilterReason.NONE
+                and not brunnel.is_aligned_with_route(self, bearing_tolerance_degrees)
+            ):
+                brunnel.filter_reason = FilterReason.UNALIGNED
+                unaligned_count += 1
+
+        if unaligned_count > 0:
+            logger.debug(
+                f"Filtered {unaligned_count} brunnels out of {len(brunnels)} "
+                f"contained brunnels due to bearing misalignment (tolerance: {bearing_tolerance_degrees}°)"
+            )
+
+    def calculate_route_spans(self, brunnels: Dict[str, Brunnel]) -> None:
+        """
+        Calculate the route span for each included brunnel.
+        """
+        for brunnel in brunnels.values():
+            if brunnel.filter_reason == FilterReason.NONE:
+                brunnel.calculate_route_span(self)
+
+
+def filter_uncontained_brunnels(
+    route_geometry: BaseGeometry, brunnels: Dict[str, Brunnel]
+) -> None:
+    """
+    Filters brunnels that are not contained within the given route geometry.
+
+    Args:
+        route_geometry: The Shapely geometry of the (buffered) route.
+        brunnels: A dictionary of Brunnel objects to check.
+
+    """
+
+    for brunnel in brunnels.values():
+        if brunnel.filter_reason == FilterReason.NONE and not brunnel.is_contained_by(
+            route_geometry
+        ):
+            brunnel.filter_reason = FilterReason.NOT_CONTAINED

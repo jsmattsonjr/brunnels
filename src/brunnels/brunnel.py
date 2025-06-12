@@ -281,15 +281,12 @@ class Brunnel(Geometry):
             )
             return False
 
-    def calculate_route_span(self, route) -> RouteSpan:
+    def calculate_route_span(self, route) -> None:
         """
         Calculate the span of this brunnel along the route.
 
         Args:
             route: Route object representing the route
-
-        Returns:
-            RouteSpan object with start/end distances and length
         """
         coords = self.coordinate_list
         if not coords:
@@ -311,7 +308,7 @@ class Brunnel(Geometry):
             min_distance = min(min_distance, distance)
             max_distance = max(max_distance, distance)
 
-        return RouteSpan(min_distance, max_distance)
+        self.route_span = RouteSpan(min_distance, max_distance)
 
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """
