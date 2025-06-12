@@ -14,7 +14,7 @@ from shapely.geometry.base import BaseGeometry
 
 from .geometry import Position, Geometry
 from .config import BrunnelsConfig
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, FilterReason
 from .overpass import query_overpass_brunnels
 
 logger = logging.getLogger(__name__)
@@ -144,7 +144,7 @@ class Route(Geometry):
             b
             for b in brunnels.values()
             if b.is_representative()
-            and b.route_span is not None
+            and b.get_route_span() is not None
             and b.filter_reason == FilterReason.NONE
         ]
 
@@ -260,42 +260,13 @@ class Route(Geometry):
         raw_ways = query_overpass_brunnels(bbox)
 
         brunnels = {}
-        filtered_count = 0
         for way_data in raw_ways:
             try:
                 brunnel = Brunnel.from_overpass_data(way_data)
-                # Count filtered brunnels but keep them for visualization
-                if brunnel.filter_reason != FilterReason.NONE:
-                    filtered_count += 1
-
                 brunnels[brunnel.get_id()] = brunnel
             except (KeyError, ValueError) as e:
                 logger.warning(f"Failed to parse brunnel way: {e}")
                 continue
-
-        logger.info(f"Found {len(brunnels)} brunnels near route")
-
-        if filtered_count > 0:
-            logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
-
-        route_geometry = self._calculate_buffered_route_geometry(config.route_buffer)
-
-        # Check for containment within the route buffer and bearing alignment
-        filter_uncontained_brunnels(route_geometry, brunnels)
-
-        # Filter misaligned brunnels based on bearing tolerance
-        if config.bearing_tolerance > 0:
-            self.filter_misaligned_brunnels(brunnels, config.bearing_tolerance)
-
-        # Count contained vs total brunnels
-        bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
-        tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
-        contained_bridges = [b for b in bridges if b.filter_reason == FilterReason.NONE]
-        contained_tunnels = [b for b in tunnels if b.filter_reason == FilterReason.NONE]
-
-        logger.debug(
-            f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
-        )
 
         return brunnels
 
@@ -550,7 +521,7 @@ class Route(Geometry):
         """Allow iteration over trackpoints."""
         return iter(self.trackpoints)
 
-    def _calculate_buffered_route_geometry(self, route_buffer: float) -> BaseGeometry:
+    def calculate_buffered_route_geometry(self, route_buffer: float) -> BaseGeometry:
         """
         Calculate the buffered Shapely geometry for the route.
 
@@ -646,22 +617,3 @@ class Route(Geometry):
         for brunnel in brunnels.values():
             if brunnel.filter_reason == FilterReason.NONE:
                 brunnel.calculate_route_span(self)
-
-
-def filter_uncontained_brunnels(
-    route_geometry: BaseGeometry, brunnels: Dict[str, Brunnel]
-) -> None:
-    """
-    Filters brunnels that are not contained within the given route geometry.
-
-    Args:
-        route_geometry: The Shapely geometry of the (buffered) route.
-        brunnels: A dictionary of Brunnel objects to check.
-
-    """
-
-    for brunnel in brunnels.values():
-        if brunnel.filter_reason == FilterReason.NONE and not brunnel.is_contained_by(
-            route_geometry
-        ):
-            brunnel.filter_reason = FilterReason.NOT_CONTAINED

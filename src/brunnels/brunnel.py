@@ -2,7 +2,7 @@
 """ """
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional, List, Dict, Any, Set, Callable
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
@@ -363,69 +363,6 @@ class Brunnel(Geometry):
         return aligned
 
     @classmethod
-    def determine_type(cls, metadata: Dict[str, Any]) -> BrunnelType:
-        """
-        Determine brunnel type from OSM metadata.
-
-        Args:
-            metadata: OSM metadata for the brunnel
-
-        Returns:
-            BrunnelType enum value
-        """
-        tags = metadata.get("tags", {})
-
-        # Check for tunnel first (tunnels are often more specific)
-        if "tunnel" in tags and tags["tunnel"] not in ["no", "false"]:
-            return BrunnelType.TUNNEL
-
-        # Otherwise, assume it's a bridge
-        return BrunnelType.BRIDGE
-
-    @classmethod
-    def should_filter(cls, metadata: Dict[str, Any]) -> FilterReason:
-        """
-        Determine if a brunnel should be filtered out based on cycling relevance and geometry.
-
-        Args:
-            metadata: OSM metadata for the brunnel
-
-        Returns:
-            FilterReason.NONE if the brunnel should be kept, otherwise returns
-            the reason for filtering.
-        """
-        # Check for closed way
-        nodes = metadata.get("nodes", [])
-        if len(nodes) >= 2 and nodes[0] == nodes[-1]:
-            return FilterReason.CLOSED_WAY
-
-        tags = metadata.get("tags", {})
-
-        # Check bicycle tag first - highest priority
-        if "bicycle" in tags:
-            if tags["bicycle"] == "no":
-                return FilterReason.BICYCLE_NO
-            else:
-                # bicycle=* (anything other than "no") - keep and skip other checks
-                return FilterReason.NONE
-
-        # Check for cycleway - keep and skip other checks
-        if tags.get("highway") == "cycleway":
-            return FilterReason.NONE
-
-        # Check for waterway - filter out
-        if "waterway" in tags:
-            return FilterReason.WATERWAY
-
-        # Check for railway - filter out unless abandoned
-        if "railway" in tags:
-            if tags["railway"] != "abandoned":
-                return FilterReason.RAILWAY
-
-        # Default: keep the brunnel
-        return FilterReason.NONE
-
-    @classmethod
     def from_overpass_data(cls, way_data: Dict[str, Any]) -> "Brunnel":
         """
         Parse a single way from Overpass response into Brunnel object.
@@ -442,14 +379,15 @@ class Brunnel(Geometry):
             for node in way_data["geometry"]:
                 coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
 
-        brunnel_type = cls.determine_type(way_data)
-        filter_reason = cls.should_filter(way_data)
+        tags = way_data.get("tags", {})
+        brunnel_type = BrunnelType.BRIDGE  # Default to bridge
+        if tags.get("tunnel", "no") not in ["no", "false"]:
+            brunnel_type = BrunnelType.TUNNEL
 
         return cls(
             coords=coords,
             metadata=way_data,
             brunnel_type=brunnel_type,
-            filter_reason=filter_reason,
         )
 
 

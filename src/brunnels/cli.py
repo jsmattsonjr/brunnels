@@ -17,12 +17,14 @@ import sys
 import os
 import gpxpy
 import gpxpy.gpx
+from shapely.geometry.base import BaseGeometry
+
 
 from . import __version__
 from . import visualization
 from .config import BrunnelsConfig
 from .route import Route, UnsupportedRouteError
-from .brunnel import Brunnel, FilterReason, find_compound_brunnels
+from .brunnel import Brunnel, BrunnelType, FilterReason, find_compound_brunnels
 from .file_utils import generate_output_filename
 
 # Configure logging
@@ -195,6 +197,57 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         logger.info(f"  {brunnel.get_log_description()}")
 
 
+def filter_brunnels_by_metadata(brunnels: Dict[str, Brunnel]) -> None:
+    """
+    Filter brunnels based on metadata and configuration options.
+
+    Args:
+        brunnels: Dictionary of all brunnels to filter
+    """
+    for brunnel in brunnels.values():
+        # Check for closed way
+        nodes = brunnel.metadata.get("nodes", [])
+        if len(nodes) >= 2 and nodes[0] == nodes[-1]:
+            brunnel.filter_reason = FilterReason.CLOSED_WAY
+            continue
+
+        tags = brunnel.metadata.get("tags", {})
+
+        if "bicycle" in tags:
+            if tags["bicycle"] == "no":
+                brunnel.filter_reason = FilterReason.BICYCLE_NO
+            continue
+
+        if tags.get("highway") == "cycleway":
+            continue
+
+        if "waterway" in tags:
+            brunnel.filter_reason = FilterReason.WATERWAY
+            continue
+
+        if tags.get("railway", "abandoned") != "abandoned":
+            brunnel.filter_reason = FilterReason.RAILWAY
+
+
+def filter_uncontained_brunnels(
+    route_geometry: BaseGeometry, brunnels: Dict[str, Brunnel]
+) -> None:
+    """
+    Filters brunnels that are not contained within the given route geometry.
+
+    Args:
+        route_geometry: The Shapely geometry of the (buffered) route.
+        brunnels: A dictionary of Brunnel objects to check.
+
+    """
+
+    for brunnel in brunnels.values():
+        if brunnel.filter_reason == FilterReason.NONE and not brunnel.is_contained_by(
+            route_geometry
+        ):
+            brunnel.filter_reason = FilterReason.NOT_CONTAINED
+
+
 def main():
     parser = create_argument_parser()
     args = parser.parse_args()
@@ -238,8 +291,39 @@ def main():
         f"Total route distance: {route.trackpoints[-1]['track_distance']:.2f} km"
     )
 
-    # Find bridges and tunnels near the route (containment detection included)
+    # Find bridges and tunnels near the route
     brunnels = route.find_brunnels(config)
+
+    logger.info(f"Found {len(brunnels)} brunnels near route")
+
+    filter_brunnels_by_metadata(brunnels)
+
+    filtered_count = len(
+        [b for b in brunnels.values() if b.filter_reason != FilterReason.NONE]
+    )
+
+    if filtered_count > 0:
+        logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
+
+    route_geometry = route.calculate_buffered_route_geometry(config.route_buffer)
+
+    # Check for containment within the route buffer
+    filter_uncontained_brunnels(route_geometry, brunnels)
+
+    # Filter misaligned brunnels based on bearing tolerance
+    if config.bearing_tolerance > 0:
+        route.filter_misaligned_brunnels(brunnels, config.bearing_tolerance)
+
+    # Count contained vs total brunnels
+    bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
+    tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
+    contained_bridges = [b for b in bridges if b.filter_reason == FilterReason.NONE]
+    contained_tunnels = [b for b in tunnels if b.filter_reason == FilterReason.NONE]
+
+    logger.debug(
+        f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
+    )
+
     route.calculate_route_spans(brunnels)
     find_compound_brunnels(brunnels)
     if not config.no_overlap_filtering:
