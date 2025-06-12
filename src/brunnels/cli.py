@@ -21,7 +21,7 @@ import gpxpy.gpx
 from . import __version__
 from . import visualization
 from .config import BrunnelsConfig
-from .route import Route, RouteValidationError
+from .route import Route, UnsupportedRouteError
 from .brunnel import Brunnel, FilterReason, find_compound_brunnels
 from .file_utils import generate_output_filename
 
@@ -227,7 +227,7 @@ def main():
     except gpxpy.gpx.GPXException as e:
         logger.error(f"Failed to parse GPX file: {e}")
         sys.exit(1)
-    except RouteValidationError as e:
+    except UnsupportedRouteError as e:
         logger.error(f"Route validation failed: {e}")
         sys.exit(1)
 
