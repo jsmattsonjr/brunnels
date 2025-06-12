@@ -2,7 +2,7 @@
 """ """
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, Set, Callable
+from typing import Optional, List, Dict, Any, Set
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
