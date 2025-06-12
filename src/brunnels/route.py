@@ -19,7 +19,7 @@ from .overpass import query_overpass_brunnels
 logger = logging.getLogger(__name__)
 
 
-class RouteValidationError(Exception):
+class UnsupportedRouteError(Exception):
     """Raised when route fails validation checks."""
 
     pass
@@ -506,7 +506,7 @@ class Route(Geometry):
             Route object representing the concatenated route
 
         Raises:
-            RouteValidationError: If route crosses antimeridian or approaches poles
+            UnsupprtedRouteError: If route crosses antimeridian or approaches poles
             gpxpy.gpx.GPXException: If GPX file is malformed
         """
         try:
@@ -553,7 +553,7 @@ class Route(Geometry):
             Route object representing the route
 
         Raises:
-            RouteValidationError: If route fails validation
+            UnsupprtedRouteError: If route fails validation
             FileNotFoundError: If file doesn't exist
             PermissionError: If file can't be read
         """
@@ -600,7 +600,7 @@ class Route(Geometry):
             trackpoints: List of trackpoint dictionaries to validate
 
         Raises:
-            RouteValidationError: If validation fails
+            UnsupprtedRouteError: If validation fails
         """
         if not trackpoints:
             return
@@ -608,7 +608,7 @@ class Route(Geometry):
         # Check for polar proximity (within 5 degrees of poles)
         for i, tp in enumerate(trackpoints):
             if abs(tp["latitude"]) > 85.0:
-                raise RouteValidationError(
+                raise UnsupportedRouteError(
                     f"Route point {i} at latitude {tp['latitude']:.3f}° is within "
                     f"5 degrees of a pole"
                 )
@@ -619,7 +619,7 @@ class Route(Geometry):
                 trackpoints[i]["longitude"] - trackpoints[i - 1]["longitude"]
             )
             if lon_diff > 180.0:
-                raise RouteValidationError(
+                raise UnsupportedRouteError(
                     f"Route crosses antimeridian between points {i-1} and {i} "
                     f"(longitude jump: {lon_diff:.3f}°)"
                 )

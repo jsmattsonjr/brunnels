@@ -14,7 +14,7 @@ __email__ = "jsmattsonjr@gmail.com"
 # Import main classes for public API
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 
-from .route import Route, RouteValidationError
+from .route import Route, UnsupportedRouteError
 from .geometry import Position
 
 __all__ = [
@@ -23,6 +23,6 @@ __all__ = [
     "FilterReason",
     "RouteSpan",
     "Route",
-    "RouteValidationError",
+    "UnsupportedRouteError",
     "Position",
 ]
