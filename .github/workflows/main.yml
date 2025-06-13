@@ -51,7 +51,6 @@ jobs:
     - name: Type check with mypy
       run: |
         mypy src/brunnels
-      continue-on-error: true
 
     - name: Test help command
       run: brunnels --help
