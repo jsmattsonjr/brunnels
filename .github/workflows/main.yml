@@ -2,9 +2,9 @@ name: Test Brunnels CLI Tool
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, current ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, current ]
   workflow_dispatch:  # Allow manual triggers
 
 jobs:
