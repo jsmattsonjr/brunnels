@@ -42,6 +42,7 @@ dev = [
     "black",
     "flake8",
     "mypy",
+    "psutil",
 ]
 
 [project.urls]
