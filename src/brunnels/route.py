@@ -173,13 +173,7 @@ class Route(Geometry):
 
                     # Check if brunnel2 overlaps with any brunnel in current group
                     for brunnel_in_group in current_group:
-                        if (
-                            brunnel_in_group.route_span is not None
-                            and brunnel2.route_span is not None
-                            and brunnel_in_group.route_span.overlaps_with(
-                                brunnel2.route_span
-                            )
-                        ):
+                        if brunnel_in_group.overlaps_with(brunnel2):
                             current_group.append(brunnel2)
                             processed.add(j)
                             changed = True

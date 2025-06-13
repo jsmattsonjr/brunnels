@@ -46,21 +46,6 @@ class RouteSpan:
     start_distance: float  # Distance from route start where brunnel begins
     end_distance: float  # Distance from route start where brunnel ends
 
-    def overlaps_with(self, other: "RouteSpan") -> bool:
-        """
-        Check if this route span overlaps with another route span.
-
-        Args:
-            other: Another route span
-
-        Returns:
-            True if the spans overlap, False otherwise
-        """
-        return (
-            self.start_distance <= other.end_distance
-            and other.start_distance <= self.end_distance
-        )
-
 
 @dataclass
 class Brunnel(Geometry):
@@ -140,6 +125,24 @@ class Brunnel(Geometry):
                 compound_group[-1].route_span.end_distance,
             )
         return self.route_span
+
+    def overlaps_with(self, other: "Brunnel") -> bool:
+        """
+        Check if this brunnel's route span overlaps with another brunnel's route span.
+
+        Args:
+            other: Another Brunnel object
+
+        Returns:
+            True if their route spans overlap, False otherwise.
+            Returns False if either brunnel does not have a route_span.
+        """
+        if self.route_span is None or other.route_span is None:
+            return False
+        return (
+            self.route_span.start_distance <= other.route_span.end_distance
+            and other.route_span.start_distance <= self.route_span.end_distance
+        )
 
     def to_html(self) -> str:
         """
