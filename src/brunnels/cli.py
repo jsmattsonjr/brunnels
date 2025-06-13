@@ -44,6 +44,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "filename",
         type=str,
+        nargs="?",
         help="GPX file to process",
     )
     parser.add_argument(
@@ -218,6 +219,10 @@ def filter_uncontained_brunnels(
 def main():
     parser = create_argument_parser()
     args = parser.parse_args()
+
+    if not args.filename:
+        parser.print_help()
+        sys.exit(1)
 
     # Setup logging
     setup_logging(args)
