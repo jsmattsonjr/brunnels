@@ -528,6 +528,78 @@ class TestTransfagarasanRoute(BaseRouteTest):
         ), "Stricter bearing tolerance should not increase included brunnels"
         # Additional utility for manual testing/debugging
 
+    def test_include_waterways_option(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test --include-waterways option includes waterway infrastructure"""
+        result = run_brunnels_cli(gpx_file, include_waterways=True)
+        assert result.exit_code == 0
+
+        # Validate the exact metrics observed with --include-waterways
+        expected_metrics = {
+            "total_brunnels_found": 55,
+            "total_bridges_found": 35,
+            "total_tunnels_found": 20,
+            "contained_bridges": 19,
+            "contained_tunnels": 10,
+            "final_included_individual": 29,
+            "final_included_compound": 0,
+            "final_included_total": 29,
+        }
+
+        for metric, expected_value in expected_metrics.items():
+            actual_value = result.metrics.get(metric)
+            assert (
+                actual_value == expected_value
+            ), f"{metric}: expected {expected_value}, got {actual_value}"
+
+        # Validate filtering metrics
+        expected_filtering = {
+            "outwith_route_buffer": 25,
+            "not_aligned_with_route": 1,
+        }
+
+        for filter_reason, expected_count in expected_filtering.items():
+            actual_count = result.filtering.get(filter_reason)
+            assert (
+                actual_count == expected_count
+            ), f"filtered_{filter_reason}: expected {expected_count}, got {actual_count}"
+
+        # Validate that HTML contains waterway entries
+        assert result.html_content is not None, "No HTML content generated"
+
+        # Count waterway entries in HTML (should be 9 'tunnel:culvert' with waterway tags)
+        waterway_entries = result.html_content.count("waterway")
+        assert (
+            waterway_entries == 9
+        ), f"Expected 9 waterway entries in HTML, found {waterway_entries}"
+
+        # Verify waterway tags are highlighted in red (indicating filtered infrastructure)
+        waterway_highlighted_entries = result.html_content.count(
+            "<span style='color: red;'><i>waterway:</i>"
+        )
+        assert (
+            waterway_highlighted_entries == 9
+        ), f"Expected 9 highlighted waterway tags, found {waterway_highlighted_entries}"
+
+        # Verify "tunnel:culvert" entries are present
+        culvert_entries = result.html_content.count("tunnel:</i> culvert")
+        assert (
+            culvert_entries >= 9
+        ), f"Expected at least 9 tunnel:culvert entries, found {culvert_entries}"
+
+        # Test comparison: without --include-waterways should have fewer brunnels
+        default_result = run_brunnels_cli(gpx_file)
+        assert default_result.exit_code == 0
+
+        assert (
+            result.metrics["total_brunnels_found"]
+            > default_result.metrics["total_brunnels_found"]
+        ), "Including waterways should increase total brunnels found"
+
+        assert (
+            result.metrics["final_included_total"]
+            >= default_result.metrics["final_included_total"]
+        ), "Including waterways should not decrease final included brunnels"
+
 
 class TestArea51Route(BaseRouteTest):
     """Integration tests for Area 51 Desert Route (zero brunnels edge case)"""
