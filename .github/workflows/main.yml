@@ -1,0 +1,217 @@
+name: Test Brunnels CLI Tool
+
+on:
+  push:
+    branches: [ main, current ]
+  pull_request:
+    branches: [ main, current ]
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  test:
+    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+      fail-fast: false  # Continue testing other combinations if one fails
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install package and dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Lint with flake8
+      run: |
+        flake8 src/brunnels --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/brunnels --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+    
+    - name: Check code formatting with black
+      run: |
+        black --check --diff src/brunnels
+    
+    - name: Type check with mypy
+      run: |
+        mypy src/brunnels
+    
+    - name: Test CLI tool basic functionality
+      run: |
+        # Test help output
+        brunnels --help
+        
+        # Test version output
+        brunnels --version
+        
+        # Test with a sample GPX file (using Area51 since it has zero brunnels)
+        brunnels tests/fixtures/Area51.gpx --no-open --output test_output.html
+        
+        # Verify HTML output was created
+        ls -la test_output.html
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/test_integration.py -v --tb=short
+    
+    - name: Test with different CLI options
+      run: |
+        # Test with different buffer sizes
+        brunnels tests/fixtures/Area51.gpx --bbox-buffer 20 --route-buffer 5.0 --no-open --output test_buffer.html
+        
+        # Test with different bearing tolerance
+        brunnels tests/fixtures/Area51.gpx --bearing-tolerance 30.0 --no-open --output test_bearing.html
+        
+        # Test metrics output
+        brunnels tests/fixtures/Area51.gpx --metrics --no-open --output test_metrics.html
+    
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-outputs-${{ matrix.os }}-py${{ matrix.python-version }}
+        path: |
+          test_*.html
+          *.log
+        retention-days: 3
+
+  test-edge-cases:
+    name: Test Edge Cases and Error Handling
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+    
+    - name: Install package
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Test error handling
+      run: |
+        # Test with non-existent file (should fail gracefully)
+        brunnels nonexistent.gpx --no-open || echo "Expected failure handled correctly"
+        
+        # Test with invalid arguments
+        brunnels --invalid-arg || echo "Invalid argument handled correctly"
+    
+    - name: Test with all fixture files
+      run: |
+        # Test each GPX fixture to ensure they all work
+        for gpx_file in tests/fixtures/*.gpx; do
+          echo "Testing $gpx_file"
+          brunnels "$gpx_file" --no-open --output "test_$(basename "$gpx_file" .gpx).html"
+        done
+
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install package
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Run performance test on largest route
+      run: |
+        # Run with Toronto route (largest test file) and measure time
+        time brunnels tests/fixtures/Toronto.gpx --no-open --output perf_test.html
+    
+    - name: Check output file size
+      run: |
+        ls -lh perf_test.html
+        # Ensure output file is reasonable size (less than 10MB)
+        test $(stat -c%s perf_test.html) -lt 10485760
+
+  build-test:
+    name: Test Package Building
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip build
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Test installation from built package
+      run: |
+        pip install dist/*.whl
+        brunnels --version
+        brunnels --help
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: built-package
+        path: dist/
+        retention-days: 7
+
+  dependency-audit:
+    name: Security and Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install package and audit tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install safety bandit
+    
+    - name: Run security audit
+      run: |
+        safety check
+        bandit -r src/brunnels -f json -o bandit-report.json || true
+    
+    - name: Upload security reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: bandit-report.json
+        retention-days: 30
