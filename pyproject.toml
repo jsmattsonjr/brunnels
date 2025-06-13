@@ -43,6 +43,7 @@ dev = [
     "flake8",
     "mypy",
     "psutil",
+    "types-requests",
 ]
 
 [project.urls]
