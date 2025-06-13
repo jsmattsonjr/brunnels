@@ -104,7 +104,10 @@ class Brunnel(Geometry):
     def get_id(self) -> str:
         """Get a string identifier for this brunnel."""
         if self.is_compound_brunnel():
-            return f"{";".join(str(component.metadata.get('id', 'unknown')) for component in self.metadata.get('compound_group', []))}"
+            return ";".join(
+                str(component.metadata.get("id", "unknown"))
+                for component in self.metadata.get("compound_group", [])
+            )
         return str(self.metadata.get("id", "unknown"))
 
     def get_display_name(self) -> str:
