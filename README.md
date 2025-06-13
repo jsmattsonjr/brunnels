@@ -111,6 +111,7 @@ python3 -m brunnels.cli route.gpx \
 - `--include-waterways`: Include ways tagged as `waterway` in the Overpass query.
 - `--include-active-railways`: Include ways tagged as `railway` with values other than `abandoned` in the Overpass query.
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `--metrics`: Output detailed structured metrics about the processing of brunnels. Examples include: total brunnels found, total bridges and tunnels found, counts of brunnels filtered by different reasons, and counts of finally included brunnels (individual, compound, total). Note that this option also sets the log level to `DEBUG`.
 - `--no-open`: Don't automatically open the map in browser
 
 ## Output Files
