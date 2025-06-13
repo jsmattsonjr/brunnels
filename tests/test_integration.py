@@ -159,6 +159,8 @@ class BrunnelsTestResult:
 
 def run_brunnels_cli(gpx_file: Path, **kwargs) -> BrunnelsTestResult:
     """Run brunnels CLI and return parsed results"""
+    import time
+
     with tempfile.TemporaryDirectory() as temp_dir:
         output_file = Path(temp_dir) / "test_output.html"
 
@@ -190,17 +192,31 @@ def run_brunnels_cli(gpx_file: Path, **kwargs) -> BrunnelsTestResult:
             cwd=Path(__file__).parent.parent,  # Run from project root
         )
 
-        # Check if output file was created BEFORE temp dir is deleted
-        output_exists = output_file.exists() if result.returncode == 0 else False
-
-        # Copy file content if it exists (so we can validate HTML later)
+        # Copy file content if command succeeded
         html_content = None
-        if output_exists:
-            try:
-                with open(output_file) as f:
-                    html_content = f.read()
-            except Exception:
-                html_content = None
+        if result.returncode == 0:
+            # Windows fix: Wait a moment for file to be fully written
+            time.sleep(0.1)
+
+            # Check if output file was created
+            if output_file.exists():
+                # Windows fix: Multiple attempts to read file
+                for attempt in range(3):
+                    try:
+                        with open(output_file, "r", encoding="utf-8") as f:
+                            html_content = f.read()
+                        break  # Success, exit retry loop
+                    except (IOError, OSError, PermissionError) as e:
+                        if attempt < 2:  # Not the last attempt
+                            time.sleep(0.1)  # Wait before retry
+                            continue
+                        else:
+                            print(
+                                f"Warning: Failed to read HTML output after 3 attempts: {e}"
+                            )
+                            html_content = None
+            else:
+                print(f"Warning: Output file {output_file} was not created")
 
         return BrunnelsTestResult(
             result.stdout, result.stderr, result.returncode, html_content=html_content
