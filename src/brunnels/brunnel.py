@@ -175,6 +175,14 @@ class Brunnel(Geometry):
         if remaining_tags:
             html_parts.append("<br><b>Tags:</b>")
             for key, value in sorted(remaining_tags.items()):
+                if (
+                    key == "bicycle"
+                    and value == "no"
+                    or key == "waterway"
+                    or key == "railway"
+                    and value != "abandoned"
+                ):
+                    value = f"<span style='color: red;'>{value}</span>"
                 html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value}")
 
         # Add other metadata (excluding tags and id which we already handled,

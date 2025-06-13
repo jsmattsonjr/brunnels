@@ -98,6 +98,21 @@ def create_argument_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"brunnels {__version__}",
     )
+    parser.add_argument(
+        "--include-bicycle-no",
+        action="store_true",
+        help="Include ways tagged bicycle=no in the Overpass query",
+    )
+    parser.add_argument(
+        "--include-waterways",
+        action="store_true",
+        help="Include ways tagged waterway in the Overpass query",
+    )
+    parser.add_argument(
+        "--include-active-railways",
+        action="store_true",
+        help="Include ways tagged railway (excluding railway=abandoned) in the Overpass query",
+    )
     return parser
 
 

@@ -107,6 +107,9 @@ python3 -m brunnels.cli route.gpx \
 - `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
 - `--no-tag-filtering`: Disable filtering based on cycling relevance
 - `--no-overlap-filtering`: Disable filtering of overlapping brunnels (keep all overlapping brunnels)
+- `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query.
+- `--include-waterways`: Include ways tagged as `waterway` in the Overpass query.
+- `--include-active-railways`: Include ways tagged as `railway` with values other than `abandoned` in the Overpass query.
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `--no-open`: Don't automatically open the map in browser
 

@@ -257,7 +257,8 @@ class Route(Geometry):
         logger.debug(
             f"Querying Overpass API for bridges and tunnels in {area_sq_km:.1f} sq km area..."
         )
-        raw_ways = query_overpass_brunnels(bbox)
+
+        raw_ways = query_overpass_brunnels(bbox, args)
 
         brunnels = {}
         for way_data in raw_ways:
