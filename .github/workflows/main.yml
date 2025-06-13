@@ -52,14 +52,13 @@ jobs:
       run: |
         mypy src/brunnels
       continue-on-error: true
-    
+
     - name: Test help command
       run: brunnels --help
-    
+
     - name: Test version command
       run: brunnels --version
-      continue-on-error: true
-    
+
     - name: Test with sample GPX file
       run: |
         # Test with a sample GPX file (using Area51 since it has zero brunnels)
@@ -207,7 +206,6 @@ jobs:
     - name: Test installation from built package
       run: |
         pip install dist/*.whl
-        brunnels --help
         brunnels --version
     
     - name: Upload build artifacts
