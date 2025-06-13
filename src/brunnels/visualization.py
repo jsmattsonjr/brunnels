@@ -167,7 +167,7 @@ def create_route_map(
     contained_tunnel_count = 0
     compound_count = 0
     individual_count = 0
-    filter_reason_counts = collections.Counter()
+    filter_reason_counts: Dict[FilterReason, int] = collections.Counter()
 
     for brunnel in brunnels.values():
         brunnel_coords = brunnel.get_visualization_coordinates()
