@@ -2,7 +2,7 @@
 """ """
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional, List, Dict, Any, Set, NamedTuple
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
@@ -39,8 +39,7 @@ class FilterReason(Enum):
         return self.value
 
 
-@dataclass
-class RouteSpan:
+class RouteSpan(NamedTuple):
     """Information about where a brunnel spans along a route."""
 
     start_distance: float  # Distance from route start where brunnel begins
