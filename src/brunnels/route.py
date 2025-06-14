@@ -20,12 +20,6 @@ from .overpass import query_overpass_brunnels
 logger = logging.getLogger(__name__)
 
 
-class UnsupportedRouteError(Exception):
-    """Raised for corner cases that would be difficult to handle."""
-
-    pass
-
-
 @dataclass
 class Route(Geometry):
     """Represents a GPX route with memoized geometric operations."""
@@ -480,7 +474,7 @@ class Route(Geometry):
             trackpoints: List of trackpoint dictionaries to check
 
         Raises:
-            UnsupportedRouteError: If route is unsupported
+            RuntimeError: If route is unsupported
         """
         if not trackpoints:
             return
@@ -488,7 +482,7 @@ class Route(Geometry):
         # Check for polar proximity (within 5 degrees of poles)
         for i, tp in enumerate(trackpoints):
             if abs(tp["latitude"]) > 85.0:
-                raise UnsupportedRouteError(
+                raise RuntimeError(
                     f"Route point {i} at latitude {tp['latitude']:.3f}° is within "
                     f"5 degrees of a pole"
                 )
@@ -499,7 +493,7 @@ class Route(Geometry):
                 trackpoints[i]["longitude"] - trackpoints[i - 1]["longitude"]
             )
             if lon_diff > 180.0:
-                raise UnsupportedRouteError(
+                raise RuntimeError(
                     f"Route crosses antimeridian between points {i-1} and {i} "
                     f"(longitude jump: {lon_diff:.3f}°)"
                 )

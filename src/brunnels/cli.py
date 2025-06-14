@@ -22,7 +22,7 @@ from shapely.geometry.base import BaseGeometry
 
 from . import __version__
 from . import visualization
-from .route import Route, UnsupportedRouteError
+from .route import Route
 from .brunnel import Brunnel, BrunnelType, FilterReason, find_compound_brunnels
 from .file_utils import generate_output_filename
 
@@ -253,17 +253,7 @@ def main():
         sys.exit(1)
 
     # Load and parse the GPX file into a route
-    try:
-        route = Route.from_file(args.filename)
-    except (FileNotFoundError, PermissionError) as e:
-        logger.error(f"Failed to read file '{args.filename}': {e}")
-        sys.exit(1)
-    except gpxpy.gpx.GPXException as e:
-        logger.error(f"Failed to parse GPX file: {e}")
-        sys.exit(1)
-    except UnsupportedRouteError as e:
-        logger.error(f"Route validation failed: {e}")
-        sys.exit(1)
+    route = Route.from_file(args.filename)
 
     logger.info(f"Loaded GPX route with {len(route)} points")
 
