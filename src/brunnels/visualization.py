@@ -170,7 +170,9 @@ def create_route_map(
     filter_reason_counts: Dict[FilterReason, int] = collections.Counter()
 
     for brunnel in brunnels.values():
-        brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coordinate_list]
+        brunnel_coords = [
+            [pos.latitude, pos.longitude] for pos in brunnel.coordinate_list
+        ]
         if not brunnel_coords:
             continue
 
