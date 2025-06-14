@@ -25,6 +25,7 @@ class Route(Geometry):
     """Represents a GPX route with memoized geometric operations."""
 
     trackpoints: List[Dict[str, Any]]
+    cumulative_distance: List[float] = field(default_factory=list, init=False)
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
@@ -304,8 +305,12 @@ class Route(Geometry):
         if not self.trackpoints:
             return
 
+        # Initialize cumulative_distance list
+        self.cumulative_distance = [0.0] * len(self.trackpoints)
+
         # Set first trackpoint distance to 0
-        self.trackpoints[0]["track_distance"] = 0.0
+        # self.trackpoints[0]["track_distance"] = 0.0 # Removed
+        self.cumulative_distance[0] = 0.0
 
         # Calculate cumulative distances for remaining trackpoints
         for i in range(1, len(self.trackpoints)):
@@ -322,8 +327,11 @@ class Route(Geometry):
 
             # Calculate distance from previous point and add to cumulative distance
             segment_distance = prev_point.distance_to(curr_point)
-            self.trackpoints[i]["track_distance"] = (
-                self.trackpoints[i - 1]["track_distance"] + segment_distance
+            # self.trackpoints[i]["track_distance"] = ( # Removed
+            # self.trackpoints[i - 1]["track_distance"] + segment_distance # Removed
+            # ) # Removed
+            self.cumulative_distance[i] = (
+                self.cumulative_distance[i - 1] + segment_distance
             )
 
     def closest_point_to(self: "Route", point: Position) -> Tuple[float, Position]:
@@ -363,9 +371,10 @@ class Route(Geometry):
                 best_position = closest_point
 
                 # Calculate cumulative distance to this point
-                best_distance = self.trackpoints[i][
-                    "track_distance"
-                ] + seg_start.distance_to(best_position)
+                # best_distance = self.trackpoints[i][ # Removed
+                # "track_distance" # Removed
+                # ] + seg_start.distance_to(best_position) # Removed
+                best_distance = self.cumulative_distance[i] + seg_start.distance_to(best_position)
 
         return best_distance, best_position
 
