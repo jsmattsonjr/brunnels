@@ -210,7 +210,7 @@ def create_route_map(
                 tunnel_count += 1
 
             if filter_reason == FilterReason.NONE:
-                if brunnel.is_compound_brunnel():
+                if brunnel.compound_group is not None:
                     compound_count += 1
                 else:
                     individual_count += 1

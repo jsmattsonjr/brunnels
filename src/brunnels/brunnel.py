@@ -60,6 +60,7 @@ class Brunnel(Geometry):
         brunnel_type: BrunnelType,
         filter_reason: FilterReason = FilterReason.NONE,
         route_span: Optional[RouteSpan] = None,
+        compound_group: Optional[List["Brunnel"]] = None,
     ):
         super().__init__()
         self.coords = coords
@@ -67,6 +68,7 @@ class Brunnel(Geometry):
         self.brunnel_type = brunnel_type
         self.filter_reason = filter_reason
         self.route_span = route_span
+        self.compound_group = compound_group
         if not coords:
             raise ValueError(f"{self.get_short_description()} has no coordinates")
         if len(coords) < 2:
@@ -79,24 +81,18 @@ class Brunnel(Geometry):
         """Return the list of Position objects for this geometry."""
         return self.coords
 
-    def is_compound_brunnel(self) -> bool:
-        """
-        Check if this brunnel is part of a compound group.
-        """
-        return "compound_group" in self.metadata
-
     def is_representative(self) -> bool:
-        if not self.is_compound_brunnel():
+        if self.compound_group is None:
             return True
-        compound_group = self.metadata.get("compound_group", [])
+        compound_group = self.compound_group
         return compound_group.index(self) == 0
 
     def get_id(self) -> str:
         """Get a string identifier for this brunnel."""
-        if self.is_compound_brunnel():
+        if self.compound_group is not None:
             return ";".join(
                 str(component.metadata.get("id", "unknown"))
-                for component in self.metadata.get("compound_group", [])
+                for component in self.compound_group
             )
         return str(self.metadata.get("id", "unknown"))
 
@@ -108,8 +104,8 @@ class Brunnel(Geometry):
         """Get a short description for logging."""
         brunnel_type = self.brunnel_type.value.capitalize()
         name = self.get_display_name()
-        if self.is_compound_brunnel():
-            component_count = len(self.metadata.get("compound_group", []))
+        if self.compound_group is not None:
+            component_count = len(self.compound_group)
             return f"Compound {brunnel_type}: {name} ({self.get_id()}) [{component_count} segments]"
         return f"{brunnel_type}: {name} ({self.get_id()})"
 
@@ -123,11 +119,16 @@ class Brunnel(Geometry):
             return f"{self.get_short_description()} (no route span)"
 
     def get_route_span(self) -> Optional[RouteSpan]:
-        if self.is_compound_brunnel():
-            compound_group = self.metadata.get("compound_group", [])
+        if self.compound_group is not None and len(self.compound_group) > 0:
+            first_component = self.compound_group[0]
+            last_component = self.compound_group[-1]
+            if first_component.route_span is None or last_component.route_span is None:
+                raise ValueError(
+                    f"Compound brunnel {self.get_id()} has component without route_span"
+                )
             return RouteSpan(
-                compound_group[0].route_span.start_distance,
-                compound_group[-1].route_span.end_distance,
+                first_component.route_span.start_distance,
+                last_component.route_span.end_distance,
             )
         return self.route_span
 
@@ -158,8 +159,8 @@ class Brunnel(Geometry):
         """
         html_parts = []
 
-        if self.is_compound_brunnel():
-            compound_group = self.metadata.get("compound_group", [])
+        if self.compound_group is not None:
+            compound_group = self.compound_group
             html_parts.append(
                 f"Segment {compound_group.index(self)+1} of {len(compound_group)} in compound group<br>"
             )
@@ -393,8 +394,8 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     Identify connected components of brunnels and mark compound groups.
 
     This function analyzes the graph formed by brunnels sharing nodes and identifies
-    connected components. For components with more than one way, it adds compound_group
-    metadata to mark them as part of the same logical structure.
+    connected components. For components with more than one way, it constructs a compound group
+    to mark them as part of the same logical structure.
 
     Args:
         brunnels: Dictionary of Brunnel objects to analyze
@@ -457,7 +458,7 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     for component in connected_components:
         # Only mark components with more than one way as compound groups
         if len(component) > 1:
-            # Add compound_group metadata to all brunnels in this component
+            # Add compound_group to all brunnels in this component
             logger.debug(
                 f"Marking compound group with {len(component)} ways: {', '.join(component)}"
             )
@@ -468,4 +469,4 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
             )
             for way_id in component:
                 brunnel = brunnels[way_id]
-                brunnel.metadata["compound_group"] = compound_group
+                brunnel.compound_group = compound_group
