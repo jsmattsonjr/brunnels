@@ -67,6 +67,12 @@ class Brunnel(Geometry):
         self.brunnel_type = brunnel_type
         self.filter_reason = filter_reason
         self.route_span = route_span
+        if not coords:
+            raise ValueError(f"{self.get_short_description()} has no coordinates")
+        if len(coords) < 2:
+            raise ValueError(
+                f"{self.get_short_description()} has insufficient coordinates"
+            )
 
     @property
     def coordinate_list(self) -> List[Position]:
@@ -300,21 +306,11 @@ class Brunnel(Geometry):
         Args:
             route: Route object representing the route
         """
-        coords = self.coordinate_list
-        if not coords:
-            raise ValueError(
-                f"{self.get_short_description()} has no coordinates to calculate route span"
-            )
-        if len(coords) < 2:
-            raise ValueError(
-                f"{self.get_short_description()} has insufficient coordinates to calculate route span"
-            )
-
         min_distance = float("inf")
         max_distance = -float("inf")
 
         # Find the closest route point for each brunnel coordinate
-        for brunnel_point in coords:
+        for brunnel_point in self.coordinate_list:
             distance, _ = route.closest_point_to(brunnel_point)
 
             min_distance = min(min_distance, distance)
@@ -334,21 +330,10 @@ class Brunnel(Geometry):
             True if brunnel is aligned with route within tolerance, False otherwise
         """
 
-        coords = self.coordinate_list
-        if not coords or len(coords) < 2:
-            logger.debug(
-                f"{self.get_short_description()} has insufficient coordinates for bearing calculation"
-            )
-            return False
-
-        if len(route) < 2:  # Check length using Route's __len__
-            logger.debug("Route has insufficient coordinates for bearing calculation")
-            return False
-
         # Find closest segments between brunnel and route
         # route.coordinate_list returns List[Position]
         brunnel_segment, route_segment = find_closest_segments(
-            coords, route.coordinate_list
+            self.coordinate_list, route.coordinate_list
         )
 
         if brunnel_segment is None or route_segment is None:
