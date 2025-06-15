@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class Route(Geometry):
     """Represents a GPX route with memoized geometric operations."""
 
-    trackpoints: List[Dict[str, Any]]
+    coords: List[Position]
     cumulative_distance: List[float] = field(default_factory=list, init=False)
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
@@ -33,15 +33,7 @@ class Route(Geometry):
     @property
     def coordinate_list(self) -> List[Position]:
         """Return the list of Position objects for this geometry."""
-        # Convert trackpoints to Position objects
-        return [
-            Position(
-                latitude=tp["latitude"],
-                longitude=tp["longitude"],
-                elevation=tp.get("elevation"),  # Use .get for optional elevation
-            )
-            for tp in self.trackpoints
-        ]
+        return self.coords
 
     def get_bbox(self, buffer: float = 0.0) -> Tuple[float, float, float, float]:
         """
@@ -57,7 +49,7 @@ class Route(Geometry):
         Raises:
             ValueError: If route is empty
         """
-        if not self.trackpoints:
+        if not self.coords:
             raise ValueError("Cannot calculate bounding box for empty route")
 
         # Ensure the base bounding box (0 buffer) is calculated and memoized
@@ -96,8 +88,8 @@ class Route(Geometry):
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
         """
-        latitudes = [tp["latitude"] for tp in self.trackpoints]
-        longitudes = [tp["longitude"] for tp in self.trackpoints]
+        latitudes = [coord.latitude for coord in self.coords]
+        longitudes = [coord.longitude for coord in self.coords]
 
         min_lat, max_lat = min(latitudes), max(latitudes)
         min_lon, max_lon = min(longitudes), max(longitudes)
@@ -131,7 +123,7 @@ class Route(Geometry):
         Args:
             brunnels: Dictionary of Brunnel objects to filter (modified in-place)
         """
-        if not self.trackpoints or not brunnels:
+        if not self.coords or not brunnels:
             return
 
         # Only consider contained brunnels with route spans
@@ -229,7 +221,7 @@ class Route(Geometry):
         Returns:
             List of Brunnel objects found near the route, with containment status set
         """
-        if not self.trackpoints:
+        if not self.coords:
             raise ValueError("Cannot find brunnels for empty route")
 
         bbox = self.get_bbox(args.bbox_buffer)
@@ -272,7 +264,7 @@ class Route(Geometry):
         """
         geometry_coords = geometry.coordinate_list
 
-        if not geometry_coords or not self.trackpoints:
+        if not geometry_coords or not self.coords:
             return float("inf")
 
         total_distance = 0.0
@@ -300,17 +292,17 @@ class Route(Geometry):
 
 
         """
-        if not self.trackpoints:
+        if not self.coords:
             return
 
         # Initialize cumulative_distance list
-        self.cumulative_distance = [0.0] * len(self.trackpoints)
+        self.cumulative_distance = [0.0] * len(self.coords)
 
         # Set first trackpoint distance to 0
         self.cumulative_distance[0] = 0.0
 
         # Calculate cumulative distances for remaining trackpoints
-        for i in range(1, len(self.trackpoints)):
+        for i in range(1, len(self.coords)):
 
             # Calculate distance from previous point and add to cumulative distance
             segment_distance = self.coordinate_list[i - 1].distance_to(
@@ -383,21 +375,21 @@ class Route(Geometry):
         except gpxpy.gpx.GPXException as e:
             raise gpxpy.gpx.GPXException(e)
 
-        trackpoints_data = []
+        coords_data = []
 
         # Extract all track points from all tracks and segments
         for track in gpx_data.tracks:
             for segment in track.segments:
                 for point in segment.points:
-                    trackpoints_data.append(
-                        {
-                            "latitude": point.latitude,
-                            "longitude": point.longitude,
-                            "elevation": point.elevation,
-                        }
+                    coords_data.append(
+                        Position(
+                            latitude=point.latitude,
+                            longitude=point.longitude,
+                            elevation=point.elevation,
+                        )
                     )
 
-        route = cls(trackpoints_data)
+        route = cls(coords_data)
 
         if not route:
             raise ValueError("No track points found in GPX file")
@@ -405,7 +397,7 @@ class Route(Geometry):
         logger.debug(f"Parsed {len(route)} track points from GPX file")
 
         # Check the route
-        cls._check_route(route.trackpoints)
+        cls._check_route(route.coords)
 
         return route
 
@@ -441,51 +433,42 @@ class Route(Geometry):
             Route object representing the route
         """
         if not positions:
+            # If positions is empty, initialize with an empty list for coords
             return cls([])
 
-        trackpoints_data = [
-            {
-                "latitude": pos.latitude,
-                "longitude": pos.longitude,
-                "elevation": pos.elevation,
-            }
-            for pos in positions
-        ]
-
-        route = cls(trackpoints_data)
+        # Directly use the provided positions list
+        route = cls(positions)
 
         # Check the route
-        cls._check_route(route.trackpoints)
+        cls._check_route(route.coords)
 
         return route
 
     @staticmethod
-    def _check_route(trackpoints: List[Dict[str, Any]]) -> None:
+    def _check_route(coords: List[Position]) -> None:
         """
         Check route for antimeridian crossing and polar proximity.
 
         Args:
-            trackpoints: List of trackpoint dictionaries to check
+            coords: List of Position objects to check
 
         Raises:
             RuntimeError: If route is unsupported
         """
-        if not trackpoints:
+        if not coords:
             return
 
         # Check for polar proximity (within 5 degrees of poles)
-        for i, tp in enumerate(trackpoints):
-            if abs(tp["latitude"]) > 85.0:
+        for i, coord in enumerate(coords):
+            if abs(coord.latitude) > 85.0:
                 raise RuntimeError(
-                    f"Route point {i} at latitude {tp['latitude']:.3f}° is within "
+                    f"Route point {i} at latitude {coord.latitude:.3f}° is within "
                     f"5 degrees of a pole"
                 )
 
         # Check for antimeridian crossing
-        for i in range(1, len(trackpoints)):
-            lon_diff = abs(
-                trackpoints[i]["longitude"] - trackpoints[i - 1]["longitude"]
-            )
+        for i in range(1, len(coords)):
+            lon_diff = abs(coords[i].longitude - coords[i - 1].longitude)
             if lon_diff > 180.0:
                 raise RuntimeError(
                     f"Route crosses antimeridian between points {i-1} and {i} "
@@ -494,15 +477,15 @@ class Route(Geometry):
 
     def __len__(self) -> int:
         """Return number of trackpoints in route."""
-        return len(self.trackpoints)
+        return len(self.coords)
 
     def __getitem__(self, index):
         """Allow indexing into trackpoints."""
-        return self.trackpoints[index]
+        return self.coords[index]
 
     def __iter__(self):
         """Allow iteration over trackpoints."""
-        return iter(self.trackpoints)
+        return iter(self.coords)
 
     def calculate_buffered_route_geometry(self, route_buffer: float) -> BaseGeometry:
         """
@@ -514,9 +497,9 @@ class Route(Geometry):
         Returns:
             Shapely geometry object or None if it could not be created.
         """
-        if not self.trackpoints:
+        if not self.coords:
             raise ValueError(
-                "Cannot calculate buffered geometry for empty route, trackpoints are empty"
+                "Cannot calculate buffered geometry for empty route, coords are empty"
             )
 
         route_line = self.get_linestring()
@@ -527,7 +510,7 @@ class Route(Geometry):
 
         # Convert buffer from meters to approximate degrees
 
-        avg_lat = self.trackpoints[0]["latitude"]
+        avg_lat = self.coords[0].latitude
         # 1 degree latitude ≈ 111 km = 111000m
         lat_buffer_deg = route_buffer / 111000.0
         # Longitude conversion depends on latitude
