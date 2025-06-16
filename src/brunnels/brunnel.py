@@ -49,12 +49,8 @@ class RouteSpan(NamedTuple):
     end_distance: float  # Distance from route start where brunnel ends
 
 
-@dataclass
 class Brunnel:
     """A single bridge or tunnel way from OpenStreetMap."""
-
-    coords: List[Position]
-    metadata: Dict[str, Any]
 
     def __init__(
         self,

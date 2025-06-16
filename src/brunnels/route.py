@@ -27,11 +27,7 @@ logger = logging.getLogger(__name__)
 class Route:
     """Represents a GPX route with memoized geometric operations."""
 
-    coords: List[Position]
     cumulative_distance: List[float] = field(default_factory=list, init=False)
-    _bbox: Optional[Tuple[float, float, float, float]] = field(
-        default=None, init=False, repr=False
-    )
 
     def __init__(self, coords: List[Position]):
         if not coords:
@@ -39,10 +35,10 @@ class Route:
         if len(coords) < 2:
             raise ValueError("Route must have at least two coordinates")
         self.coords = coords
-        self._bbox = self._calculate_bbox()
+        self.bbox = self._calculate_bbox()
 
         # Create projection based on route bounding box
-        self.projection = create_transverse_mercator_projection(self._bbox)
+        self.projection = create_transverse_mercator_projection(self.bbox)
 
         self.linestring: LineString = coords_to_polyline(self.coords, self.projection)
 
@@ -69,15 +65,15 @@ class Route:
             raise ValueError("Cannot calculate bounding box for empty route")
 
         # Ensure the base bounding box (0 buffer) is calculated and memoized
-        if self._bbox is None:
-            self._bbox = self._calculate_bbox()
+        if self.bbox is None:
+            self.bbox = self._calculate_bbox()
 
         # If no buffer is requested, return the memoized base bounding box
         if buffer == 0.0:
-            return self._bbox
+            return self.bbox
 
         # If a buffer is requested, calculate it based on the memoized _bbox
-        min_lat, min_lon, max_lat, max_lon = self._bbox
+        min_lat, min_lon, max_lat, max_lon = self.bbox
 
         # Convert buffer from m to approximate degrees
         # 1 degree latitude ≈ 111 km = 111000m
