@@ -15,7 +15,7 @@ __email__ = "jsmattsonjr@gmail.com"
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
 
 from .route import Route
-from .geometry import Position
+from .geometry_utils import Position  # Changed import
 
 __all__ = [
     "Brunnel",
