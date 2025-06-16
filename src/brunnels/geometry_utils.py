@@ -9,8 +9,6 @@ from geopy.distance import geodesic
 import math
 import logging
 
-# from .geometry import Position # Removed old import
-
 logger = logging.getLogger(__name__)
 
 

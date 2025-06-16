@@ -4,18 +4,18 @@
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Set, NamedTuple
 from collections import defaultdict, deque
-from dataclasses import dataclass, field  # Added field
+from dataclasses import dataclass, field
 from enum import Enum
 import logging
-from shapely.geometry import LineString  # Added import
+from shapely.geometry import LineString
 import pyproj
 
-from .geometry_utils import Position  # Changed import
+from .geometry_utils import Position
 from .geometry_utils import (
     find_closest_segments,
     bearings_aligned,
 )
-from .shapely_utils import coords_to_polyline  # Added import
+from .shapely_utils import coords_to_polyline
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class RouteSpan(NamedTuple):
 
 
 @dataclass
-class Brunnel:  # Removed Geometry base class
+class Brunnel:
     """A single bridge or tunnel way from OpenStreetMap."""
 
     coords: List[Position]
@@ -66,7 +66,6 @@ class Brunnel:  # Removed Geometry base class
         compound_group: Optional[List["Brunnel"]] = None,
         projection: Optional[pyproj.Proj] = None,
     ):
-        # super().__init__() # Removed call to super
         self.coords = coords
         self.metadata = metadata
         self.brunnel_type = brunnel_type

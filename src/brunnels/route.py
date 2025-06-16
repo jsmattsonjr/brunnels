@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Route:  # Removed Geometry base class
+class Route:
     """Represents a GPX route with memoized geometric operations."""
 
     coords: List[Position]
@@ -270,7 +270,7 @@ class Route:  # Removed Geometry base class
 
     def average_distance_to_polyline(
         self, geometry: "Brunnel"
-    ) -> float:  # Changed Geometry to "Brunnel"
+    ) -> float:
         """
         Calculate the average distance from all points in a geometry to the closest points on this route.
 
