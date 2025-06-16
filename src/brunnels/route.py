@@ -12,18 +12,18 @@ import argparse
 import gpxpy
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
-from shapely.geometry import LineString # Added import
+from shapely.geometry import LineString  # Added import
 
-from .geometry_utils import Position # Changed import
+from .geometry_utils import Position  # Changed import
 from .brunnel import Brunnel, FilterReason
 from .overpass import query_overpass_brunnels
-from .shapely_utils import coords_to_polyline # Added import
+from .shapely_utils import coords_to_polyline  # Added import
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Route: # Removed Geometry base class
+class Route:  # Removed Geometry base class
     """Represents a GPX route with memoized geometric operations."""
 
     coords: List[Position]
@@ -31,23 +31,21 @@ class Route: # Removed Geometry base class
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
-    _linestring: Optional[LineString] = field(default=None, init=False, repr=False) # Added attribute
+
+    def __init__(self, coords: List[Position]):
+        if not coords:
+            raise ValueError("Route coordinates cannot be empty")
+        if len(coords) < 2:
+            raise ValueError("Route must have at least two coordinates")
+        self.coords = coords
+        self.linestring: LineString = coords_to_polyline(self.coords)
+        # Note: cumulative_distance and _bbox are initialized by other methods
+        # or have default_factory and init=False respectively.
 
     @property
     def coordinate_list(self) -> List[Position]:
         """Return the list of Position objects for this geometry."""
         return self.coords
-
-    def get_linestring(self) -> Optional[LineString]:
-        """
-        Get memoized LineString representation of this geometry's coordinates.
-
-        Returns:
-            LineString object, or None if coordinates is empty or has less than 2 points
-        """
-        if self._linestring is None:
-            self._linestring = coords_to_polyline(self.coordinate_list)
-        return self._linestring
 
     def get_bbox(self, buffer: float = 0.0) -> Tuple[float, float, float, float]:
         """
@@ -266,7 +264,9 @@ class Route: # Removed Geometry base class
 
         return brunnels
 
-    def average_distance_to_polyline(self, geometry: "Brunnel") -> float: # Changed Geometry to "Brunnel"
+    def average_distance_to_polyline(
+        self, geometry: "Brunnel"
+    ) -> float:  # Changed Geometry to "Brunnel"
         """
         Calculate the average distance from all points in a geometry to the closest points on this route.
 
@@ -403,12 +403,10 @@ class Route: # Removed Geometry base class
                         )
                     )
 
+        # Note: The __init__ method will raise ValueError if coords_data is empty or has less than 2 points.
         route = cls(coords_data)
 
-        if not route:
-            raise ValueError("No track points found in GPX file")
-
-        logger.debug(f"Parsed {len(route)} track points from GPX file")
+        logger.debug(f"Parsed {len(route.coords)} track points from GPX file")
 
         # Check the route
         cls._check_route(route.coords)
@@ -446,11 +444,9 @@ class Route: # Removed Geometry base class
         Returns:
             Route object representing the route
         """
-        if not positions:
-            # If positions is empty, initialize with an empty list for coords
-            return cls([])
-
-        # Directly use the provided positions list
+        # Note: The __init__ method will raise ValueError if positions is empty or has less than 2 points.
+        # The factory method should probably also raise an error earlier if desired for empty lists,
+        # or rely on __init__ to do so. For now, let __init__ handle it.
         route = cls(positions)
 
         # Check the route
@@ -516,8 +512,10 @@ class Route: # Removed Geometry base class
                 "Cannot calculate buffered geometry for empty route, coords are empty"
             )
 
-        route_line = self.get_linestring()
-        if route_line is None:
+        route_line = self.linestring
+        if (
+            route_line is None
+        ):  # Should not happen if __init__ enforces LineString creation
             raise ValueError(
                 "Cannot calculate buffered geometry because LineString is None"
             )

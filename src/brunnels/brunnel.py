@@ -4,17 +4,17 @@
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Set, NamedTuple
 from collections import defaultdict, deque
-from dataclasses import dataclass, field # Added field
+from dataclasses import dataclass, field  # Added field
 from enum import Enum
 import logging
-from shapely.geometry import LineString # Added import
+from shapely.geometry import LineString  # Added import
 
-from .geometry_utils import Position # Changed import
+from .geometry_utils import Position  # Changed import
 from .geometry_utils import (
     find_closest_segments,
     bearings_aligned,
 )
-from .shapely_utils import coords_to_polyline # Added import
+from .shapely_utils import coords_to_polyline  # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,11 @@ class RouteSpan(NamedTuple):
 
 
 @dataclass
-class Brunnel: # Removed Geometry base class
+class Brunnel:  # Removed Geometry base class
     """A single bridge or tunnel way from OpenStreetMap."""
 
     coords: List[Position]
     metadata: Dict[str, Any]
-    _linestring: Optional[LineString] = field(default=None, init=False, repr=False) # Added attribute
 
     def __init__(
         self,
@@ -78,22 +77,12 @@ class Brunnel: # Removed Geometry base class
             raise ValueError(
                 f"{self.get_short_description()} has insufficient coordinates"
             )
+        self.linestring: LineString = coords_to_polyline(self.coords)
 
     @property
     def coordinate_list(self) -> List[Position]:
         """Return the list of Position objects for this geometry."""
         return self.coords
-
-    def get_linestring(self) -> Optional[LineString]:
-        """
-        Get memoized LineString representation of this geometry's coordinates.
-
-        Returns:
-            LineString object, or None if coordinates is empty or has less than 2 points
-        """
-        if self._linestring is None:
-            self._linestring = coords_to_polyline(self.coordinate_list)
-        return self._linestring
 
     def is_representative(self) -> bool:
         if self.compound_group is None:
@@ -301,7 +290,7 @@ class Brunnel: # Removed Geometry base class
         """
         try:
             # Get cached LineString from brunnel
-            brunnel_line = self.get_linestring()
+            brunnel_line = self.linestring
             if brunnel_line is None:
                 return False
 
