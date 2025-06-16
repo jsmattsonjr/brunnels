@@ -8,6 +8,7 @@ from dataclasses import dataclass, field  # Added field
 from enum import Enum
 import logging
 from shapely.geometry import LineString  # Added import
+import pyproj
 
 from .geometry_utils import Position  # Changed import
 from .geometry_utils import (
@@ -63,6 +64,7 @@ class Brunnel:  # Removed Geometry base class
         filter_reason: FilterReason = FilterReason.NONE,
         route_span: Optional[RouteSpan] = None,
         compound_group: Optional[List["Brunnel"]] = None,
+        projection: Optional[pyproj.Proj] = None,
     ):
         # super().__init__() # Removed call to super
         self.coords = coords
@@ -71,13 +73,14 @@ class Brunnel:  # Removed Geometry base class
         self.filter_reason = filter_reason
         self.route_span = route_span
         self.compound_group = compound_group
+        self.projection = projection
         if not coords:
             raise ValueError(f"{self.get_short_description()} has no coordinates")
         if len(coords) < 2:
             raise ValueError(
                 f"{self.get_short_description()} has insufficient coordinates"
             )
-        self.linestring: LineString = coords_to_polyline(self.coords)
+        self.linestring: LineString = coords_to_polyline(self.coords, self.projection)
 
     @property
     def coordinate_list(self) -> List[Position]:
@@ -364,7 +367,9 @@ class Brunnel:  # Removed Geometry base class
         return aligned
 
     @classmethod
-    def from_overpass_data(cls, way_data: Dict[str, Any]) -> "Brunnel":
+    def from_overpass_data(
+        cls, way_data: Dict[str, Any], projection: Optional[pyproj.Proj] = None
+    ) -> "Brunnel":
         """
         Parse a single way from Overpass response into Brunnel object.
 
@@ -389,6 +394,7 @@ class Brunnel:  # Removed Geometry base class
             coords=coords,
             metadata=way_data,
             brunnel_type=brunnel_type,
+            projection=projection,
         )
 
 

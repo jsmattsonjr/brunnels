@@ -12,12 +12,13 @@ import argparse
 import gpxpy
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
-from shapely.geometry import LineString  # Added import
+from shapely.geometry import LineString
+import pyproj
 
-from .geometry_utils import Position  # Changed import
+from .geometry_utils import Position
 from .brunnel import Brunnel, FilterReason
 from .overpass import query_overpass_brunnels
-from .shapely_utils import coords_to_polyline  # Added import
+from .shapely_utils import coords_to_polyline, create_transverse_mercator_projection
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,12 @@ class Route:  # Removed Geometry base class
         if len(coords) < 2:
             raise ValueError("Route must have at least two coordinates")
         self.coords = coords
-        self.linestring: LineString = coords_to_polyline(self.coords)
         self._bbox = self._calculate_bbox()
+
+        # Create projection based on route bounding box
+        self.projection = create_transverse_mercator_projection(self._bbox)
+
+        self.linestring: LineString = coords_to_polyline(self.coords, self.projection)
 
     @property
     def coordinate_list(self) -> List[Position]:
@@ -255,7 +260,7 @@ class Route:  # Removed Geometry base class
         brunnels = {}
         for way_data in raw_ways:
             try:
-                brunnel = Brunnel.from_overpass_data(way_data)
+                brunnel = Brunnel.from_overpass_data(way_data, self.projection)
                 brunnels[brunnel.get_id()] = brunnel
             except (KeyError, ValueError) as e:
                 logger.warning(f"Failed to parse brunnel way: {e}")
@@ -512,34 +517,19 @@ class Route:  # Removed Geometry base class
             )
 
         route_line = self.linestring
-        if (
-            route_line is None
-        ):  # Should not happen if __init__ enforces LineString creation
+        if route_line is None:
             raise ValueError(
                 "Cannot calculate buffered geometry because LineString is None"
             )
 
-        # Convert buffer from meters to approximate degrees
-
-        avg_lat = self.coords[0].latitude
-        # 1 degree latitude ≈ 111 km = 111000m
-        lat_buffer_deg = route_buffer / 111000.0
-        # Longitude conversion depends on latitude
-        lon_buffer_deg = route_buffer / (111000.0 * abs(cos(radians(avg_lat))))
-
-        # Use the smaller of the two buffers to be conservative,
-        # as buffering is generally isotropic in projected coordinate systems
-        # but here we are using geographic coordinates.
-        buffer_degrees = min(lat_buffer_deg, lon_buffer_deg)
-
-        if buffer_degrees <= 0:
+        if route_buffer <= 0:
             raise ValueError(
-                f"Calculated buffer in degrees is {buffer_degrees:.6f}. "
-                "This might lead to unexpected behavior or invalid geometry. "
-                "Ensure route_buffer is positive and trackpoints are valid."
+                f"Route buffer must be positive, got {route_buffer} meters"
             )
 
-        route_geometry = route_line.buffer(buffer_degrees)
+        # Since we're now using projected coordinates in meters,
+        # we can use the buffer distance directly
+        route_geometry = route_line.buffer(route_buffer)
 
         if not route_geometry.is_valid:
             logger.warning(
