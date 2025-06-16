@@ -3,19 +3,21 @@
 Geometry and distance calculation utilities for route analysis.
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional # Added Optional here as it's used by Position
+from dataclasses import dataclass, field # Added for Position
+from geopy.distance import geodesic # Added for Position
+import math # Added for Position
 import logging
 
-from .geometry import Position
-
+# from .geometry import Position # Removed old import
 
 logger = logging.getLogger(__name__)
 
 
 def find_closest_segments(
-    polyline1: List[Position], polyline2: List[Position]
+    polyline1: List["Position"], polyline2: List["Position"]
 ) -> Tuple[
-    Optional[Tuple[int, Position, Position]], Optional[Tuple[int, Position, Position]]
+    Optional[Tuple[int, "Position", "Position"]], Optional[Tuple[int, "Position", "Position"]]
 ]:
     """
     Find the closest segments between two polylines.
@@ -96,3 +98,75 @@ def bearings_aligned(
     opposite_direction = abs(diff - 180) <= tolerance_degrees
 
     return same_direction or opposite_direction
+
+@dataclass
+class Position:
+    latitude: float
+    longitude: float
+    elevation: Optional[float] = None
+
+    def has_elevation(self) -> bool:
+        return self.elevation is not None
+
+    def distance_to(self, other: "Position") -> float:
+        return geodesic(
+            (self.latitude, self.longitude), (other.latitude, other.longitude)
+        ).kilometers
+
+    def bearing_to(self, other: "Position") -> float:
+        if self == other:
+            return 0.0
+        if math.isclose(self.latitude, 90.0):
+            return 180.0
+        if math.isclose(self.latitude, -90.0):
+            return 0.0
+        if math.isclose(other.latitude, 90.0):
+            return 0.0
+        if math.isclose(other.latitude, -90.0):
+            return 180.0
+        lat1 = math.radians(self.latitude)
+        lat2 = math.radians(other.latitude)
+        lon1 = math.radians(self.longitude)
+        lon2 = math.radians(other.longitude)
+        dlon = lon2 - lon1
+        y = math.sin(dlon) * math.cos(lat2)
+        x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(
+            lat2
+        ) * math.cos(dlon)
+        bearing = math.atan2(y, x)
+        bearing = math.degrees(bearing)
+        bearing = (bearing + 360) % 360
+        return bearing
+
+    def to_line_segment_distance_and_projection(
+        self, seg_start: "Position", seg_end: "Position"
+    ) -> Tuple[float, float, "Position"]:
+        lat_p, lon_p = math.radians(self.latitude), math.radians(self.longitude)
+        lat_a, lon_a = math.radians(seg_start.latitude), math.radians(
+            seg_start.longitude
+        )
+        lat_b, lon_b = math.radians(seg_end.latitude), math.radians(seg_end.longitude)
+        earth_radius = 6371000
+        cos_lat_avg = math.cos((lat_a + lat_b) / 2)
+        x_p = (lon_p - lon_a) * earth_radius * cos_lat_avg
+        y_p = (lat_p - lat_a) * earth_radius
+        x_a = 0.0
+        y_a = 0.0
+        x_b = (lon_b - lon_a) * earth_radius * cos_lat_avg
+        y_b = (lat_b - lat_a) * earth_radius
+        dx = x_b - x_a
+        dy = y_b - y_a
+        if dx == 0 and dy == 0:
+            distance_m = math.sqrt(x_p**2 + y_p**2)
+            return distance_m / 1000.0, 0.0, seg_start
+        t = ((x_p - x_a) * dx + (y_p - y_a) * dy) / (dx**2 + dy**2)
+        t = max(0.0, min(1.0, t))
+        x_closest = x_a + t * dx
+        y_closest = y_a + t * dy
+        distance_m = math.sqrt((x_p - x_closest) ** 2 + (y_p - y_closest) ** 2)
+        lat_closest = lat_a + (y_closest / earth_radius)
+        lon_closest = lon_a + (x_closest / (earth_radius * cos_lat_avg))
+        closest_point = Position(
+            latitude=math.degrees(lat_closest), longitude=math.degrees(lon_closest)
+        )
+        return distance_m / 1000.0, t, closest_point

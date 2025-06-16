@@ -12,16 +12,18 @@ import argparse
 import gpxpy
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
+from shapely.geometry import LineString # Added import
 
-from .geometry import Position, Geometry
+from .geometry_utils import Position # Changed import
 from .brunnel import Brunnel, FilterReason
 from .overpass import query_overpass_brunnels
+from .shapely_utils import coords_to_polyline # Added import
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Route(Geometry):
+class Route: # Removed Geometry base class
     """Represents a GPX route with memoized geometric operations."""
 
     coords: List[Position]
@@ -29,11 +31,23 @@ class Route(Geometry):
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
+    _linestring: Optional[LineString] = field(default=None, init=False, repr=False) # Added attribute
 
     @property
     def coordinate_list(self) -> List[Position]:
         """Return the list of Position objects for this geometry."""
         return self.coords
+
+    def get_linestring(self) -> Optional[LineString]:
+        """
+        Get memoized LineString representation of this geometry's coordinates.
+
+        Returns:
+            LineString object, or None if coordinates is empty or has less than 2 points
+        """
+        if self._linestring is None:
+            self._linestring = coords_to_polyline(self.coordinate_list)
+        return self._linestring
 
     def get_bbox(self, buffer: float = 0.0) -> Tuple[float, float, float, float]:
         """
@@ -252,12 +266,12 @@ class Route(Geometry):
 
         return brunnels
 
-    def average_distance_to_polyline(self, geometry: Geometry) -> float:
+    def average_distance_to_polyline(self, geometry: "Brunnel") -> float: # Changed Geometry to "Brunnel"
         """
         Calculate the average distance from all points in a geometry to the closest points on this route.
 
         Args:
-            geometry: Any Geometry object (Brunnel, CompoundBrunnel, etc.)
+            geometry: Any Brunnel object (Brunnel, CompoundBrunnel, etc.)
 
         Returns:
             Average distance in kilometers, or float('inf') if calculation fails
