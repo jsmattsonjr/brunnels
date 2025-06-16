@@ -3,10 +3,10 @@
 Geometry and distance calculation utilities for route analysis.
 """
 
-from typing import List, Tuple, Optional  # Added Optional here as it's used by Position
-from dataclasses import dataclass, field  # Added for Position
-from geopy.distance import geodesic  # Added for Position
-import math  # Added for Position
+from typing import List, Tuple, Optional
+from dataclasses import dataclass, field
+from geopy.distance import geodesic
+import math
 import logging
 
 # from .geometry import Position # Removed old import

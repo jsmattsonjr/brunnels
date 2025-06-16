@@ -31,25 +31,20 @@ class Route:  # Removed Geometry base class
     _bbox: Optional[Tuple[float, float, float, float]] = field(
         default=None, init=False, repr=False
     )
-    _linestring: Optional[LineString] = field(
-        default=None, init=False, repr=False
-    )  # Added attribute
+
+    def __init__(self, coords: List[Position]):
+        if not coords:
+            raise ValueError("Route coordinates cannot be empty")
+        if len(coords) < 2:
+            raise ValueError("Route must have at least two coordinates")
+        self.coords = coords
+        self.linestring: LineString = coords_to_polyline(self.coords)
+        self._bbox = self._calculate_bbox()
 
     @property
     def coordinate_list(self) -> List[Position]:
         """Return the list of Position objects for this geometry."""
         return self.coords
-
-    def get_linestring(self) -> Optional[LineString]:
-        """
-        Get memoized LineString representation of this geometry's coordinates.
-
-        Returns:
-            LineString object, or None if coordinates is empty or has less than 2 points
-        """
-        if self._linestring is None:
-            self._linestring = coords_to_polyline(self.coordinate_list)
-        return self._linestring
 
     def get_bbox(self, buffer: float = 0.0) -> Tuple[float, float, float, float]:
         """
@@ -407,12 +402,10 @@ class Route:  # Removed Geometry base class
                         )
                     )
 
+        # Note: The __init__ method will raise ValueError if coords_data is empty or has less than 2 points.
         route = cls(coords_data)
 
-        if not route:
-            raise ValueError("No track points found in GPX file")
-
-        logger.debug(f"Parsed {len(route)} track points from GPX file")
+        logger.debug(f"Parsed {len(route.coords)} track points from GPX file")
 
         # Check the route
         cls._check_route(route.coords)
@@ -450,11 +443,9 @@ class Route:  # Removed Geometry base class
         Returns:
             Route object representing the route
         """
-        if not positions:
-            # If positions is empty, initialize with an empty list for coords
-            return cls([])
-
-        # Directly use the provided positions list
+        # Note: The __init__ method will raise ValueError if positions is empty or has less than 2 points.
+        # The factory method should probably also raise an error earlier if desired for empty lists,
+        # or rely on __init__ to do so. For now, let __init__ handle it.
         route = cls(positions)
 
         # Check the route
@@ -520,8 +511,10 @@ class Route:  # Removed Geometry base class
                 "Cannot calculate buffered geometry for empty route, coords are empty"
             )
 
-        route_line = self.get_linestring()
-        if route_line is None:
+        route_line = self.linestring
+        if (
+            route_line is None
+        ):  # Should not happen if __init__ enforces LineString creation
             raise ValueError(
                 "Cannot calculate buffered geometry because LineString is None"
             )
