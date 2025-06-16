@@ -46,7 +46,7 @@ If you prefer not to install the package, you can run it directly from the clone
 git clone https://github.com/jsmattsonjr/brunnels.git
 cd brunnels
 # Install dependencies only
-pip install gpxpy folium requests shapely geopy
+pip install gpxpy folium requests shapely geopy pyproj
 # Run directly from source
 python3 -m brunnels.cli your_route.gpx
 ```

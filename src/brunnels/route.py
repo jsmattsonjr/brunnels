@@ -268,9 +268,7 @@ class Route:
 
         return brunnels
 
-    def average_distance_to_polyline(
-        self, geometry: "Brunnel"
-    ) -> float:
+    def average_distance_to_polyline(self, geometry: "Brunnel") -> float:
         """
         Calculate the average distance from all points in a geometry to the closest points on this route.
 

@@ -34,6 +34,7 @@ dependencies = [
     "requests",
     "shapely",
     "geopy",
+    "pyproj",
 ]
 
 [project.optional-dependencies]
