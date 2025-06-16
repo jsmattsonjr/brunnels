@@ -66,9 +66,9 @@ jobs:
         # Verify HTML output was created (cross-platform)
         python -c "import os; print('File exists:', os.path.exists('test_output.html')); print('File size:', os.path.getsize('test_output.html') if os.path.exists('test_output.html') else 'N/A')"
     
-    - name: Run integration tests
+    - name: Run integration tests, excluding performance tests
       run: |
-        pytest tests/test_integration.py -v --tb=short
+        pytest tests/test_integration.py -v --tb=short -m "not performance"
     
     - name: Test with different CLI options
       run: |

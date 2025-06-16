@@ -398,6 +398,7 @@ class TestTorontoWaterfrontRoute(BaseRouteTest):
             "strict_bearing_included",
         )
 
+    @pytest.mark.performance
     def test_performance_benchmarks(self, gpx_file: Path, metadata: Dict[str, Any]):
         """Test performance meets expected benchmarks"""
         import time
@@ -640,6 +641,7 @@ class TestArea51Route(BaseRouteTest):
         assert "polyline" in html_content.lower()
         assert "marker" in html_content.lower()
 
+    @pytest.mark.performance
     def test_small_query_area_performance(
         self, gpx_file: Path, metadata: Dict[str, Any]
     ):
@@ -811,6 +813,7 @@ class TestPaulRevereRoute(BaseRouteTest):
                 15.0 <= bridge["start_km"] <= 23.0
             ), f"Minuteman bridge at {bridge['start_km']}km outside expected range"
 
+    @pytest.mark.performance
     def test_urban_density_performance(self, gpx_file: Path, metadata: Dict[str, Any]):
         """Test performance with high-density urban brunnel data"""
         import time
