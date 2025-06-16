@@ -1,5 +1,5 @@
 from typing import List, Optional, Tuple
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 import pyproj
 from .geometry_utils import Position
 
@@ -59,3 +59,39 @@ def coords_to_polyline(
             coords.append((x, y))
 
     return LineString(coords)
+
+
+def linestring_distance_to_index(linestring: LineString, distance: float) -> int:
+    """
+    Find the highest index of a LineString coordinate whose distance from
+    the start is less than the given distance.
+
+    Args:
+        linestring: The Shapely LineString
+        distance: Distance along the linestring from the start
+
+    Returns:
+        Index of the coordinate (0-based)
+    """
+    if distance < 0:
+        raise ValueError("Distance must be greater than or equal to 0")
+    if distance > linestring.length:
+        raise ValueError("Distance exceeds the total length of the linestring")
+
+    coords = list(linestring.coords)
+
+    # Walk along the linestring accumulating distances
+    cumulative_distance = 0.0
+    for i in range(len(coords) - 1):
+        segment_start = Point(coords[i])
+        segment_end = Point(coords[i + 1])
+        segment_length = segment_start.distance(segment_end)
+
+        if cumulative_distance + segment_length >= distance:
+            return i
+
+        cumulative_distance += segment_length
+
+    return (
+        len(coords) - 2
+    )  # Return the last index if distance is at the end of the linestring
