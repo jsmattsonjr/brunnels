@@ -71,8 +71,3 @@ def bearing(start, end: "Position") -> float:
 class Position:
     latitude: float
     longitude: float
-
-    def distance_to(self, other: "Position") -> float:
-        return geodesic(
-            (self.latitude, self.longitude), (other.latitude, other.longitude)
-        ).kilometers

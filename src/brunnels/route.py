@@ -23,7 +23,6 @@ from .shapely_utils import coords_to_polyline, create_transverse_mercator_projec
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class Route:
     """Represents a GPX route with memoized geometric operations."""
 
