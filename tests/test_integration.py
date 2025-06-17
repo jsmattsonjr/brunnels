@@ -920,6 +920,127 @@ class TestPaulRevereRoute(BaseRouteTest):
             ), "Expected some bearing misalignment filtering"
 
 
+class TestCoronadoRoute(BaseRouteTest):
+    """Integration tests for Coronado Bay Trail"""
+
+    @pytest.fixture
+    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
+        """Load metadata JSON file matching the GPX basename"""
+        metadata_file = gpx_file.with_suffix(".json")
+        with open(metadata_file) as f:
+            return json.load(f)
+
+    @pytest.fixture
+    def gpx_file(self) -> Path:
+        """Path to Coronado GPX file"""
+        return Path(__file__).parent / "fixtures" / "Coronado.gpx"
+
+    def test_known_bridges_present(self, gpx_file: Path, metadata: Dict[str, Any]):
+        """Test that known bridges are detected correctly"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        known_bridges = metadata["known_bridges"]
+
+        # Collect all OSM IDs from included brunnels
+        included_osm_ids = set()
+        for brunnel in result.included_brunnels:
+            if brunnel["type"] == "compound":
+                # For compound brunnels, split the semicolon-separated IDs
+                ids = brunnel["osm_id"].split(";")
+                included_osm_ids.update(ids)
+            else:
+                included_osm_ids.add(brunnel["osm_id"])
+
+        # Check that all known bridges are found
+        for bridge in known_bridges:
+            assert (
+                str(bridge["osm_way_id"]) in included_osm_ids
+            ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
+
+    def test_bearing_alignment_filtering(self, gpx_file: Path):
+        """Test that bearing misalignment filtering works correctly"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        # Should have exactly 1 bridge filtered for bearing misalignment
+        assert (
+            result.filtering.get("not_aligned_with_route", 0) == 1
+        ), f"Expected 1 bearing misalignment, got {result.filtering.get('not_aligned_with_route', 0)}"
+
+        # Test with stricter bearing tolerance should filter more
+        strict_result = run_brunnels_cli(gpx_file, bearing_tolerance=10.0)
+        assert strict_result.exit_code == 0
+
+        # Should have same or fewer included bridges with stricter tolerance
+        assert (
+            strict_result.metrics["final_included_total"]
+            <= result.metrics["final_included_total"]
+        )
+
+    def test_include_bicycle_infrastructure(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test that --include-bicycle-no flag reveals additional infrastructure"""
+        # Test with bicycle infrastructure included
+        result = run_brunnels_cli(gpx_file, route_buffer=5.0, include_bicycle_no=True)
+        assert result.exit_code == 0
+
+        # Should find significantly more brunnels
+        assert result.metrics["total_brunnels_found"] == 186
+        assert result.metrics["total_bridges_found"] == 171
+        assert result.metrics["total_tunnels_found"] == 14
+
+        # Should include compound bridge and tunnel
+        assert result.metrics["final_included_total"] == 8
+        assert result.metrics["final_included_individual"] == 7
+        assert result.metrics["final_included_compound"] == 1
+        assert result.metrics["contained_bridges"] == 7
+        assert result.metrics["contained_tunnels"] == 1
+
+        # Collect all OSM IDs from included brunnels
+        included_osm_ids = set()
+        for brunnel in result.included_brunnels:
+            if brunnel["type"] == "compound":
+                ids = brunnel["osm_id"].split(";")
+                included_osm_ids.update(ids)
+            else:
+                included_osm_ids.add(brunnel["osm_id"])
+
+        # Check default bridges are still found
+        for bridge in metadata["known_bridges"]:
+            assert (
+                str(bridge["osm_way_id"]) in included_osm_ids
+            ), f"Default bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found with bicycle infrastructure"
+
+        # Check bicycle infrastructure bridges
+        for bridge in metadata["known_bridges_bicycle_infrastructure"]:
+            if "osm_way_ids" in bridge:
+                # Compound bridge - check if components are found
+                bridge_ids = {str(oid) for oid in bridge["osm_way_ids"]}
+                found_ids = bridge_ids & included_osm_ids
+                assert (
+                    len(found_ids) > 0
+                ), f"Bicycle infrastructure compound bridge {bridge['name']} components not found"
+            else:
+                assert (
+                    str(bridge["osm_way_id"]) in included_osm_ids
+                ), f"Bicycle infrastructure bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
+
+        # Check bicycle infrastructure tunnels
+        for tunnel in metadata["known_tunnels_bicycle_infrastructure"]:
+            assert (
+                str(tunnel["osm_way_id"]) in included_osm_ids
+            ), f"Bicycle infrastructure tunnel {tunnel['name']} (OSM {tunnel['osm_way_id']}) not found"
+
+        # Compare with default settings - should find more
+        default_result = run_brunnels_cli(gpx_file)
+        assert (
+            result.metrics["total_brunnels_found"]
+            > default_result.metrics["total_brunnels_found"]
+        ), "Including bicycle infrastructure should find more brunnels"
+
+
 def debug_route(gpx_filename: str):
     """Run any route and print detailed comparison with expected values"""
     gpx_file = Path(f"tests/fixtures/{gpx_filename}")
