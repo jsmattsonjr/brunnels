@@ -3,8 +3,7 @@
 Route data model for brunnel analysis.
 """
 
-from typing import Optional, Tuple, List, TextIO, Dict, Any
-from dataclasses import dataclass, field
+from typing import Tuple, List, TextIO, Dict
 import logging
 import math
 from math import cos, radians
@@ -13,7 +12,6 @@ import gpxpy
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
-import pyproj
 
 from .geometry_utils import Position
 from .brunnel import Brunnel, FilterReason

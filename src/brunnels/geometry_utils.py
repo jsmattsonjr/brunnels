@@ -3,17 +3,16 @@
 Geometry and distance calculation utilities for route analysis.
 """
 
-from typing import List, Tuple, Optional
-from dataclasses import dataclass, field
-from geopy.distance import geodesic
-from shapely.geometry import LineString, Point
-from shapely.ops import nearest_points
-import math
+from typing import NamedTuple
 import logging
-
-from .shapely_utils import linestring_distance_to_index
+import math
 
 logger = logging.getLogger(__name__)
+
+
+class Position(NamedTuple):
+    latitude: float
+    longitude: float
 
 
 def bearings_aligned(
@@ -56,18 +55,12 @@ def bearing(start, end: "Position") -> float:
     lat2 = math.radians(end.latitude)
     lon1 = math.radians(start.longitude)
     lon2 = math.radians(end.longitude)
-    dlon = lon2 - lon1
-    y = math.sin(dlon) * math.cos(lat2)
+    delta_lon = lon2 - lon1
+    y = math.sin(delta_lon) * math.cos(lat2)
     x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(
-        dlon
+        delta_lon
     )
     bearing = math.atan2(y, x)
     bearing = math.degrees(bearing)
     bearing = (bearing + 360) % 360
     return bearing
-
-
-@dataclass
-class Position:
-    latitude: float
-    longitude: float

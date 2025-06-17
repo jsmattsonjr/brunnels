@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """ """
 
-from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Set, NamedTuple
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
 from enum import Enum
 import logging
 from shapely import Point
