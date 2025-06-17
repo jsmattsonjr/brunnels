@@ -325,7 +325,7 @@ def create_route_map(
         else:
             # Use muted colors for filtered or non-contained brunnels
             opacity = 0.3
-            weight = 2
+            weight = 4
             if brunnel_type == BrunnelType.BRIDGE:
                 color = "#A8A8A8"  # Excluded Bridges
             else:  # TUNNEL
