@@ -37,6 +37,24 @@ class Route:
             raise ValueError("Route coordinates cannot be empty")
         if len(coords) < 2:
             raise ValueError("Route must have at least two coordinates")
+
+        # Check for polar proximity (within 5 degrees of poles)
+        for i, coord in enumerate(coords):
+            if abs(coord.latitude) > 85.0:
+                raise RuntimeError(
+                    f"Route point {i} at latitude {coord.latitude:.3f}° is within "
+                    f"5 degrees of a pole"
+                )
+
+        # Check for antimeridian crossing
+        for i in range(1, len(coords)):
+            lon_diff = abs(coords[i].longitude - coords[i - 1].longitude)
+            if lon_diff > 180.0:
+                raise RuntimeError(
+                    f"Route crosses antimeridian between points {i-1} and {i} "
+                    f"(longitude jump: {lon_diff:.3f}°)"
+                )
+
         self.coords = coords
         self.bbox = self._calculate_bbox()
 
@@ -319,7 +337,7 @@ class Route:
             Route object representing the concatenated route
 
         Raises:
-            RuntimeError: If the route crosses the antimeridian or approaches poles (validated by `_check_route`).
+            RuntimeError: If the route crosses the antimeridian or approaches poles.
             gpxpy.gpx.GPXException: If GPX file is malformed.
         """
         gpx_data = gpxpy.parse(file_input)
@@ -341,9 +359,6 @@ class Route:
         route = cls(coords_data)
 
         logger.debug(f"Parsed {len(route.coords)} track points from GPX file")
-
-        # Check the route
-        cls._check_route(route.coords)
 
         return route
 
@@ -367,37 +382,6 @@ class Route:
         logger.debug(f"Reading GPX file: {filename}")
         with open(filename, "r", encoding="utf-8") as f:
             return cls.from_gpx(f)
-
-    @staticmethod
-    def _check_route(coords: List[Position]) -> None:
-        """
-        Check route for antimeridian crossing and polar proximity.
-
-        Args:
-            coords: List of Position objects to check
-
-        Raises:
-            RuntimeError: If route is unsupported
-        """
-        if not coords:
-            return
-
-        # Check for polar proximity (within 5 degrees of poles)
-        for i, coord in enumerate(coords):
-            if abs(coord.latitude) > 85.0:
-                raise RuntimeError(
-                    f"Route point {i} at latitude {coord.latitude:.3f}° is within "
-                    f"5 degrees of a pole"
-                )
-
-        # Check for antimeridian crossing
-        for i in range(1, len(coords)):
-            lon_diff = abs(coords[i].longitude - coords[i - 1].longitude)
-            if lon_diff > 180.0:
-                raise RuntimeError(
-                    f"Route crosses antimeridian between points {i-1} and {i} "
-                    f"(longitude jump: {lon_diff:.3f}°)"
-                )
 
     def __len__(self) -> int:
         """Return number of trackpoints in route."""
