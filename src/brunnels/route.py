@@ -322,10 +322,7 @@ class Route:
             RuntimeError: If the route crosses the antimeridian or approaches poles (validated by `_check_route`).
             gpxpy.gpx.GPXException: If GPX file is malformed.
         """
-        try:
-            gpx_data = gpxpy.parse(file_input)
-        except gpxpy.gpx.GPXException as e:
-            raise gpxpy.gpx.GPXException(e)
+        gpx_data = gpxpy.parse(file_input)
 
         coords_data = []
 
