@@ -133,9 +133,16 @@ class Brunnel:
         returns "unnamed".
 
         Returns:
-            str: The display name or "unnamed".
+            str: The OSM name or "unnamed".
         """
-        return self.metadata.get("tags", {}).get("name", "unnamed")
+        if self.compound_group is not None:
+            # For compound brunnels, use the name of the first named component
+            for component in self.compound_group:
+                if "name" in component.metadata["tags"]:
+                    return component.metadata["tags"]["name"]
+            logging.debug("No names in compound group")
+            return "unnamed"
+        return self.metadata["tags"].get("name", "unnamed")
 
     def get_short_description(self) -> str:
         """Get a short, human-readable description for logging.
