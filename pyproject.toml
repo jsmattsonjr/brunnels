@@ -66,9 +66,7 @@ target-version = ['py39']
 python_version = "3.9"
 warn_return_any = false  # Allow Any returns for third-party libraries
 warn_unused_configs = true
-disallow_untyped_defs = false  # Allow untyped function definitions
 ignore_missing_imports = true  # Ignore missing stubs for third-party libraries
-check_untyped_defs = false  # Don't check untyped function bodies
 
 [tool.setuptools_scm]
 write_to = "src/brunnels/_version.py"
