@@ -75,7 +75,8 @@ class Brunnel:
             raise ValueError(
                 f"{self.get_short_description()} has insufficient coordinates"
             )
-        self.linestring: LineString = coords_to_polyline(self.coords, self.projection)
+        coord_tuples = [(pos.longitude, pos.latitude) for pos in self.coords]
+        self.linestring: LineString = coords_to_polyline(coord_tuples, self.projection)
 
     @property
     def coordinate_list(self) -> List[Position]:
@@ -334,19 +335,15 @@ class Brunnel:
 
         # Find closest segments between brunnel and route
         # route.coordinate_list returns List[Position]
-        brunnel_segment, route_segment = find_closest_segments(
-            self.coordinate_list, route.coordinate_list
+        brunnel_index, route_index = find_closest_segments(
+            self.linestring, route.linestring
         )
 
-        if brunnel_segment is None or route_segment is None:
-            logger.debug(
-                f"Could not find closest segments for {self.get_short_description()}"
-            )
-            return False
-
         # Extract segment coordinates
-        _, brunnel_start, brunnel_end = brunnel_segment
-        _, route_start, route_end = route_segment
+        brunnel_start = self.coordinate_list[brunnel_index]
+        brunnel_end = self.coordinate_list[brunnel_index + 1]
+        route_start = route.coordinate_list[route_index]
+        route_end = route.coordinate_list[route_index + 1]
 
         # Calculate bearings for both segments
         brunnel_bearing = brunnel_start.bearing_to(brunnel_end)

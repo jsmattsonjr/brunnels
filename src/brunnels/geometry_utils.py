@@ -6,72 +6,35 @@ Geometry and distance calculation utilities for route analysis.
 from typing import List, Tuple, Optional
 from dataclasses import dataclass, field
 from geopy.distance import geodesic
+from shapely.geometry import LineString, Point
+from shapely.ops import nearest_points
 import math
 import logging
+
+from .shapely_utils import linestring_distance_to_index
 
 logger = logging.getLogger(__name__)
 
 
 def find_closest_segments(
-    polyline1: List["Position"], polyline2: List["Position"]
-) -> Tuple[
-    Optional[Tuple[int, "Position", "Position"]],
-    Optional[Tuple[int, "Position", "Position"]],
-]:
+    linestring1: LineString, linestring2: LineString
+) -> Tuple[int, int]:
     """
-    Find the closest segments between two polylines.
+    Find the closest segments between two linestrings.
 
     Args:
-        polyline1: First polyline as list of positions
-        polyline2: Second polyline as list of positions
+        linestring1: First linestring
+        linestring2: Second linestring
 
     Returns:
-        Tuple of (closest_segment1, closest_segment2) where each is:
-        (segment_index, segment_start, segment_end) or None if no valid segments found
+        Tuple of (closest_segment1, closest_segment2)
     """
-    if len(polyline1) < 2 or len(polyline2) < 2:
-        return None, None
-
-    min_distance = float("inf")
-    best_seg1 = None
-    best_seg2 = None
-
-    # Check each segment of polyline1 against each segment of polyline2
-    for i in range(len(polyline1) - 1):
-        seg1_start = polyline1[i]
-        seg1_end = polyline1[i + 1]
-
-        for j in range(len(polyline2) - 1):
-            seg2_start = polyline2[j]
-            seg2_end = polyline2[j + 1]
-
-            # Find closest points between segments
-            # Check distance from seg1_start to seg2
-            dist1, _, _ = seg1_start.to_line_segment_distance_and_projection(
-                seg2_start, seg2_end
-            )
-            # Check distance from seg1_end to seg2
-            dist2, _, _ = seg1_end.to_line_segment_distance_and_projection(
-                seg2_start, seg2_end
-            )
-            # Check distance from seg2_start to seg1
-            dist3, _, _ = seg2_start.to_line_segment_distance_and_projection(
-                seg1_start, seg1_end
-            )
-            # Check distance from seg2_end to seg1
-            dist4, _, _ = seg2_end.to_line_segment_distance_and_projection(
-                seg1_start, seg1_end
-            )
-
-            # Use minimum distance between all combinations
-            segment_distance = min(dist1, dist2, dist3, dist4)
-
-            if segment_distance < min_distance:
-                min_distance = segment_distance
-                best_seg1 = (i, seg1_start, seg1_end)
-                best_seg2 = (j, seg2_start, seg2_end)
-
-    return best_seg1, best_seg2
+    point1, point2 = nearest_points(linestring1, linestring2)
+    distance1 = linestring1.project(point1)
+    distance2 = linestring2.project(point2)
+    segment1 = linestring_distance_to_index(linestring1, distance1)
+    segment2 = linestring_distance_to_index(linestring2, distance2)
+    return (segment1, segment2)
 
 
 def bearings_aligned(

@@ -40,7 +40,8 @@ class Route:
         # Create projection based on route bounding box
         self.projection = create_transverse_mercator_projection(self.bbox)
 
-        self.linestring: LineString = coords_to_polyline(self.coords, self.projection)
+        coord_tuples = [(pos.longitude, pos.latitude) for pos in self.coords]
+        self.linestring: LineString = coords_to_polyline(coord_tuples, self.projection)
 
     @property
     def coordinate_list(self) -> List[Position]:

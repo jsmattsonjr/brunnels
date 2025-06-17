@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple
 from shapely.geometry import LineString, Point
 import pyproj
-from .geometry_utils import Position
 
 
 def create_transverse_mercator_projection(
@@ -28,13 +27,13 @@ def create_transverse_mercator_projection(
 
 
 def coords_to_polyline(
-    positions: List[Position], projection: Optional[pyproj.Proj] = None
+    coord_tuples: List[Tuple[float, float]], projection: Optional[pyproj.Proj] = None
 ) -> LineString:
     """
-    Convert a list of Position objects to a Shapely LineString.
+    Convert a list of coordinate tuples to a Shapely LineString.
 
     Args:
-        positions: List of Position objects
+        coord_tuples: List of (longitude, latitude) tuples
         projection: Optional pyproj.Proj object for coordinate transformation.
                    If None, uses lat/lon coordinates directly.
 
@@ -43,22 +42,21 @@ def coords_to_polyline(
         otherwise in geographic coordinates
 
     Raises:
-        ValueError: If positions is empty or has less than 2 points
+        ValueError: If coord_tuples is empty or has less than 2 points
     """
-    if not positions or len(positions) < 2:
+    if not coord_tuples or len(coord_tuples) < 2:
         raise ValueError("At least two positions are required to create a LineString.")
 
-    if projection is None:
-        # Use geographic coordinates (longitude, latitude)
-        coords = [(pos.longitude, pos.latitude) for pos in positions]
-    else:
+    if projection is not None:
         # Transform to projected coordinates (x, y)
-        coords = []
-        for pos in positions:
-            x, y = projection(pos.longitude, pos.latitude)
-            coords.append((x, y))
+        lons = [pos[0] for pos in coord_tuples]
+        lats = [pos[1] for pos in coord_tuples]
+        x_coords, y_coords = projection(lons, lats)
+        projected_coords = list(zip(x_coords, y_coords))
+        return LineString(projected_coords)
 
-    return LineString(coords)
+    # If no projection, use coordinates as is (assumed to be in lat/lon)
+    return LineString(coord_tuples)
 
 
 def linestring_distance_to_index(linestring: LineString, distance: float) -> int:
