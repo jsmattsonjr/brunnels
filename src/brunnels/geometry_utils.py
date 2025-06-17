@@ -45,10 +45,6 @@ def bearings_aligned(
 class Position:
     latitude: float
     longitude: float
-    elevation: Optional[float] = None
-
-    def has_elevation(self) -> bool:
-        return self.elevation is not None
 
     def distance_to(self, other: "Position") -> float:
         return geodesic(
