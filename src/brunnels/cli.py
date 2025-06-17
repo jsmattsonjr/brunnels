@@ -20,6 +20,7 @@ from shapely.geometry.base import BaseGeometry
 
 from . import __version__
 from . import visualization
+from .metrics import collect_metrics, log_metrics
 from .route import Route
 from .brunnel import Brunnel, BrunnelType, FilterReason, find_compound_brunnels
 from .file_utils import generate_output_filename
@@ -296,12 +297,17 @@ def main():
     # Log the final list of included brunnels (what will actually appear on the map)
     log_final_included_brunnels(brunnels)
 
+    # Collect metrics before creating map
+    metrics = collect_metrics(brunnels)
+
     # Create visualization map
     try:
-        visualization.create_route_map(route, output_filename, brunnels, args)
+        visualization.create_route_map(route, output_filename, brunnels, metrics, args)
     except Exception as e:
         logger.error(f"Failed to create map: {e}")
         sys.exit(1)
+
+    log_metrics(brunnels, metrics, args)
 
     # Automatically open the HTML file in the default browser
     if not args.no_open:
