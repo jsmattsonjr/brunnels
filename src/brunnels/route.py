@@ -368,27 +368,6 @@ class Route:
         with open(filename, "r", encoding="utf-8") as f:
             return cls.from_gpx(f)
 
-    @classmethod
-    def from_positions(cls, positions: List[Position]) -> "Route":
-        """
-        Create a Route from a list of Position objects.
-
-        Args:
-            positions: List of Position objects
-
-        Returns:
-            Route object representing the route
-        """
-        # Note: The __init__ method will raise ValueError if positions is empty or has less than 2 points.
-        # The factory method should probably also raise an error earlier if desired for empty lists,
-        # or rely on __init__ to do so. For now, let __init__ handle it.
-        route = cls(positions)
-
-        # Check the route
-        cls._check_route(route.coords)
-
-        return route
-
     @staticmethod
     def _check_route(coords: List[Position]) -> None:
         """
