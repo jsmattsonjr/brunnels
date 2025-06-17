@@ -52,23 +52,23 @@ class BrunnelLegend(folium.MacroElement):
         ">
             <b>Legend</b><br>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: red; font-weight: bold; font-size: 16px;">—</span>
+                <span style="color: #2E86AB; font-weight: bold; font-size: 16px;">—</span>
                 GPX Route
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: blue; font-weight: bold; font-size: 16px;">—</span>
+                <span style="color: #E63946; font-weight: bold; font-size: 16px;">—</span>
                 Included Bridges ({{ this.contained_bridge_count }})
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: brown; font-weight: bold; font-size: 16px; letter-spacing: 2px;">- -</span>
+                <span style="color: #6A4C93; font-weight: bold; font-size: 16px;">—</span>
                 Included Tunnels ({{ this.contained_tunnel_count }})
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: lightsteelblue; font-weight: bold; font-size: 16px;">—</span>
+                <span style="color: #A8A8A8; font-weight: bold; font-size: 16px;">—</span>
                 Excluded Bridges ({{ this.bridge_count - this.contained_bridge_count }})
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: rosybrown; font-weight: bold; font-size: 16px; letter-spacing: 2px;">- -</span>
+                <span style="color: #9B9B9B; font-weight: bold; font-size: 16px;">—</span>
                 Excluded Tunnels ({{ this.tunnel_count - this.contained_tunnel_count }})
             </div>
         </div>
@@ -144,7 +144,12 @@ def create_route_map(
 
     # Add route as polyline
     folium.PolyLine(
-        coordinates, color="red", weight=2, opacity=0.6, popup="GPX Route", z_index=1
+        coordinates,
+        color="#2E86AB",
+        weight=2,
+        opacity=0.6,
+        popup="GPX Route",
+        z_index=1,
     ).add_to(route_map)
 
     # Add start and end markers
@@ -188,11 +193,11 @@ def create_route_map(
             opacity = 0.9
             weight = 4
             if brunnel_type == BrunnelType.BRIDGE:
-                color = "blue"
+                color = "#E63946"  # Included Bridges
                 if brunnel.is_representative():
                     contained_bridge_count += 1
             else:  # TUNNEL
-                color = "brown"
+                color = "#6A4C93"  # Included Tunnels
                 if brunnel.is_representative():
                     contained_tunnel_count += 1
         else:
@@ -200,9 +205,9 @@ def create_route_map(
             opacity = 0.3
             weight = 2
             if brunnel_type == BrunnelType.BRIDGE:
-                color = "lightsteelblue"  # grey-blue for bridges
+                color = "#A8A8A8"  # Excluded Bridges
             else:  # TUNNEL
-                color = "rosybrown"  # grey-brown for tunnels
+                color = "#9B9B9B"  # Excluded Tunnels
 
         # Count all representative brunnels
         if brunnel.is_representative():
@@ -244,7 +249,6 @@ def create_route_map(
                 color=color,
                 weight=weight,
                 opacity=opacity,
-                dash_array="5, 5",
                 popup=folium.Popup(
                     popup_text, max_width=400
                 ),  # Wider for compound brunnels
