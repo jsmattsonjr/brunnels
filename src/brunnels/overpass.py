@@ -79,18 +79,6 @@ out geom qt;
             else:
                 # Re-raise for non-429 errors or final attempt
                 raise
-        except Exception as e:
-            # Re-raise any other exceptions (connection errors, etc.)
-            if attempt < max_retries:
-                delay = base_delay * (2**attempt)
-                logger.warning(
-                    f"Request failed with {type(e).__name__}: {e}, retrying in {delay:.0f}s (attempt {attempt + 1}/{max_retries + 1})"
-                )
-                time.sleep(delay)
-                continue
-            else:
-                raise
-
     # This should never be reached, but satisfies mypy
     raise RuntimeError("Unexpected end of retry loop")
 
@@ -126,7 +114,7 @@ def _parse_separated_results(
                     f"Found way {element.get('id')} before any count element"
                 )
 
-    logger.info(
+    logger.debug(
         f"Parsed {len(bridges)} bridges and {len(tunnels)} tunnels from Overpass response"
     )
     return bridges, tunnels
