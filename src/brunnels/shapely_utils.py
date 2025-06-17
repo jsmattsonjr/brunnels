@@ -1,5 +1,6 @@
 from typing import List, Optional, Tuple
 from shapely.geometry import LineString, Point
+from shapely.ops import nearest_points
 import pyproj
 
 
@@ -93,3 +94,24 @@ def linestring_distance_to_index(linestring: LineString, distance: float) -> int
     return (
         len(coords) - 2
     )  # Return the last index if distance is at the end of the linestring
+
+
+def find_closest_segments(
+    linestring1: LineString, linestring2: LineString
+) -> Tuple[int, int]:
+    """
+    Find the closest segments between two linestrings.
+
+    Args:
+        linestring1: First linestring
+        linestring2: Second linestring
+
+    Returns:
+        Tuple of (closest_segment1, closest_segment2)
+    """
+    point1, point2 = nearest_points(linestring1, linestring2)
+    distance1 = linestring1.project(point1)
+    distance2 = linestring2.project(point2)
+    segment1 = linestring_distance_to_index(linestring1, distance1)
+    segment2 = linestring_distance_to_index(linestring2, distance2)
+    return (segment1, segment2)

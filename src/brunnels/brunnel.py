@@ -13,10 +13,12 @@ import pyproj
 
 from .geometry_utils import Position
 from .geometry_utils import (
-    find_closest_segments,
     bearings_aligned,
 )
-from .shapely_utils import coords_to_polyline
+from .shapely_utils import (
+    coords_to_polyline,
+    find_closest_segments,
+)
 
 logger = logging.getLogger(__name__)
 
