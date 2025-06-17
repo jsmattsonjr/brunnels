@@ -33,7 +33,6 @@ dependencies = [
     "folium",
     "requests",
     "shapely",
-    "geopy",
     "pyproj",
 ]
 

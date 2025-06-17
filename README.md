@@ -46,7 +46,7 @@ If you prefer not to install the package, you can run it directly from the clone
 git clone https://github.com/jsmattsonjr/brunnels.git
 cd brunnels
 # Install dependencies only
-pip install gpxpy folium requests shapely geopy pyproj
+pip install gpxpy folium requests shapely pyproj
 # Run directly from source
 python3 -m brunnels.cli your_route.gpx
 ```
@@ -192,7 +192,6 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 
 ### Coordinate System
 - Uses WGS84 decimal degrees (standard GPS coordinates)
-- Geodesic distance calculations for accuracy using geopy
 - Handles routes worldwide (excludes polar regions and antimeridian crossings)
 
 ### Data Sources
