@@ -2,6 +2,7 @@ from typing import Dict, Any, Tuple, List
 import requests
 import logging
 import argparse
+import time
 
 
 DEFAULT_API_TIMEOUT = 30
@@ -17,8 +18,13 @@ def query_overpass_brunnels(
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Query Overpass API for bridge and tunnel ways within bounding box with cycling-relevant filtering.
 
+    Retries up to 3 times with exponential backoff on 429 (rate limit) errors.
+
     Returns:
         Tuple of (bridges, tunnels) as separate lists
+
+    Raises:
+        requests.exceptions.RequestException: On network or HTTP errors after retries
     """
     south, west, north, east = bbox
 
@@ -47,11 +53,34 @@ out geom qt;
 
     url = OVERPASS_API_URL
 
-    response = requests.post(url, data=query.strip(), timeout=DEFAULT_API_TIMEOUT)
-    response.raise_for_status()
+    # Retry with exponential backoff for 429 errors
+    max_retries = 3
+    base_delay = 1.0  # seconds
 
-    elements = response.json().get("elements", [])
-    return _parse_separated_results(elements)
+    for attempt in range(max_retries + 1):
+        try:
+            response = requests.post(
+                url, data=query.strip(), timeout=DEFAULT_API_TIMEOUT
+            )
+            response.raise_for_status()
+
+            elements = response.json().get("elements", [])
+            return _parse_separated_results(elements)
+
+        except requests.exceptions.HTTPError as e:
+            if e.response and e.response.status_code == 429 and attempt < max_retries:
+                # Calculate delay with exponential backoff
+                delay = base_delay * (2**attempt)
+                logger.warning(
+                    f"Rate limited (429), retrying in {delay:.0f}s (attempt {attempt + 1}/{max_retries + 1})"
+                )
+                time.sleep(delay)
+                continue
+            else:
+                # Re-raise for non-429 errors or final attempt
+                raise
+    # This should never be reached, but satisfies mypy
+    raise RuntimeError("Unexpected end of retry loop")
 
 
 def _parse_separated_results(
