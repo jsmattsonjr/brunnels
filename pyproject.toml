@@ -29,11 +29,11 @@ classifiers = [
 keywords = ["gpx", "bridges", "tunnels", "cycling", "openstreetmap", "gis", "visualization"]
 
 dependencies = [
-    "gpxpy",
-    "folium",
-    "requests",
-    "shapely",
-    "pyproj",
+    "gpxpy>=1.4.2,<2.0",           # Stable API, avoid major version bump
+    "folium>=0.12.0,<1.0",         # 0.12+ stable API, allow minor updates
+    "requests>=2.25.0,<3.0",       # Very stable, 2.x has been solid for years
+    "shapely>=1.8.0,<3.0",         # 1.8+ has performance improvements, 2.x is stable
+    "pyproj>=3.2.0,<4.0",          # 3.2+ is stable modern version
 ]
 
 [project.optional-dependencies]
