@@ -21,7 +21,7 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 
 ### Requirements
 
-- Python 3.7+
+- Python >=3.9
 - Internet connection (for OpenStreetMap data queries)
 
 ### Install from GitHub
@@ -46,7 +46,7 @@ If you prefer not to install the package, you can run it directly from the clone
 git clone https://github.com/jsmattsonjr/brunnels.git
 cd brunnels
 # Install dependencies only
-pip install gpxpy folium requests shapely pyproj
+pip install gpxpy>=1.4.2,<2.0 shapely>=1.8.0,<3.0 pyproj>=3.2.0,<4.0 folium>=0.12.0,<1.0 requests>=2.25.0,<3.0
 # Run directly from source
 python3 -m brunnels.cli your_route.gpx
 ```
@@ -84,7 +84,6 @@ brunnels route.gpx \
   --bbox-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
-  --no-tag-filtering \
   --log-level DEBUG
 ```
 
@@ -95,7 +94,6 @@ python3 -m brunnels.cli route.gpx \
   --bbox-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
-  --no-tag-filtering \
   --log-level DEBUG
 ```
 
@@ -105,13 +103,13 @@ python3 -m brunnels.cli route.gpx \
 - `--bbox-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
-- `--no-tag-filtering`: Disable filtering based on cycling relevance
 - `--no-overlap-filtering`: Disable filtering of overlapping brunnels (keep all overlapping brunnels)
 - `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query.
 - `--include-waterways`: Include ways tagged as `waterway` in the Overpass query.
 - `--include-active-railways`: Include ways tagged as `railway` with values other than `abandoned` in the Overpass query.
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `--metrics`: Output detailed structured metrics about the processing of brunnels. Examples include: total brunnels found, total bridges and tunnels found, counts of brunnels filtered by different reasons, and counts of finally included brunnels (individual, compound, total). Note that this option also sets the log level to `DEBUG`.
+- `--version`: Show program's version number and exit.
 - `--no-open`: Don't automatically open the map in browser
 
 ## Output Files
