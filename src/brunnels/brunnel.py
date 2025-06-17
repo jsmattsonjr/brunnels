@@ -222,20 +222,8 @@ class Brunnel:
         Returns:
             True if the route geometry completely contains this brunnel, False otherwise
         """
-        try:
-            # Get cached LineString from brunnel
-            brunnel_line = self.linestring
-            if brunnel_line is None:
-                return False
 
-            # Check if route geometry completely contains the brunnel
-            return route_geometry.contains(brunnel_line)
-
-        except Exception as e:
-            logger.warning(
-                f"Failed to check containment for brunnel {self.get_id()}: {e}"
-            )
-            return False
+        return route_geometry.contains(self.linestring)
 
     def calculate_route_span(self, route) -> None:
         """

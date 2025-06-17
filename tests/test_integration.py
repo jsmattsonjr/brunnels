@@ -193,7 +193,15 @@ def run_brunnels_cli(gpx_file: Path, **kwargs) -> BrunnelsTestResult:
             cwd=Path(__file__).parent.parent,  # Run from project root
         )
 
-        # Copy file content if command succeeded
+        # Log failure details for debugging intermittent issues
+        if result.returncode != 0:
+            print(f"CLI failed for {gpx_file}")
+            print(f"Command: {' '.join(cmd)}")
+            print(f"Exit code: {result.returncode}")
+            print(f"STDERR: {result.stderr}")
+            print(f"STDOUT: {result.stdout}")
+
+            # Copy file content if command succeeded
         html_content = None
         if result.returncode == 0:
             # Windows fix: Wait a moment for file to be fully written
