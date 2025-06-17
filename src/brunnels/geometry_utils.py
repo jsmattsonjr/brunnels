@@ -41,6 +41,32 @@ def bearings_aligned(
     return same_direction or opposite_direction
 
 
+def bearing(start, end: "Position") -> float:
+    if start == end:
+        return 0.0
+    if math.isclose(start.latitude, 90.0):
+        return 180.0
+    if math.isclose(start.latitude, -90.0):
+        return 0.0
+    if math.isclose(end.latitude, 90.0):
+        return 0.0
+    if math.isclose(end.latitude, -90.0):
+        return 180.0
+    lat1 = math.radians(start.latitude)
+    lat2 = math.radians(end.latitude)
+    lon1 = math.radians(start.longitude)
+    lon2 = math.radians(end.longitude)
+    dlon = lon2 - lon1
+    y = math.sin(dlon) * math.cos(lat2)
+    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(
+        dlon
+    )
+    bearing = math.atan2(y, x)
+    bearing = math.degrees(bearing)
+    bearing = (bearing + 360) % 360
+    return bearing
+
+
 @dataclass
 class Position:
     latitude: float
@@ -50,28 +76,3 @@ class Position:
         return geodesic(
             (self.latitude, self.longitude), (other.latitude, other.longitude)
         ).kilometers
-
-    def bearing_to(self, other: "Position") -> float:
-        if self == other:
-            return 0.0
-        if math.isclose(self.latitude, 90.0):
-            return 180.0
-        if math.isclose(self.latitude, -90.0):
-            return 0.0
-        if math.isclose(other.latitude, 90.0):
-            return 0.0
-        if math.isclose(other.latitude, -90.0):
-            return 180.0
-        lat1 = math.radians(self.latitude)
-        lat2 = math.radians(other.latitude)
-        lon1 = math.radians(self.longitude)
-        lon2 = math.radians(other.longitude)
-        dlon = lon2 - lon1
-        y = math.sin(dlon) * math.cos(lat2)
-        x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(
-            lat2
-        ) * math.cos(dlon)
-        bearing = math.atan2(y, x)
-        bearing = math.degrees(bearing)
-        bearing = (bearing + 360) % 360
-        return bearing

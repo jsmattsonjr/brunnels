@@ -13,6 +13,7 @@ import pyproj
 
 from .geometry_utils import Position
 from .geometry_utils import (
+    bearing,
     bearings_aligned,
 )
 from .shapely_utils import (
@@ -338,7 +339,6 @@ class Brunnel:
         """
 
         # Find closest segments between brunnel and route
-        # route.coordinate_list returns List[Position]
         brunnel_index, route_index = find_closest_segments(
             self.linestring, route.linestring
         )
@@ -350,8 +350,8 @@ class Brunnel:
         route_end = route.coordinate_list[route_index + 1]
 
         # Calculate bearings for both segments
-        brunnel_bearing = brunnel_start.bearing_to(brunnel_end)
-        route_bearing = route_start.bearing_to(route_end)
+        brunnel_bearing = bearing(brunnel_start, brunnel_end)
+        route_bearing = bearing(route_start, route_end)
 
         # Check if bearings are aligned
         aligned = bearings_aligned(brunnel_bearing, route_bearing, tolerance_degrees)
