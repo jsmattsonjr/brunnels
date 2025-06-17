@@ -5,7 +5,6 @@ Geometry and distance calculation utilities for route analysis.
 
 from typing import List, Tuple, Optional
 from dataclasses import dataclass, field
-from geopy.distance import geodesic
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 import math
