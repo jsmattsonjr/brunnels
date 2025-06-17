@@ -257,8 +257,7 @@ def main():
 
     logger.info(f"Loaded GPX route with {len(route)} points")
 
-    route.calculate_distances()
-    logger.info(f"Total route distance: {route.cumulative_distance[-1]:.2f} km")
+    logger.info(f"Total route distance: {route.linestring.length / 1000:.2f} km")
 
     # Find bridges and tunnels near the route
     brunnels = route.find_brunnels(args)

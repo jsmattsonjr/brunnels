@@ -27,8 +27,6 @@ logger = logging.getLogger(__name__)
 class Route:
     """Represents a GPX route with memoized geometric operations."""
 
-    cumulative_distance: List[float] = field(default_factory=list, init=False)
-
     def __init__(self, coords: List[Position]):
         if not coords:
             raise ValueError("Route coordinates cannot be empty")
@@ -283,32 +281,6 @@ class Route:
             total_distance += point.distance(self.linestring)
 
         return total_distance / len(points) / 1000.0  # Convert to kilometers
-
-    def calculate_distances(self) -> None:
-        """
-        Calculate and set track_distance for each trackpoint.
-
-
-        """
-        if not self.coords:
-            return
-
-        # Initialize cumulative_distance list
-        self.cumulative_distance = [0.0] * len(self.coords)
-
-        # Set first trackpoint distance to 0
-        self.cumulative_distance[0] = 0.0
-
-        # Calculate cumulative distances for remaining trackpoints
-        for i in range(1, len(self.coords)):
-
-            # Calculate distance from previous point and add to cumulative distance
-            segment_distance = self.coordinate_list[i - 1].distance_to(
-                self.coordinate_list[i]
-            )
-            self.cumulative_distance[i] = (
-                self.cumulative_distance[i - 1] + segment_distance
-            )
 
     @classmethod
     def from_gpx(cls, file_input: TextIO) -> "Route":
