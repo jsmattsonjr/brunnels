@@ -80,11 +80,6 @@ class Brunnel:
         coord_tuples = [(pos.longitude, pos.latitude) for pos in self.coords]
         self.linestring: LineString = coords_to_polyline(coord_tuples, self.projection)
 
-    @property
-    def coordinate_list(self) -> List[Position]:
-        """Return the list of Position objects for this geometry."""
-        return self.coords
-
     def is_representative(self) -> bool:
         if self.compound_group is None:
             return True
@@ -342,10 +337,10 @@ class Brunnel:
         )
 
         # Extract segment coordinates
-        brunnel_start = self.coordinate_list[brunnel_index]
-        brunnel_end = self.coordinate_list[brunnel_index + 1]
-        route_start = route.coordinate_list[route_index]
-        route_end = route.coordinate_list[route_index + 1]
+        brunnel_start = self.coords[brunnel_index]
+        brunnel_end = self.coords[brunnel_index + 1]
+        route_start = route.coords[route_index]
+        route_end = route.coords[route_index + 1]
 
         # Calculate bearings for both segments
         brunnel_bearing = bearing(brunnel_start, brunnel_end)
