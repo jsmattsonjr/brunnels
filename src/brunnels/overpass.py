@@ -54,10 +54,11 @@ out geom qt;
     url = OVERPASS_API_URL
 
     # Retry with exponential backoff for 429 errors
+    attempt = 0
     max_retries = 3
     base_delay = 1.0  # seconds
 
-    for attempt in range(max_retries + 1):
+    while True:
         try:
             response = requests.post(
                 url, data=query.strip(), timeout=DEFAULT_API_TIMEOUT
@@ -72,15 +73,14 @@ out geom qt;
                 # Calculate delay with exponential backoff
                 delay = base_delay * (2**attempt)
                 logger.warning(
-                    f"Rate limited (429), retrying in {delay:.0f}s (attempt {attempt + 1}/{max_retries + 1})"
+                    f"Rate limited (429), retrying in {delay:.0f}s (attempt {attempt + 1} of {max_retries + 1})"
                 )
                 time.sleep(delay)
+                attempt += 1
                 continue
             else:
                 # Re-raise for non-429 errors or final attempt
                 raise
-    # This should never be reached, but satisfies mypy
-    raise RuntimeError("Unexpected end of retry loop")
 
 
 def _parse_separated_results(
