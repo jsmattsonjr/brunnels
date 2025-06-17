@@ -295,13 +295,18 @@ class Brunnel:
 
     @classmethod
     def from_overpass_data(
-        cls, way_data: Dict[str, Any], projection: Optional[pyproj.Proj] = None
+        cls,
+        way_data: Dict[str, Any],
+        brunnel_type: BrunnelType,
+        projection: Optional[pyproj.Proj] = None,
     ) -> "Brunnel":
         """
         Parse a single way from Overpass response into Brunnel object.
 
         Args:
             way_data: Raw way data from Overpass API
+            brunnel_type: Type of brunnel (BRIDGE or TUNNEL)
+            projection: Optional projection for coordinate transformation
 
         Returns:
             Brunnel object
@@ -311,11 +316,6 @@ class Brunnel:
         if "geometry" in way_data:
             for node in way_data["geometry"]:
                 coords.append(Position(latitude=node["lat"], longitude=node["lon"]))
-
-        tags = way_data.get("tags", {})
-        brunnel_type = BrunnelType.BRIDGE  # Default to bridge
-        if tags.get("tunnel", "no") not in ["no", "false"]:
-            brunnel_type = BrunnelType.TUNNEL
 
         return cls(
             coords=coords,

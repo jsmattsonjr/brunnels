@@ -14,7 +14,7 @@ from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
 
 from .geometry_utils import Position
-from .brunnel import Brunnel, FilterReason
+from .brunnel import Brunnel, BrunnelType, FilterReason
 from .overpass import query_overpass_brunnels
 from .shapely_utils import coords_to_polyline, create_transverse_mercator_projection
 
@@ -255,15 +255,31 @@ class Route:
             f"Querying Overpass API for bridges and tunnels in {area_sq_km:.1f} sq km area..."
         )
 
-        raw_ways = query_overpass_brunnels(bbox, args)
+        # Get separated bridge and tunnel data
+        raw_bridges, raw_tunnels = query_overpass_brunnels(bbox, args)
 
         brunnels = {}
-        for way_data in raw_ways:
+
+        # Process bridges
+        for way_data in raw_bridges:
             try:
-                brunnel = Brunnel.from_overpass_data(way_data, self.projection)
+                brunnel = Brunnel.from_overpass_data(
+                    way_data, BrunnelType.BRIDGE, self.projection
+                )
                 brunnels[brunnel.get_id()] = brunnel
             except (KeyError, ValueError) as e:
-                logger.warning(f"Failed to parse brunnel way: {e}")
+                logger.warning(f"Failed to parse bridge way: {e}")
+                continue
+
+        # Process tunnels
+        for way_data in raw_tunnels:
+            try:
+                brunnel = Brunnel.from_overpass_data(
+                    way_data, BrunnelType.TUNNEL, self.projection
+                )
+                brunnels[brunnel.get_id()] = brunnel
+            except (KeyError, ValueError) as e:
+                logger.warning(f"Failed to parse tunnel way: {e}")
                 continue
 
         return brunnels
