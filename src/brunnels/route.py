@@ -40,11 +40,6 @@ class Route:
         coord_tuples = [(pos.longitude, pos.latitude) for pos in self.coords]
         self.linestring: LineString = coords_to_polyline(coord_tuples, self.projection)
 
-    @property
-    def coordinate_list(self) -> List[Position]:
-        """Return the list of Position objects for this geometry."""
-        return self.coords
-
     def get_bbox(self, buffer: float = 0.0) -> Tuple[float, float, float, float]:
         """
         Get bounding box for this route, optionally with a buffer.

@@ -140,7 +140,7 @@ def create_route_map(
     folium.LayerControl().add_to(route_map)
 
     # Convert route to coordinate pairs for folium using the new method
-    coordinates = [[pos.latitude, pos.longitude] for pos in route.coordinate_list]
+    coordinates = [[pos.latitude, pos.longitude] for pos in route.coords]
 
     # Add route as polyline
     folium.PolyLine(
@@ -175,9 +175,7 @@ def create_route_map(
     filter_reason_counts: Dict[FilterReason, int] = collections.Counter()
 
     for brunnel in brunnels.values():
-        brunnel_coords = [
-            [pos.latitude, pos.longitude] for pos in brunnel.coordinate_list
-        ]
+        brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
         if not brunnel_coords:
             continue
 
