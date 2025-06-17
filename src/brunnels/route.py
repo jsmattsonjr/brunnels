@@ -12,7 +12,7 @@ import argparse
 import gpxpy
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 import pyproj
 
 from .geometry_utils import Position
@@ -195,7 +195,7 @@ class Route:
             # Calculate average distance to route for each brunnel in the group
             brunnel_distances = []
             for brunnel in group:
-                avg_distance = self.average_distance_to_polyline(brunnel)
+                avg_distance = self.average_distance_to_brunnel(brunnel)
                 brunnel_distances.append((brunnel, avg_distance))
                 logger.debug(
                     f"  {brunnel.get_short_description()}: avg distance = {avg_distance:.3f}km"
@@ -265,39 +265,24 @@ class Route:
 
         return brunnels
 
-    def average_distance_to_polyline(self, geometry: "Brunnel") -> float:
+    def average_distance_to_brunnel(self, brunnel: Brunnel) -> float:
         """
-        Calculate the average distance from all points in a geometry to the closest points on this route.
+        Calculate the average distance from all points in a brunnel to the closest points on this route.
 
         Args:
-            geometry: Any Brunnel object (Brunnel, CompoundBrunnel, etc.)
-
+            brunnel: Brunnel object to calculate distances for
         Returns:
-            Average distance in kilometers, or float('inf') if calculation fails
+            Average distance in kilometers
         """
-        geometry_coords = geometry.coordinate_list
 
-        if not geometry_coords or not self.coords:
-            return float("inf")
+        points = [Point(coord) for coord in brunnel.linestring.coords]
 
         total_distance = 0.0
-        valid_points = 0
 
-        for geometry_point in geometry_coords:
-            try:
-                _, closest_route_point = self.closest_point_to(geometry_point)
-                # Calculate direct distance between geometry point and closest route point
-                distance = geometry_point.distance_to(closest_route_point)
-                total_distance += distance
-                valid_points += 1
-            except Exception as e:
-                logger.warning(f"Failed to calculate distance for geometry point: {e}")
-                continue
+        for point in points:
+            total_distance += point.distance(self.linestring)
 
-        if valid_points == 0:
-            return float("inf")
-
-        return total_distance / valid_points
+        return total_distance / len(points) / 1000.0  # Convert to kilometers
 
     def calculate_distances(self) -> None:
         """
@@ -324,49 +309,6 @@ class Route:
             self.cumulative_distance[i] = (
                 self.cumulative_distance[i - 1] + segment_distance
             )
-
-    def closest_point_to(self: "Route", point: Position) -> Tuple[float, Position]:
-        """
-        Find the closest point on a route to a given point and return the cumulative distance.
-
-        Args:
-            point: Point to find closest route point for
-
-        Returns:
-            Tuple of (distance, closest_position) where:
-            - distance: Distance from route start to closest point
-            - closest_position: Position of closest point on route
-        """
-        route_positions = self.coordinate_list
-
-        if len(route_positions) < 2:
-            raise ValueError(
-                "Route must have at least two positions to calculate distance."
-            )
-
-        min_distance = float("inf")
-        best_distance = 0.0
-        best_position = route_positions[0]
-
-        # Check each segment of the route
-        for i in range(len(route_positions) - 1):
-            seg_start = route_positions[i]
-            seg_end = route_positions[i + 1]
-
-            distance, t, closest_point = point.to_line_segment_distance_and_projection(
-                seg_start, seg_end
-            )
-
-            if distance < min_distance:
-                min_distance = distance
-                best_position = closest_point
-
-                # Calculate cumulative distance to this point
-                best_distance = self.cumulative_distance[i] + seg_start.distance_to(
-                    best_position
-                )
-
-        return best_distance, best_position
 
     @classmethod
     def from_gpx(cls, file_input: TextIO) -> "Route":

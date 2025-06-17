@@ -7,6 +7,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 import logging
+from shapely import Point
 from shapely.geometry import LineString
 import pyproj
 
@@ -312,9 +313,10 @@ class Brunnel:
         min_distance = float("inf")
         max_distance = -float("inf")
 
+        points = [Point(coord) for coord in self.linestring.coords]
         # Find the closest route point for each brunnel coordinate
-        for brunnel_point in self.coordinate_list:
-            distance, _ = route.closest_point_to(brunnel_point)
+        for point in points:
+            distance = route.linestring.project(point) / 1000.0  # Convert to kilometers
 
             min_distance = min(min_distance, distance)
             max_distance = max(max_distance, distance)
