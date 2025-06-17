@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-""" """
+"""Data structures for representing bridges and tunnels (brunnels)."""
 
 from typing import Optional, List, Dict, Any, Set, NamedTuple
 from collections import defaultdict, deque
@@ -64,6 +64,20 @@ class Brunnel:
         compound_group: Optional[List["Brunnel"]] = None,
         projection: Optional[pyproj.Proj] = None,
     ):
+            """Initializes a Brunnel object.
+
+            Args:
+                coords: A list of Position objects representing the brunnel's geometry.
+                metadata: A dictionary containing metadata from OpenStreetMap.
+                brunnel_type: The type of the brunnel (BRIDGE or TUNNEL).
+                filter_reason: The reason why this brunnel might be filtered out.
+                route_span: A RouteSpan object indicating where the brunnel intersects with a route.
+                compound_group: A list of other Brunnel objects if this is part of a compound structure.
+                projection: A pyproj.Proj object for coordinate transformations.
+
+            Raises:
+                ValueError: If coords is empty or has insufficient coordinates.
+            """
         self.coords = coords
         self.metadata = metadata
         self.brunnel_type = brunnel_type
@@ -81,13 +95,30 @@ class Brunnel:
         self.linestring: LineString = coords_to_polyline(coord_tuples, self.projection)
 
     def is_representative(self) -> bool:
+        """
+        Checks if this brunnel is the representative of its compound group.
+
+        If the brunnel is not part of a compound group, it is always representative.
+        Otherwise, only the first brunnel in the sorted compound_group list is considered representative.
+
+        Returns:
+            bool: True if this brunnel is representative, False otherwise.
+        """
         if self.compound_group is None:
             return True
         compound_group = self.compound_group
         return compound_group.index(self) == 0
 
     def get_id(self) -> str:
-        """Get a string identifier for this brunnel."""
+        """Get a string identifier for this brunnel.
+
+        For a simple brunnel, this is usually its OSM ID.
+        For a compound brunnel, it's a semicolon-separated string of the OSM IDs
+        of all its component brunnels.
+
+        Returns:
+            str: The identifier string.
+        """
         if self.compound_group is not None:
             return ";".join(
                 str(component.metadata.get("id", "unknown"))
@@ -96,11 +127,24 @@ class Brunnel:
         return str(self.metadata.get("id", "unknown"))
 
     def get_display_name(self) -> str:
-        """Get the display name for this brunnel."""
+        """Get the display name for this brunnel.
+
+        Retrieves the 'name' tag from OSM metadata. If no 'name' tag exists,
+        returns "unnamed".
+
+        Returns:
+            str: The display name or "unnamed".
+        """
         return self.metadata.get("tags", {}).get("name", "unnamed")
 
     def get_short_description(self) -> str:
-        """Get a short description for logging."""
+        """Get a short, human-readable description for logging.
+
+        Includes the brunnel type, display name, ID, and segment count for compound brunnels.
+
+        Returns:
+            str: A short descriptive string.
+        """
         brunnel_type = self.brunnel_type.value.capitalize()
         name = self.get_display_name()
         if self.compound_group is not None:
@@ -109,7 +153,13 @@ class Brunnel:
         return f"{brunnel_type}: {name} ({self.get_id()})"
 
     def get_log_description(self) -> str:
-        """Get a standardized description for logging with route span info."""
+        """Get a standardized description for logging, including route span information.
+
+        Combines the short description with formatted route span distances if available.
+
+        Returns:
+            str: A descriptive string for logging purposes.
+        """
         route_span = self.get_route_span()
         if route_span is not None:
             span_info = f"{route_span.start_distance:.2f}-{route_span.end_distance:.2f} km (length: {route_span.end_distance - route_span.start_distance:.2f} km)"
@@ -118,6 +168,19 @@ class Brunnel:
             return f"{self.get_short_description()} (no route span)"
 
     def get_route_span(self) -> Optional[RouteSpan]:
+        """
+        Get the RouteSpan for this brunnel.
+
+        For a simple brunnel, this is its own route_span.
+        For a compound brunnel, it's calculated from the route_spans of its
+        first and last components.
+
+        Returns:
+            Optional[RouteSpan]: The route span, or None if not calculated.
+
+        Raises:
+            ValueError: If a compound brunnel has a component without a route_span.
+        """
         if self.compound_group is not None and len(self.compound_group) > 0:
             first_component = self.compound_group[0]
             last_component = self.compound_group[-1]

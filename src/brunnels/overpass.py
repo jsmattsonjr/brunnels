@@ -1,3 +1,10 @@
+"""
+Handles querying the Overpass API for bridge and tunnel data.
+
+This module contains functions to construct and send queries to the
+Overpass API to retrieve OpenStreetMap data relevant to brunnels
+(bridges and tunnels) within a specified geographic bounding box.
+"""
 from typing import Dict, Any, Tuple, List
 import requests
 import logging
