@@ -25,6 +25,14 @@ class Route:
     """Represents a GPX route with memoized geometric operations."""
 
     def __init__(self, coords: List[Position]):
+        """Initializes a Route object.
+
+        Args:
+            coords: A list of Position objects representing the route's geometry.
+
+        Raises:
+            ValueError: If coords is empty or has fewer than two coordinates.
+        """
         if not coords:
             raise ValueError("Route coordinates cannot be empty")
         if len(coords) < 2:
@@ -86,10 +94,15 @@ class Route:
 
     def _calculate_bbox(self) -> Tuple[float, float, float, float]:
         """
-        Calculate bounding box for route, always with a 0 buffer.
+        Calculates the unbuffered bounding box for the route.
+
+        This internal method determines the minimum and maximum latitude and longitude
+        for the route's coordinates. The result is stored and used as the basis
+        for the public `get_bbox` method, which can then apply a buffer.
 
         Returns:
-            Tuple of (south, west, north, east) in decimal degrees
+            A tuple (south, west, north, east) representing the bounding box
+            in decimal degrees, with no buffer applied.
         """
         latitudes = [coord.latitude for coord in self.coords]
         longitudes = [coord.longitude for coord in self.coords]
@@ -259,10 +272,14 @@ class Route:
         """
         Calculate the average distance from all points in a brunnel to the closest points on this route.
 
+        The distance is measured in projected coordinates (typically meters) and then
+        averaged and converted to kilometers.
+
         Args:
-            brunnel: Brunnel object to calculate distances for
+            brunnel: Brunnel object to calculate distances for.
+
         Returns:
-            Average distance in kilometers
+            float: Average distance in kilometers.
         """
 
         points = [Point(coord) for coord in brunnel.linestring.coords]
@@ -286,8 +303,8 @@ class Route:
             Route object representing the concatenated route
 
         Raises:
-            UnsupprtedRouteError: If route crosses antimeridian or approaches poles
-            gpxpy.gpx.GPXException: If GPX file is malformed
+            RuntimeError: If the route crosses the antimeridian or approaches poles (validated by `_check_route`).
+            gpxpy.gpx.GPXException: If GPX file is malformed.
         """
         try:
             gpx_data = gpxpy.parse(file_input)
@@ -329,9 +346,10 @@ class Route:
             Route object representing the route
 
         Raises:
-            UnsupprtedRouteError: If route fails validation
-            FileNotFoundError: If file doesn't exist
-            PermissionError: If file can't be read
+            RuntimeError: If route fails validation (e.g., antimeridian crossing, polar proximity).
+            FileNotFoundError: If file doesn't exist.
+            PermissionError: If file can't be read.
+            gpxpy.gpx.GPXException: If GPX file is malformed.
         """
         logger.debug(f"Reading GPX file: {filename}")
         with open(filename, "r", encoding="utf-8") as f:

@@ -1,3 +1,12 @@
+"""
+Utility functions for working with Shapely geometries and projections.
+
+This module provides helper functions for tasks such as creating custom
+map projections (Transverse Mercator), converting coordinate lists to
+Shapely LineString objects, and finding relationships between geometries
+like closest segments or points at a certain distance along a line.
+"""
+
 from typing import List, Optional, Tuple
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points

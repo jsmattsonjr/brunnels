@@ -231,6 +231,10 @@ def filter_uncontained_brunnels(
 
 
 def main():
+    """
+    Parses command-line arguments, processes the GPX file,
+    finds brunnels, and generates an interactive map.
+    """
     parser = create_argument_parser()
     args = parser.parse_args()
 

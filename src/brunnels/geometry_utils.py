@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class Position(NamedTuple):
+    """Represents a geographic position with latitude and longitude."""
+
     latitude: float
     longitude: float
 
@@ -40,7 +42,27 @@ def bearings_aligned(
     return same_direction or opposite_direction
 
 
-def bearing(start, end: "Position") -> float:
+def bearing(start: Position, end: Position) -> float:
+    """
+    Calculates the initial bearing (forward azimuth) from a start Position to an end Position.
+
+    The bearing is the angle, measured in degrees, clockwise from north,
+    from the first point to the second point.
+
+    Special Cases:
+    - If start and end points are coincident, returns 0.0.
+    - If start latitude is at North Pole (90.0), returns 180.0 (south).
+    - If start latitude is at South Pole (-90.0), returns 0.0 (north).
+    - If end latitude is at North Pole (90.0), returns 0.0 (north).
+    - If end latitude is at South Pole (-90.0), returns 180.0 (south).
+
+    Args:
+        start: The starting Position (latitude, longitude).
+        end: The ending Position (latitude, longitude).
+
+    Returns:
+        The bearing in degrees, from 0.0 to 359.99...
+    """
     if start == end:
         return 0.0
     if math.isclose(start.latitude, 90.0):
