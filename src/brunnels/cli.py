@@ -15,6 +15,8 @@ import argparse
 import logging
 import sys
 import os
+import gpxpy
+from gpxpy import gpx
 from shapely.geometry.base import BaseGeometry
 
 
@@ -256,8 +258,17 @@ def main():
         sys.exit(1)
 
     # Load and parse the GPX file into a route
-    route = Route.from_file(args.filename)
-
+    try:
+        route = Route.from_file(args.filename)
+    except FileNotFoundError:
+        logger.error(f"GPX file not found: {args.filename}")
+        sys.exit(1)
+    except PermissionError:
+        logger.error(f"Cannot read GPX file (permission denied): {args.filename}")
+        sys.exit(1)
+    except gpx.GPXException as e:
+        logger.error(f"Invalid GPX file: {e}")
+        sys.exit(1)
     logger.info(f"Loaded GPX route with {len(route)} points")
 
     logger.info(f"Total route distance: {route.linestring.length / 1000:.2f} km")
