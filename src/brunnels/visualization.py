@@ -4,7 +4,6 @@ Route visualization using folium maps.
 """
 
 from typing import Dict, Any
-import collections
 import logging
 import argparse
 import folium
@@ -12,6 +11,7 @@ from folium.template import Template
 
 from .brunnel import Brunnel, BrunnelType, FilterReason
 from .route import Route
+from .metrics import BrunnelMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +205,7 @@ def create_route_map(
     route: Route,
     output_filename: str,
     brunnels: Dict[str, Brunnel],
+    metrics: BrunnelMetrics,
     args: argparse.Namespace,
 ) -> None:
     """
@@ -214,7 +215,8 @@ def create_route_map(
         route: Route object representing the route
         output_filename: Path where HTML map file should be saved
         brunnels: Dictionary of Brunnel objects to display on map
-        args: argparse.Namespace object containing settings like buffer and metrics flag
+        metrics: BrunnelMetrics containing pre-collected metrics
+        args: argparse.Namespace object containing settings like buffer
 
     Raises:
         ValueError: If route is empty
@@ -263,7 +265,7 @@ def create_route_map(
     # Add LayerControl
     folium.LayerControl().add_to(route_map)
 
-    # Convert route to coordinate pairs for folium using the new method
+    # Convert route to coordinate pairs for folium
     coordinates = [[pos.latitude, pos.longitude] for pos in route.coords]
 
     # Add route as polyline
@@ -289,15 +291,7 @@ def create_route_map(
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(route_map)
 
-    # Count brunnels by type and containment status
-    bridge_count = 0
-    tunnel_count = 0
-    contained_bridge_count = 0
-    contained_tunnel_count = 0
-    compound_count = 0
-    individual_count = 0
-    filter_reason_counts: Dict[FilterReason, int] = collections.Counter()
-
+    # Process and add brunnels to map (metrics already collected)
     for brunnel in brunnels.values():
         brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
         if not brunnel_coords:
@@ -307,42 +301,22 @@ def create_route_map(
         filter_reason = brunnel.filter_reason
         route_span = brunnel.get_route_span()
 
-        if filter_reason != FilterReason.NONE:
-            filter_reason_counts[filter_reason] += 1
-
         # Determine color and opacity based on containment status and filtering
         if filter_reason == FilterReason.NONE:
             opacity = 0.9
             weight = 4
             if brunnel_type == BrunnelType.BRIDGE:
                 color = "#E63946"  # Included Bridges
-                if brunnel.is_representative():
-                    contained_bridge_count += 1
             else:  # TUNNEL
                 color = "#6A4C93"  # Included Tunnels
-                if brunnel.is_representative():
-                    contained_tunnel_count += 1
         else:
             # Use muted colors for filtered or non-contained brunnels
             opacity = 0.3
-            weight = 4
+            weight = 2
             if brunnel_type == BrunnelType.BRIDGE:
                 color = "#A8A8A8"  # Excluded Bridges
             else:  # TUNNEL
                 color = "#9B9B9B"  # Excluded Tunnels
-
-        # Count all representative brunnels
-        if brunnel.is_representative():
-            if brunnel_type == BrunnelType.BRIDGE:
-                bridge_count += 1
-            else:
-                tunnel_count += 1
-
-            if filter_reason == FilterReason.NONE:
-                if brunnel.compound_group is not None:
-                    compound_count += 1
-                else:
-                    individual_count += 1
 
         # Create popup text with full metadata
         if filter_reason == FilterReason.NONE:
@@ -389,12 +363,12 @@ def create_route_map(
                 z_index=2,  # Ensure bridges are above route
             ).add_to(route_map)
 
-    # Add legend with dynamic counts
+    # Add legend with dynamic counts from metrics
     legend = BrunnelLegend(
-        bridge_count,
-        tunnel_count,
-        contained_bridge_count,
-        contained_tunnel_count,
+        metrics.bridge_count,
+        metrics.tunnel_count,
+        metrics.contained_bridge_count,
+        metrics.contained_tunnel_count,
     )
     route_map.add_child(legend)
 
@@ -405,22 +379,5 @@ def create_route_map(
     route_map.save(output_filename)
 
     logger.debug(
-        f"Map saved to {output_filename} with {contained_bridge_count}/{bridge_count} bridges and {contained_tunnel_count}/{tunnel_count} tunnels contained in route buffer"
+        f"Map saved to {output_filename} with {metrics.contained_bridge_count}/{metrics.bridge_count} bridges and {metrics.contained_tunnel_count}/{metrics.tunnel_count} tunnels contained in route buffer"
     )
-
-    if args.metrics:
-        # Log detailed filtering metrics
-        logger.debug("=== BRUNNELS_METRICS ===")
-        logger.debug(f"total_brunnels_found={len(brunnels)}")
-        logger.debug(f"total_bridges_found={bridge_count}")
-        logger.debug(f"total_tunnels_found={tunnel_count}")
-
-        for reason, count in filter_reason_counts.items():
-            logger.debug((f"filtered_reason[{reason.value}]={count}"))
-
-        logger.debug(f"contained_bridges={contained_bridge_count}")
-        logger.debug(f"contained_tunnels={contained_tunnel_count}")
-        logger.debug(f"final_included_individual={individual_count}")
-        logger.debug(f"final_included_compound={compound_count}")
-        logger.debug(f"final_included_total={individual_count + compound_count}")
-        logger.debug("=== END_BRUNNELS_METRICS ===")
