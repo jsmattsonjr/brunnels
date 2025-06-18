@@ -10,13 +10,10 @@ from shapely.geometry import LineString
 import pyproj
 
 from .geometry_utils import Position
-from .geometry_utils import (
-    bearing,
-    bearings_aligned,
-)
+
 from .shapely_utils import (
     coords_to_polyline,
-    find_closest_segments,
+    linestrings_aligned,
 )
 
 logger = logging.getLogger(__name__)
@@ -264,28 +261,13 @@ class Brunnel:
             True if brunnel is aligned with route within tolerance, False otherwise
         """
 
-        # Find closest segments between brunnel and route
-        brunnel_index, route_index = find_closest_segments(
-            self.linestring, route.linestring
+        aligned = linestrings_aligned(
+            self.linestring, route.linestring, tolerance_degrees
         )
-
-        # Extract segment coordinates
-        brunnel_start = self.coords[brunnel_index]
-        brunnel_end = self.coords[brunnel_index + 1]
-        route_start = route.coords[route_index]
-        route_end = route.coords[route_index + 1]
-
-        # Calculate bearings for both segments
-        brunnel_bearing = bearing(brunnel_start, brunnel_end)
-        route_bearing = bearing(route_start, route_end)
-
-        # Check if bearings are aligned
-        aligned = bearings_aligned(brunnel_bearing, route_bearing, tolerance_degrees)
-
-        logger.debug(
-            f"{self.get_short_description()}: brunnel_bearing={brunnel_bearing:.1f}°, route_bearing={route_bearing:.1f}°, aligned={aligned} (tolerance={tolerance_degrees}°)"
-        )
-
+        if not aligned:
+            logger.debug(
+                f"{self.get_short_description()} is not aligned with the route"
+            )
         return aligned
 
     @classmethod
