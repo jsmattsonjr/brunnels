@@ -13,9 +13,8 @@ __email__ = "jsmattsonjr@gmail.com"
 
 # Import main classes for public API
 from .brunnel import Brunnel, BrunnelType, FilterReason, RouteSpan
-
 from .route import Route
-from .geometry_utils import Position
+from .geometry import Position
 
 __all__ = [
     "Brunnel",

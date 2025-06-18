@@ -9,9 +9,8 @@ from shapely import Point
 from shapely.geometry import LineString
 import pyproj
 
-from .geometry_utils import Position
-
-from .shapely_utils import (
+from .geometry import (
+    Position,
     coords_to_polyline,
     linestrings_aligned,
 )

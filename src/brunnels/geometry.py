@@ -7,11 +7,18 @@ Shapely LineString objects, and finding relationships between geometries
 like closest segments or points at a certain distance along a line.
 """
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, NamedTuple
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 import pyproj
 import math
+
+
+class Position(NamedTuple):
+    """Represents a geographic position with latitude and longitude."""
+
+    latitude: float
+    longitude: float
 
 
 def create_transverse_mercator_projection(

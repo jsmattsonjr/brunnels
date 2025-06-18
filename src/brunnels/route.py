@@ -13,10 +13,13 @@ import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
 
-from .geometry_utils import Position
 from .brunnel import Brunnel, BrunnelType, FilterReason
 from .overpass import query_overpass_brunnels
-from .shapely_utils import coords_to_polyline, create_transverse_mercator_projection
+from .geometry import (
+    Position,
+    coords_to_polyline,
+    create_transverse_mercator_projection,
+)
 
 logger = logging.getLogger(__name__)
 
