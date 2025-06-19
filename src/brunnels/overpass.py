@@ -55,8 +55,8 @@ out geom qt;
 
     # Retry with exponential backoff for 429 errors
     attempt = 0
-    max_retries = 3
-    base_delay = 1.0  # seconds
+    max_retries = 5  # Increased for CI environments
+    base_delay = 2.0  # Longer initial delay for CI
 
     while True:
         try:
@@ -69,6 +69,9 @@ out geom qt;
             return _parse_separated_results(elements)
 
         except requests.exceptions.HTTPError as e:
+            logger.debug(
+                f"HTTPError caught: status={e.response.status_code if e.response else 'None'}, attempt={attempt}, max_retries={max_retries}"
+            )
             if e.response and e.response.status_code == 429 and attempt < max_retries:
                 # Calculate delay with exponential backoff
                 delay = base_delay * (2**attempt)
@@ -80,6 +83,9 @@ out geom qt;
                 continue
             else:
                 # Re-raise for non-429 errors or final attempt
+                logger.debug(
+                    f"Not retrying: status={e.response.status_code if e.response else 'None'}, attempt={attempt}, max_retries={max_retries}"
+                )
                 raise
 
 

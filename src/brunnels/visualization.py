@@ -31,6 +31,12 @@ class BrunnelLegend(folium.MacroElement):
         self.not_nearest_tunnel_count = metrics.tunnel_counts.get(
             "not_nearest_among_overlapping_brunnels", 0
         )
+        self.unaligned_bridge_count = metrics.bridge_counts.get(
+            "not_aligned_with_route", 0
+        )
+        self.unaligned_tunnel_count = metrics.tunnel_counts.get(
+            "not_aligned_with_route", 0
+        )
 
         # Use folium's template string approach
         self._template = Template(
@@ -42,7 +48,7 @@ class BrunnelLegend(folium.MacroElement):
             left: 50px;
             width: 230px;
             min-height: 90px;
-            max-height: 150px;
+            max-height: 200px;
             background-color: white;
             border: 2px solid grey;
             z-index: 9999;
@@ -69,14 +75,26 @@ class BrunnelLegend(folium.MacroElement):
             </div>
             {% if this.not_nearest_bridge_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #DF94A7; font-weight: bold; font-size: 18px;">—</span>
+                <span style="color: #FF6B35; font-weight: bold; font-size: 18px;">—</span>
                 Not Nearest Bridges ({{ this.not_nearest_bridge_count }})
             </div>
             {% endif %}
             {% if this.not_nearest_tunnel_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #B495C2; font-weight: bold; font-size: 18px;">—</span>
+                <span style="color: #9D4EDD; font-weight: bold; font-size: 18px;">—</span>
                 Not Nearest Tunnels ({{ this.not_nearest_tunnel_count }})
+            </div>
+            {% endif %}
+            {% if this.unaligned_bridge_count > 0 %}
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: #DC2626; font-weight: bold; font-size: 18px;">—</span>
+                Unaligned Bridges ({{ this.unaligned_bridge_count }})
+            </div>
+            {% endif %}
+            {% if this.unaligned_tunnel_count > 0 %}
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: #7C3AED; font-weight: bold; font-size: 18px;">—</span>
+                Unaligned Tunnels ({{ this.unaligned_tunnel_count }})
             </div>
             {% endif %}
         </div>
@@ -309,8 +327,12 @@ def create_route_map(
         exclusion_reason = brunnel.exclusion_reason
         route_span = brunnel.get_route_span()
 
-        # Display included brunnels and "not nearest" excluded brunnels
-        if exclusion_reason not in [ExclusionReason.NONE, ExclusionReason.NOT_NEAREST]:
+        # Display included brunnels, "not nearest", and "unaligned" excluded brunnels
+        if exclusion_reason not in [
+            ExclusionReason.NONE,
+            ExclusionReason.NOT_NEAREST,
+            ExclusionReason.UNALIGNED,
+        ]:
             continue
 
         # Set color and style based on inclusion status
@@ -322,14 +344,22 @@ def create_route_map(
                 color = "#D23C4C"  # Included Bridges (80% saturation)
             else:  # TUNNEL
                 color = "#69498F"  # Included Tunnels (80% saturation)
-        else:  # NOT_NEAREST
-            # Not nearest brunnels with lighter colors
-            opacity = 0.6
+        elif exclusion_reason == ExclusionReason.NOT_NEAREST:
+            # Not nearest brunnels with yellow tinge (fully saturated)
+            opacity = 0.9
             weight = 3
             if brunnel_type == BrunnelType.BRIDGE:
-                color = "#DF94A7"  # Not Nearest Bridges (lighter)
+                color = "#FF6B35"  # Not Nearest Bridges (red-orange, yellow tinge)
             else:  # TUNNEL
-                color = "#B495C2"  # Not Nearest Tunnels (lighter)
+                color = "#9D4EDD"  # Not Nearest Tunnels (purple with yellow tinge)
+        else:  # UNALIGNED
+            # Unaligned brunnels with green tinge (fully saturated)
+            opacity = 0.9
+            weight = 3
+            if brunnel_type == BrunnelType.BRIDGE:
+                color = "#DC2626"  # Unaligned Bridges (deep red with green tinge)
+            else:  # TUNNEL
+                color = "#7C3AED"  # Unaligned Tunnels (blue-purple with green tinge)
 
         # Create popup text with full metadata
         if exclusion_reason == ExclusionReason.NONE:
@@ -340,8 +370,10 @@ def create_route_map(
                 )
             else:
                 status = "included (reason: none)"
-        else:  # NOT_NEAREST
+        elif exclusion_reason == ExclusionReason.NOT_NEAREST:
             status = "not nearest among overlapping brunnels"
+        else:  # UNALIGNED
+            status = "not aligned with route"
 
         popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
 
