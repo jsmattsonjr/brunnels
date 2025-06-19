@@ -13,7 +13,7 @@ import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
 
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, BrunnelType, ExclusionReason
 from .overpass import query_overpass_brunnels
 from .geometry import (
     Position,
@@ -149,16 +149,16 @@ class Route:
 
         return (south, west, north, east)
 
-    def filter_overlapping_brunnels(
+    def exclude_overlapping_brunnels(
         self,
         brunnels: Dict[str, Brunnel],
     ) -> None:
         """
-        Filter overlapping brunnels, keeping only the nearest one for each overlapping group.
+        Exclude overlapping brunnels, keeping only the nearest one for each overlapping group.
         Supports both regular and compound brunnels.
 
         Args:
-            brunnels: Dictionary of Brunnel objects to filter (modified in-place)
+            brunnels: Dictionary of Brunnel objects to exclude (modified in-place)
         """
         if not self.coords or not brunnels:
             return
@@ -169,11 +169,11 @@ class Route:
             for b in brunnels.values()
             if b.is_representative()
             and b.get_route_span() is not None
-            and b.filter_reason == FilterReason.NONE
+            and b.exclusion_reason == ExclusionReason.NONE
         ]
 
         if len(contained_brunnels) < 2:
-            return  # Nothing to filter
+            return  # Nothing to exclude
 
         # Find groups of overlapping brunnels
         overlap_groups = []
@@ -211,8 +211,8 @@ class Route:
             logger.debug("No overlapping brunnels found")
             return
 
-        # Filter each overlap group, keeping only the nearest
-        filtered = 0
+        # Exclude each overlap group, keeping only the nearest
+        excluded_count = 0
         for group in overlap_groups:
             logger.debug(f"Processing overlap group with {len(group)} brunnels")
 
@@ -228,7 +228,7 @@ class Route:
             # Sort by distance (closest first)
             brunnel_distances.sort(key=lambda x: x[1])
 
-            # Keep the closest, filter the rest
+            # Keep the closest, exclude the rest
             closest_brunnel, closest_distance = brunnel_distances[0]
 
             logger.debug(
@@ -236,16 +236,16 @@ class Route:
             )
 
             for brunnel, distance in brunnel_distances[1:]:
-                brunnel.filter_reason = FilterReason.NOT_NEAREST
-                filtered += 1
+                brunnel.exclusion_reason = ExclusionReason.NOT_NEAREST
+                excluded_count += 1
 
                 logger.debug(
-                    f"  Filtered: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
+                    f"  Excluded: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.exclusion_reason})"
                 )
 
-        if filtered > 0:
+        if excluded_count > 0:
             logger.debug(
-                f"Filtered {filtered} overlapping brunnels, keeping nearest in each group"
+                f"Excluded {excluded_count} overlapping brunnels, keeping nearest in each group"
             )
 
     def find_brunnels(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
@@ -443,13 +443,13 @@ class Route:
                 )
         return route_geometry
 
-    def filter_misaligned_brunnels(
+    def exclude_misaligned_brunnels(
         self,
         brunnels: Dict[str, Brunnel],
         bearing_tolerance_degrees: float,
     ) -> None:
         """
-        Filters a list of brunnels by their alignment with the route.
+        Excludes a list of brunnels by their alignment with the route.
 
         Args:
 
@@ -462,15 +462,15 @@ class Route:
         for brunnel in brunnels.values():
 
             if (
-                brunnel.filter_reason == FilterReason.NONE
+                brunnel.exclusion_reason == ExclusionReason.NONE
                 and not brunnel.is_aligned_with_route(self, bearing_tolerance_degrees)
             ):
-                brunnel.filter_reason = FilterReason.UNALIGNED
+                brunnel.exclusion_reason = ExclusionReason.UNALIGNED
                 unaligned_count += 1
 
         if unaligned_count > 0:
             logger.debug(
-                f"Filtered {unaligned_count} brunnels out of {len(brunnels)} "
+                f"Excluded {unaligned_count} brunnels out of {len(brunnels)} "
                 f"contained brunnels due to bearing misalignment (tolerance: {bearing_tolerance_degrees}°)"
             )
 
@@ -479,5 +479,5 @@ class Route:
         Calculate the route span for each included brunnel.
         """
         for brunnel in brunnels.values():
-            if brunnel.filter_reason == FilterReason.NONE:
+            if brunnel.exclusion_reason == ExclusionReason.NONE:
                 brunnel.calculate_route_span(self)

@@ -9,7 +9,7 @@ import argparse
 import folium
 from folium.template import Template
 
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, BrunnelType, ExclusionReason
 from .route import Route
 from .metrics import BrunnelMetrics
 
@@ -298,11 +298,11 @@ def create_route_map(
             continue
 
         brunnel_type = brunnel.brunnel_type
-        filter_reason = brunnel.filter_reason
+        exclusion_reason = brunnel.exclusion_reason
         route_span = brunnel.get_route_span()
 
-        # Determine color and opacity based on containment status and filtering
-        if filter_reason == FilterReason.NONE:
+        # Determine color and opacity based on containment status and exclusion
+        if exclusion_reason == ExclusionReason.NONE:
             opacity = 0.9
             weight = 4
             if brunnel_type == BrunnelType.BRIDGE:
@@ -310,7 +310,7 @@ def create_route_map(
             else:  # TUNNEL
                 color = "#6A4C93"  # Included Tunnels
         else:
-            # Use muted colors for filtered or non-contained brunnels
+            # Use muted colors for excluded or non-contained brunnels
             opacity = 0.3
             weight = 2
             if brunnel_type == BrunnelType.BRIDGE:
@@ -319,18 +319,18 @@ def create_route_map(
                 color = "#9B9B9B"  # Excluded Tunnels
 
         # Create popup text with full metadata
-        if filter_reason == FilterReason.NONE:
+        if exclusion_reason == ExclusionReason.NONE:
             if route_span:
                 status = (
                     f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
                     f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
                 )
             else:
-                status = "contained in route buffer"
-        elif filter_reason == FilterReason.NOT_CONTAINED:
-            status = "not contained in route buffer"
+                status = "included (reason: none)"
+        elif exclusion_reason == ExclusionReason.NOT_CONTAINED:
+            status = "excluded: not contained in route buffer"
         else:
-            status = f"filtered: {filter_reason}"
+            status = f"excluded: {exclusion_reason}"
 
         popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
 

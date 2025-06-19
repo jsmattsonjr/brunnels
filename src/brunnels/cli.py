@@ -24,7 +24,7 @@ from . import __version__
 from . import visualization
 from .metrics import collect_metrics, log_metrics
 from .route import Route
-from .brunnel import Brunnel, BrunnelType, FilterReason, find_compound_brunnels
+from .brunnel import Brunnel, BrunnelType, ExclusionReason, find_compound_brunnels
 from .file_utils import generate_output_filename
 
 # Configure logging
@@ -85,9 +85,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Don't automatically open the HTML file in browser",
     )
     parser.add_argument(
-        "--no-overlap-filtering",
+        "--no-overlap-exclusion",
         action="store_true",
-        help="Disable filtering of overlapping brunnels (keep all overlapping brunnels)",
+        help="Disable exclusion of overlapping brunnels (keep all overlapping brunnels)",
     )
     parser.add_argument(
         "--metrics",
@@ -192,11 +192,11 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     Args:
         brunnels: Sequence of all brunnels to check (including compound brunnels)
     """
-    # Find final included brunnels (those that are contained and not filtered)
+    # Find final included brunnels (those that are contained and not excluded)
     included_brunnels = [
         b
         for b in brunnels.values()
-        if b.filter_reason == FilterReason.NONE and b.is_representative()
+        if b.exclusion_reason == ExclusionReason.NONE and b.is_representative()
     ]
 
     if not included_brunnels:
@@ -213,11 +213,11 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         logger.info(f"  {brunnel.get_log_description()}")
 
 
-def filter_uncontained_brunnels(
+def exclude_uncontained_brunnels(
     route_geometry: BaseGeometry, brunnels: Dict[str, Brunnel]
 ) -> None:
     """
-    Filters brunnels that are not contained within the given route geometry.
+    Excludes brunnels that are not contained within the given route geometry.
 
     Args:
         route_geometry: The Shapely geometry of the (buffered) route.
@@ -226,10 +226,11 @@ def filter_uncontained_brunnels(
     """
 
     for brunnel in brunnels.values():
-        if brunnel.filter_reason == FilterReason.NONE and not brunnel.is_contained_by(
-            route_geometry
+        if (
+            brunnel.exclusion_reason == ExclusionReason.NONE
+            and not brunnel.is_contained_by(route_geometry)
         ):
-            brunnel.filter_reason = FilterReason.NOT_CONTAINED
+            brunnel.exclusion_reason = ExclusionReason.NOT_CONTAINED
 
 
 def main():
@@ -278,27 +279,31 @@ def main():
 
     logger.info(f"Found {len(brunnels)} brunnels near route")
 
-    filtered_count = len(
-        [b for b in brunnels.values() if b.filter_reason != FilterReason.NONE]
+    excluded_count = len(
+        [b for b in brunnels.values() if b.exclusion_reason != ExclusionReason.NONE]
     )
 
-    if filtered_count > 0:
-        logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
+    if excluded_count > 0:
+        logger.debug(f"{excluded_count} brunnels excluded (will show greyed out)")
 
     route_geometry = route.calculate_buffered_route_geometry(args.route_buffer)
 
     # Check for containment within the route buffer
-    filter_uncontained_brunnels(route_geometry, brunnels)
+    exclude_uncontained_brunnels(route_geometry, brunnels)
 
-    # Filter misaligned brunnels based on bearing tolerance
+    # Exclude misaligned brunnels based on bearing tolerance
     if args.bearing_tolerance > 0:
-        route.filter_misaligned_brunnels(brunnels, args.bearing_tolerance)
+        route.exclude_misaligned_brunnels(brunnels, args.bearing_tolerance)
 
     # Count contained vs total brunnels
     bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
     tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
-    contained_bridges = [b for b in bridges if b.filter_reason == FilterReason.NONE]
-    contained_tunnels = [b for b in tunnels if b.filter_reason == FilterReason.NONE]
+    contained_bridges = [
+        b for b in bridges if b.exclusion_reason == ExclusionReason.NONE
+    ]
+    contained_tunnels = [
+        b for b in tunnels if b.exclusion_reason == ExclusionReason.NONE
+    ]
 
     logger.debug(
         f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
@@ -306,8 +311,8 @@ def main():
 
     route.calculate_route_spans(brunnels)
     find_compound_brunnels(brunnels)
-    if not args.no_overlap_filtering:
-        route.filter_overlapping_brunnels(brunnels)
+    if not args.no_overlap_exclusion:
+        route.exclude_overlapping_brunnels(brunnels)
 
     # Log the final list of included brunnels (what will actually appear on the map)
     log_final_included_brunnels(brunnels)

@@ -25,7 +25,7 @@ class BrunnelsTestResult:
 
         # Initialize attributes that will be set by _parse_output
         self.metrics: Dict[str, float] = {}
-        self.filtering: Dict[str, int] = {}
+        self.exclusion_details: Dict[str, int] = {}
         self.included_brunnels: List[Dict[str, Any]] = []
 
         self._parse_output()
@@ -33,7 +33,7 @@ class BrunnelsTestResult:
     def _parse_output(self):
         """Extract metrics from structured debug output"""
         self.metrics = {}
-        self.filtering = {}
+        self.exclusion_details = {}
         self.included_brunnels = []
 
         # Parse structured metrics from stderr
@@ -51,8 +51,8 @@ class BrunnelsTestResult:
                 parts = line.split(" - ")
                 message = parts[-1] if len(parts) >= 4 else line
 
-                # Handle filtering reasons: "filtered_reason[outwith_route_buffer]=952"
-                if message.startswith("filtered_reason["):
+                # Handle exclusion reasons: "excluded_reason[outwith_route_buffer]=952"
+                if message.startswith("excluded_reason["):
                     bracket_start = message.find("[")
                     bracket_end = message.find("]")
                     equals_pos = message.find("=", bracket_end)
@@ -60,16 +60,16 @@ class BrunnelsTestResult:
                     if bracket_start != -1 and bracket_end != -1 and equals_pos != -1:
                         reason_key = message[bracket_start + 1 : bracket_end]
                         count_str = message[equals_pos + 1 :]
-                        self.filtering[reason_key] = int(count_str)
+                        self.exclusion_details[reason_key] = int(count_str)
 
                 # Handle regular metrics: "total_brunnels_found=1515"
-                elif "=" in message and not message.startswith("filtered_reason"):
+                elif "=" in message and not message.startswith("excluded_reason"):
                     key, value = message.split("=", 1)
                     self.metrics[key] = int(value)
 
-        # Calculate total filtered count
-        if self.filtering:
-            self.filtering["total"] = sum(self.filtering.values())
+        # Calculate total excluded count
+        if self.exclusion_details:
+            self.exclusion_details["total"] = sum(self.exclusion_details.values())
 
         # Parse legacy metrics from non-structured output
         patterns = {
@@ -301,14 +301,17 @@ class BaseRouteTest:
             "final_included_compound",
         )
 
-        # Validate filtering - check individual reasons only
-        filtering_expected = expected["filtered_brunnels"]
+        # Validate exclusion details - check individual reasons only
+        # Assuming 'expected["filtered_brunnels"]' key from JSON is stable for this subtask
+        exclusion_expected_json_data = expected["filtered_brunnels"]
 
-        # Check individual filtering reasons that were actually parsed
-        for reason, expected_range in filtering_expected.items():
-            if reason in result.filtering:
+        # Check individual exclusion reasons that were actually parsed
+        for reason, expected_range in exclusion_expected_json_data.items():
+            if reason in result.exclusion_details:
                 assert_in_range(
-                    result.filtering[reason], expected_range, f"filtered_{reason}"
+                    result.exclusion_details[reason],
+                    expected_range,
+                    f"excluded_{reason}",
                 )
 
     def test_html_output_validity(self, gpx_file: Path):
@@ -561,17 +564,17 @@ class TestTransfagarasanRoute(BaseRouteTest):
                 actual_value == expected_value
             ), f"{metric}: expected {expected_value}, got {actual_value}"
 
-        # Validate filtering metrics
-        expected_filtering = {
+        # Validate exclusion metrics
+        expected_exclusion_details = {
             "outwith_route_buffer": 25,
             "not_aligned_with_route": 1,
         }
 
-        for filter_reason, expected_count in expected_filtering.items():
-            actual_count = result.filtering.get(filter_reason)
+        for exclusion_reason, expected_count in expected_exclusion_details.items():
+            actual_count = result.exclusion_details.get(exclusion_reason)
             assert (
                 actual_count == expected_count
-            ), f"filtered_{filter_reason}: expected {expected_count}, got {actual_count}"
+            ), f"excluded_{exclusion_reason}: expected {expected_count}, got {actual_count}"
 
         # Validate that HTML contains waterway entries
         assert result.html_content is not None, "No HTML content generated"
@@ -719,32 +722,34 @@ class TestPaulRevereRoute(BaseRouteTest):
         """Path to PaulRevere GPX file"""
         return Path(__file__).parent / "fixtures" / "PaulRevere.gpx"
 
-    def test_overlap_filtering_with_increased_buffer(
+    def test_overlap_exclusion_with_increased_buffer(
         self, gpx_file: Path, metadata: Dict[str, Any]
     ):
-        """Test overlap filtering with increased route buffer (key feature of this route)"""
+        """Test overlap exclusion with increased route buffer (key feature of this route)"""
         # Test with route_buffer=5.0 (required to detect overlapping brunnels)
         result = run_brunnels_cli(gpx_file, route_buffer=5.0)
         assert result.exit_code == 0
 
-        # Should have overlap filtering active
-        assert "not_nearest_among_overlapping_brunnels" in result.filtering
-        overlap_filtered = result.filtering["not_nearest_among_overlapping_brunnels"]
+        # Should have overlap exclusion active
+        assert "not_nearest_among_overlapping_brunnels" in result.exclusion_details
+        overlap_excluded = result.exclusion_details[
+            "not_nearest_among_overlapping_brunnels"
+        ]
         assert (
-            overlap_filtered >= 1
-        ), f"Expected >=1 overlap filtered, got {overlap_filtered}"
+            overlap_excluded >= 1
+        ), f"Expected >=1 overlap excluded, got {overlap_excluded}"
 
-        # Test without overlap filtering disabled
+        # Test without overlap exclusion disabled
         no_overlap_result = run_brunnels_cli(
-            gpx_file, route_buffer=5.0, no_overlap_filtering=True
+            gpx_file, route_buffer=5.0, no_overlap_exclusion=True
         )
         assert no_overlap_result.exit_code == 0
 
-        # Should have same or more included brunnels when overlap filtering is disabled
+        # Should have same or more included brunnels when overlap exclusion is disabled
         assert (
             no_overlap_result.metrics["final_included_total"]
             >= result.metrics["final_included_total"]
-        ), "Disabling overlap filtering should not reduce included brunnels"
+        ), "Disabling overlap exclusion should not reduce included brunnels"
 
     def test_known_bridges_present(self, gpx_file: Path, metadata: Dict[str, Any]):
         """Test that known bridges are detected correctly"""
@@ -893,10 +898,10 @@ class TestPaulRevereRoute(BaseRouteTest):
             len(found_major_streets) >= 2
         ), f"Expected major street crossings, found: {found_major_streets}"
 
-    def test_bearing_alignment_filtering(
+    def test_bearing_alignment_exclusion(
         self, gpx_file: Path, metadata: Dict[str, Any]
     ):
-        """Test bearing alignment filtering effectiveness"""
+        """Test bearing alignment exclusion effectiveness"""
         # Test with default tolerance
         default_result = run_brunnels_cli(gpx_file, route_buffer=5.0)
         assert default_result.exit_code == 0
@@ -913,11 +918,11 @@ class TestPaulRevereRoute(BaseRouteTest):
             <= default_result.metrics["final_included_total"]
         ), "Stricter bearing tolerance should not increase included brunnels"
 
-        # Check that some brunnels were filtered for bearing misalignment
-        if "not_aligned_with_route" in default_result.filtering:
+        # Check that some brunnels were excluded for bearing misalignment
+        if "not_aligned_with_route" in default_result.exclusion_details:
             assert (
-                default_result.filtering["not_aligned_with_route"] >= 3
-            ), "Expected some bearing misalignment filtering"
+                default_result.exclusion_details["not_aligned_with_route"] >= 3
+            ), "Expected some bearing misalignment exclusion"
 
 
 class TestCoronadoRoute(BaseRouteTest):
@@ -958,15 +963,15 @@ class TestCoronadoRoute(BaseRouteTest):
                 str(bridge["osm_way_id"]) in included_osm_ids
             ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
 
-    def test_bearing_alignment_filtering(self, gpx_file: Path):
-        """Test that bearing misalignment filtering works correctly"""
+    def test_bearing_alignment_exclusion(self, gpx_file: Path):
+        """Test that bearing misalignment exclusion works correctly"""
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
 
-        # Should have exactly 1 bridge filtered for bearing misalignment
+        # Should have exactly 1 bridge excluded for bearing misalignment
         assert (
-            result.filtering.get("not_aligned_with_route", 0) == 1
-        ), f"Expected 1 bearing misalignment, got {result.filtering.get('not_aligned_with_route', 0)}"
+            result.exclusion_details.get("not_aligned_with_route", 0) == 1
+        ), f"Expected 1 bearing misalignment, got {result.exclusion_details.get('not_aligned_with_route', 0)}"
 
         # Test with stricter bearing tolerance should filter more
         strict_result = run_brunnels_cli(gpx_file, bearing_tolerance=10.0)
@@ -1081,16 +1086,17 @@ def debug_route(gpx_filename: str):
         f"Final included compound: {result.metrics.get('final_included_compound', 'N/A')} (expected: {expected['final_included_compound']})"
     )
 
-    print("\n=== Filtering Results ===")
-    filtering_expected = expected["filtered_brunnels"]
+    print("\n=== Exclusion Details ===")
+    # Assuming 'expected["filtered_brunnels"]' key from JSON is stable for this subtask for debug_route
+    exclusion_expected_json_data = expected["filtered_brunnels"]
     print(
-        f"Total filtered: {result.filtering.get('total', 'N/A')} (expected: {filtering_expected['total']})"
+        f"Total excluded: {result.exclusion_details.get('total', 'N/A')} (expected: {exclusion_expected_json_data['total']})"
     )
 
-    print("\n=== Individual Filter Reasons ===")
-    for reason, expected_range in filtering_expected.items():
+    print("\n=== Individual Exclusion Reasons ===")
+    for reason, expected_range in exclusion_expected_json_data.items():
         if reason != "total":
-            actual = result.filtering.get(reason, "N/A")
+            actual = result.exclusion_details.get(reason, "N/A")
             print(f"  {reason}: {actual} (expected: {expected_range})")
 
     print("\n=== Included Brunnels ===")

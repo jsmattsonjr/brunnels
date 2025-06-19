@@ -6,7 +6,7 @@ import argparse
 import collections
 import logging
 from typing import Dict, NamedTuple
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, BrunnelType, ExclusionReason
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class BrunnelMetrics(NamedTuple):
     contained_tunnel_count: int
     individual_count: int
     compound_count: int
-    filter_reason_counts: Dict[FilterReason, int]
+    exclusion_reason_counts: Dict[ExclusionReason, int]
 
 
 def collect_metrics(brunnels: Dict[str, Brunnel]) -> BrunnelMetrics:
@@ -39,27 +39,27 @@ def collect_metrics(brunnels: Dict[str, Brunnel]) -> BrunnelMetrics:
     contained_tunnel_count = 0
     compound_count = 0
     individual_count = 0
-    filter_reason_counts: Dict[FilterReason, int] = collections.Counter()
+    exclusion_reason_counts: Dict[ExclusionReason, int] = collections.Counter()
 
     for brunnel in brunnels.values():
         brunnel_type = brunnel.brunnel_type
-        filter_reason = brunnel.filter_reason
+        exclusion_reason = brunnel.exclusion_reason
 
-        if filter_reason != FilterReason.NONE:
-            filter_reason_counts[filter_reason] += 1
+        if exclusion_reason != ExclusionReason.NONE:
+            exclusion_reason_counts[exclusion_reason] += 1
 
         # Count all representative brunnels
         if brunnel.is_representative():
             if brunnel_type == BrunnelType.BRIDGE:
                 bridge_count += 1
-                if filter_reason == FilterReason.NONE:
+                if exclusion_reason == ExclusionReason.NONE:
                     contained_bridge_count += 1
             else:  # TUNNEL
                 tunnel_count += 1
-                if filter_reason == FilterReason.NONE:
+                if exclusion_reason == ExclusionReason.NONE:
                     contained_tunnel_count += 1
 
-            if filter_reason == FilterReason.NONE:
+            if exclusion_reason == ExclusionReason.NONE:
                 if brunnel.compound_group is not None:
                     compound_count += 1
                 else:
@@ -72,7 +72,7 @@ def collect_metrics(brunnels: Dict[str, Brunnel]) -> BrunnelMetrics:
         contained_tunnel_count=contained_tunnel_count,
         individual_count=individual_count,
         compound_count=compound_count,
-        filter_reason_counts=filter_reason_counts,
+        exclusion_reason_counts=exclusion_reason_counts,
     )
 
 
@@ -90,14 +90,14 @@ def log_metrics(
     if not args.metrics:
         return
 
-    # Log detailed filtering metrics
+    # Log detailed exclusion metrics
     logger.debug("=== BRUNNELS_METRICS ===")
     logger.debug(f"total_brunnels_found={len(brunnels)}")
     logger.debug(f"total_bridges_found={metrics.bridge_count}")
     logger.debug(f"total_tunnels_found={metrics.tunnel_count}")
 
-    for reason, count in metrics.filter_reason_counts.items():
-        logger.debug(f"filtered_reason[{reason.value}]={count}")
+    for reason, count in metrics.exclusion_reason_counts.items():
+        logger.debug(f"excluded_reason[{reason.value}]={count}")
 
     logger.debug(f"contained_bridges={metrics.contained_bridge_count}")
     logger.debug(f"contained_tunnels={metrics.contained_tunnel_count}")

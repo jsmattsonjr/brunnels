@@ -28,8 +28,8 @@ class BrunnelType(Enum):
         return self.value.capitalize()
 
 
-class FilterReason(Enum):
-    """Enumeration for brunnel filtering reasons."""
+class ExclusionReason(Enum):
+    """Enumeration for brunnel exclusion reasons."""
 
     NONE = "none"
     NOT_CONTAINED = "outwith_route_buffer"
@@ -55,7 +55,7 @@ class Brunnel:
         coords: List[Position],
         metadata: Dict[str, Any],
         brunnel_type: BrunnelType,
-        filter_reason: FilterReason = FilterReason.NONE,
+        exclusion_reason: ExclusionReason = ExclusionReason.NONE,
         route_span: Optional[RouteSpan] = None,
         compound_group: Optional[List["Brunnel"]] = None,
         projection: Optional[pyproj.Proj] = None,
@@ -66,7 +66,7 @@ class Brunnel:
             coords: A list of Position objects representing the brunnel's geometry.
             metadata: A dictionary containing metadata from OpenStreetMap.
             brunnel_type: The type of the brunnel (BRIDGE or TUNNEL).
-            filter_reason: The reason why this brunnel might be filtered out.
+            exclusion_reason: The reason why this brunnel might be excluded.
             route_span: A RouteSpan object indicating where the brunnel intersects with a route.
             compound_group: A list of other Brunnel objects if this is part of a compound structure.
             projection: A pyproj.Proj object for coordinate transformations.
@@ -77,7 +77,7 @@ class Brunnel:
         self.coords = coords
         self.metadata = metadata
         self.brunnel_type = brunnel_type
-        self.filter_reason = filter_reason
+        self.exclusion_reason = exclusion_reason
         self.route_span = route_span
         self.compound_group = compound_group
         self.projection = projection
@@ -318,7 +318,7 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
 
     for brunnel in brunnels.values():
         # Only process brunnels that are not filtered
-        if brunnel.filter_reason != FilterReason.NONE:
+        if brunnel.exclusion_reason != ExclusionReason.NONE:
             continue
 
         way_id = brunnel.get_id()

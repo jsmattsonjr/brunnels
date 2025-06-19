@@ -10,9 +10,9 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 
 - **GPX Route Processing**: Parse GPX files containing GPS tracks from cycling computers, fitness apps, or route planning tools
 - **OpenStreetMap Integration**: Query real bridge and tunnel data from OpenStreetMap via the Overpass API
-- **Smart Filtering**: Filter bridges/tunnels based on cycling relevance (bicycle access, infrastructure type)
+- **Smart Exclusion**: Exclude bridges/tunnels based on cycling relevance (bicycle access, infrastructure type)
 - **Containment Analysis**: Identify which bridges/tunnels your route actually crosses vs. those merely nearby
-- **Bearing Alignment**: Filter out bridges/tunnels that aren't aligned with your route direction (configurable tolerance)
+- **Bearing Alignment**: Exclude bridges/tunnels that aren't aligned with your route direction (configurable tolerance)
 - **Interactive Visualization**: Generate beautiful HTML maps with route and brunnel overlay
 - **Detailed Metadata**: View comprehensive OpenStreetMap tags and properties for each brunnel
 - **Adjacent Way Merging**: Automatically combines adjacent bridge/tunnel ways that share OSM nodes into single continuous brunnels
@@ -69,7 +69,7 @@ python3 -m brunnels.cli your_route.gpx
 This will:
 1. Parse your GPX file
 2. Find all bridges and tunnels in an area extending 10m beyond your route's bounding box
-3. Filter brunnels based on cycling relevance and bearing alignment with your route
+3. Exclude brunnels based on cycling relevance and bearing alignment with your route
 4. Generate an interactive map with a filename based on your input file (e.g., `route.gpx` → `route map.html`)
 5. Automatically open the map in your default browser
 
@@ -103,12 +103,12 @@ python3 -m brunnels.cli route.gpx \
 - `--bbox-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
-- `--no-overlap-filtering`: Disable filtering of overlapping brunnels (keep all overlapping brunnels)
+- `--no-overlap-exclusion`: Disable exclusion of overlapping brunnels (keep all overlapping brunnels)
 - `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query.
 - `--include-waterways`: Include ways tagged as `waterway` in the Overpass query.
 - `--include-active-railways`: Include ways tagged as `railway` with values other than `abandoned` in the Overpass query.
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- `--metrics`: Output detailed structured metrics about the processing of brunnels. Examples include: total brunnels found, total bridges and tunnels found, counts of brunnels filtered by different reasons, and counts of finally included brunnels (individual, compound, total). Note that this option also sets the log level to `DEBUG`.
+- `--metrics`: Output detailed structured metrics about the processing of brunnels. Examples include: total brunnels found, total bridges and tunnels found, counts of brunnels excluded by different reasons, and counts of finally included brunnels (individual, compound, total). Note that this option also sets the log level to `DEBUG`.
 - `--version`: Show program's version number and exit.
 - `--no-open`: Don't automatically open the map in browser
 
@@ -136,7 +136,7 @@ The generated HTML map includes:
 - **Red line**: Your GPX route
 - **Blue solid lines**: Bridges that your route crosses
 - **Brown dashed lines**: Tunnels that your route passes through
-- **Light colored lines**: Nearby bridges/tunnels that you don't cross
+- **Light colored lines**: Nearby bridges/tunnels that you don't cross (or are excluded)
 - **Green marker**: Route start
 - **Red marker**: Route end
 
@@ -146,14 +146,14 @@ The generated HTML map includes:
 - Click on any brunnel for detailed OpenStreetMap metadata
 - Contained brunnels show route span information (start/end distances, length)
 
-### Filtering
+### Exclusion
 
-The tool applies smart filtering for cycling routes:
+The tool applies smart exclusion criteria for cycling routes:
 
 - **Keeps**: Bridges/tunnels with bicycle access allowed or `highway=cycleway`
-- **Filters out**: Infrastructure marked `bicycle=no`, pure waterways, active railways
-- **Bearing alignment**: Filters out brunnels whose direction doesn't align with your route (±20° tolerance by default)
-- **Greys out**: Non-contained or filtered brunnels for context
+- **Excludes**: Infrastructure marked `bicycle=no`, pure waterways, active railways
+- **Bearing alignment**: Excludes brunnels whose direction doesn't align with your route (±20° tolerance by default)
+- **Greys out**: Non-contained or excluded brunnels for context
 
 ### Bearing Alignment
 
@@ -162,19 +162,19 @@ The tool checks if bridges and tunnels are aligned with your route direction by:
 1. Finding the closest segments between the brunnel and your route
 2. Calculating bearing (compass direction) for both segments
 3. Checking if they're aligned within tolerance (same or opposite direction)
-4. Filtering out perpendicular or oddly-angled infrastructure that you don't actually cross
+4. Excludes perpendicular or oddly-angled infrastructure that you don't actually cross
 
 This prevents including nearby infrastructure that intersects your route buffer but runs perpendicular to your actual path.
 
-### Overlap Filtering
+### Overlap Exclusion
 
-The tool automatically filters overlapping brunnels to reduce visual clutter when multiple parallel bridges or tunnels span similar portions of your route. When brunnels have overlapping route spans:
+The tool automatically excludes overlapping brunnels to reduce visual clutter when multiple parallel bridges or tunnels span similar portions of your route. When brunnels have overlapping route spans:
 
 Distance calculation: The tool calculates the average distance from each brunnel to your route
 Nearest selection: Only the closest brunnel in each overlapping group is kept
-Filtered display: Non-nearest brunnels are shown in muted colors with "filtered: not nearest among overlapping brunnels" status
+Excluded display: Non-nearest brunnels are shown in muted colors with "excluded: not nearest among overlapping brunnels" status
 
-This feature can be disabled with `--no-overlap-filtering` if you want to see all detected infrastructure.
+This feature can be disabled with `--no-overlap-exclusion` if you want to see all detected infrastructure.
 
 ### Merging
 
@@ -208,7 +208,7 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 - Finds closest segments between polylines using point-to-line projections
 - Checks alignment within configurable tolerance (default 20°)
 - Handles both same-direction and opposite-direction alignment
-- Filters out perpendicular crossings that don't represent actual route usage
+- Excludes perpendicular crossings that don't represent actual route usage
 
 ### Brunnel Merging
 - Detects adjacent brunnels of the same type sharing OSM nodes
@@ -225,7 +225,7 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 - Cannot process routes crossing the antimeridian (±180° longitude)
 - Dependent on OpenStreetMap data quality and completeness
 - Limited to ways tagged as bridges/tunnels in OSM
-- Bearing alignment works best for linear infrastructure; complex intersections may be filtered unexpectedly
+- Bearing alignment works best for linear infrastructure; complex intersections may be excluded unexpectedly
 
 ## Example Output
 
@@ -233,7 +233,7 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 06:53:46 - brunnels - INFO - Loaded GPX route with 4183 points
 06:53:47 - overpass - INFO - Found 1556 brunnels near route
 06:53:47 - geometry - INFO - Total route distance: 22.39 km
-06:53:47 - geometry - DEBUG - Filtered 3 brunnels due to bearing misalignment
+06:53:47 - geometry - DEBUG - Excluded 3 brunnels due to bearing misalignment
 06:53:47 - overpass - INFO - Found 11/680 contained bridges and 0/876 contained tunnels
 06:53:47 - merge - WARNING - Tag conflict during merge: surface='asphalt' vs 'metal_grid'; keeping first value
 06:53:47 - merge - INFO - Included brunnels (post-merge):
