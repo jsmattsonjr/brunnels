@@ -14,7 +14,6 @@ import math
 from .geometry import (
     Position,
     coords_to_polyline,
-    find_closest_segments,
 )
 
 logger = logging.getLogger(__name__)

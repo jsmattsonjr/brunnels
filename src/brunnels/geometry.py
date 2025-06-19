@@ -2,16 +2,13 @@
 Utility functions for working with Shapely geometries and projections.
 
 This module provides helper functions for tasks such as creating custom
-map projections (Transverse Mercator), converting coordinate lists to
-Shapely LineString objects, and finding relationships between geometries
-like closest segments or points at a certain distance along a line.
+map projections (Transverse Mercator) and converting coordinate lists to
+Shapely LineString objects.
 """
 
 from typing import List, Optional, Tuple, NamedTuple
-from shapely.geometry import LineString, Point
-from shapely.ops import nearest_points
+from shapely.geometry import LineString
 import pyproj
-import math
 
 
 class Position(NamedTuple):
@@ -75,60 +72,3 @@ def coords_to_polyline(
 
     # If no projection, use coordinates as is (assumed to be in lat/lon)
     return LineString(coord_tuples)
-
-
-def linestring_distance_to_index(linestring: LineString, distance: float) -> int:
-    """
-    Find the highest index of a LineString coordinate whose distance from
-    the start is less than the given distance.
-
-    Args:
-        linestring: The Shapely LineString
-        distance: Distance along the linestring from the start
-
-    Returns:
-        Index of the coordinate (0-based)
-    """
-    if distance < 0:
-        raise ValueError("Distance must be greater than or equal to 0")
-    if distance > linestring.length:
-        raise ValueError("Distance exceeds the total length of the linestring")
-
-    coords = list(linestring.coords)
-
-    # Walk along the linestring accumulating distances
-    cumulative_distance = 0.0
-    for i in range(len(coords) - 1):
-        segment_start = Point(coords[i])
-        segment_end = Point(coords[i + 1])
-        segment_length = segment_start.distance(segment_end)
-
-        if cumulative_distance + segment_length >= distance:
-            return i
-
-        cumulative_distance += segment_length
-
-    return (
-        len(coords) - 2
-    )  # Return the last index if distance is at the end of the linestring
-
-
-def find_closest_segments(
-    linestring1: LineString, linestring2: LineString
-) -> Tuple[int, int]:
-    """
-    Find the closest segments between two linestrings.
-
-    Args:
-        linestring1: First linestring
-        linestring2: Second linestring
-
-    Returns:
-        Tuple of (closest_segment1, closest_segment2)
-    """
-    point1, point2 = nearest_points(linestring1, linestring2)
-    distance1 = linestring1.project(point1)
-    distance2 = linestring2.project(point2)
-    segment1 = linestring_distance_to_index(linestring1, distance1)
-    segment2 = linestring_distance_to_index(linestring2, distance2)
-    return (segment1, segment2)
