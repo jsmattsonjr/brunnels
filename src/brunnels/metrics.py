@@ -14,13 +14,8 @@ logger = logging.getLogger(__name__)
 class BrunnelMetrics(NamedTuple):
     """Container for brunnel metrics data."""
 
-    bridge_count: int
-    tunnel_count: int
-    contained_bridge_count: int
-    contained_tunnel_count: int
-    individual_count: int
-    compound_count: int
-    exclusion_reason_counts: Dict[ExclusionReason, int]
+    bridge_counts: Dict[str, int]
+    tunnel_counts: Dict[str, int]
 
 
 def collect_metrics(brunnels: Dict[str, Brunnel]) -> BrunnelMetrics:
@@ -33,46 +28,43 @@ def collect_metrics(brunnels: Dict[str, Brunnel]) -> BrunnelMetrics:
     Returns:
         BrunnelMetrics containing all collected metrics
     """
-    bridge_count = 0
-    tunnel_count = 0
-    contained_bridge_count = 0
-    contained_tunnel_count = 0
-    compound_count = 0
-    individual_count = 0
-    exclusion_reason_counts: Dict[ExclusionReason, int] = collections.Counter()
+    # Initialize count dictionaries
+    bridge_counts: Dict[str, int] = collections.defaultdict(int)
+    tunnel_counts: Dict[str, int] = collections.defaultdict(int)
+    total_individual = 0
+    total_compound = 0
 
     for brunnel in brunnels.values():
         brunnel_type = brunnel.brunnel_type
         exclusion_reason = brunnel.exclusion_reason
 
-        if exclusion_reason != ExclusionReason.NONE:
-            exclusion_reason_counts[exclusion_reason] += 1
-
         # Count all representative brunnels
         if brunnel.is_representative():
-            if brunnel_type == BrunnelType.BRIDGE:
-                bridge_count += 1
-                if exclusion_reason == ExclusionReason.NONE:
-                    contained_bridge_count += 1
-            else:  # TUNNEL
-                tunnel_count += 1
-                if exclusion_reason == ExclusionReason.NONE:
-                    contained_tunnel_count += 1
+            counts_dict = (
+                bridge_counts if brunnel_type == BrunnelType.BRIDGE else tunnel_counts
+            )
 
+            # Total count
+            counts_dict["total"] += 1
+
+            # Contained/included count
             if exclusion_reason == ExclusionReason.NONE:
+                counts_dict["contained"] += 1
+
+                # Individual vs compound count
                 if brunnel.compound_group is not None:
-                    compound_count += 1
+                    counts_dict["compound"] += 1
+                    total_compound += 1
                 else:
-                    individual_count += 1
+                    counts_dict["individual"] += 1
+                    total_individual += 1
+            else:
+                # Exclusion reason counts
+                counts_dict[exclusion_reason.value] += 1
 
     return BrunnelMetrics(
-        bridge_count=bridge_count,
-        tunnel_count=tunnel_count,
-        contained_bridge_count=contained_bridge_count,
-        contained_tunnel_count=contained_tunnel_count,
-        individual_count=individual_count,
-        compound_count=compound_count,
-        exclusion_reason_counts=exclusion_reason_counts,
+        bridge_counts=dict(bridge_counts),
+        tunnel_counts=dict(tunnel_counts),
     )
 
 
@@ -90,20 +82,31 @@ def log_metrics(
     if not args.metrics:
         return
 
-    # Log detailed exclusion metrics
+    # Log detailed metrics
     logger.debug("=== BRUNNELS_METRICS ===")
     logger.debug(f"total_brunnels_found={len(brunnels)}")
-    logger.debug(f"total_bridges_found={metrics.bridge_count}")
-    logger.debug(f"total_tunnels_found={metrics.tunnel_count}")
+    logger.debug(f"total_bridges_found={metrics.bridge_counts.get('total', 0)}")
+    logger.debug(f"total_tunnels_found={metrics.tunnel_counts.get('total', 0)}")
 
-    for reason, count in metrics.exclusion_reason_counts.items():
-        logger.debug(f"excluded_reason[{reason.value}]={count}")
+    # Log exclusion reasons for bridges
+    for key, count in metrics.bridge_counts.items():
+        if key not in ["total", "contained", "individual", "compound"] and count > 0:
+            logger.debug(f"excluded_reason[{key}][bridge]={count}")
 
-    logger.debug(f"contained_bridges={metrics.contained_bridge_count}")
-    logger.debug(f"contained_tunnels={metrics.contained_tunnel_count}")
-    logger.debug(f"final_included_individual={metrics.individual_count}")
-    logger.debug(f"final_included_compound={metrics.compound_count}")
+    # Log exclusion reasons for tunnels
+    for key, count in metrics.tunnel_counts.items():
+        if key not in ["total", "contained", "individual", "compound"] and count > 0:
+            logger.debug(f"excluded_reason[{key}][tunnel]={count}")
+
+    logger.debug(f"contained_bridges={metrics.bridge_counts.get('contained', 0)}")
+    logger.debug(f"contained_tunnels={metrics.tunnel_counts.get('contained', 0)}")
     logger.debug(
-        f"final_included_total={metrics.individual_count + metrics.compound_count}"
+        f"final_included_individual={metrics.bridge_counts.get('individual', 0) + metrics.tunnel_counts.get('individual', 0)}"
+    )
+    logger.debug(
+        f"final_included_compound={metrics.bridge_counts.get('compound', 0) + metrics.tunnel_counts.get('compound', 0)}"
+    )
+    logger.debug(
+        f"final_included_total={metrics.bridge_counts.get('contained', 0) + metrics.tunnel_counts.get('contained', 0)}"
     )
     logger.debug("=== END_BRUNNELS_METRICS ===")

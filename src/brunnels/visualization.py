@@ -21,10 +21,16 @@ class BrunnelLegend(folium.MacroElement):
 
     def __init__(self, metrics: BrunnelMetrics):
         super().__init__()
-        self.bridge_count = metrics.bridge_count
-        self.tunnel_count = metrics.tunnel_count
-        self.contained_bridge_count = metrics.contained_bridge_count
-        self.contained_tunnel_count = metrics.contained_tunnel_count
+        self.bridge_count = metrics.bridge_counts.get("total", 0)
+        self.tunnel_count = metrics.tunnel_counts.get("total", 0)
+        self.contained_bridge_count = metrics.bridge_counts.get("contained", 0)
+        self.contained_tunnel_count = metrics.tunnel_counts.get("contained", 0)
+        self.not_nearest_bridge_count = metrics.bridge_counts.get(
+            "not_nearest_among_overlapping_brunnels", 0
+        )
+        self.not_nearest_tunnel_count = metrics.tunnel_counts.get(
+            "not_nearest_among_overlapping_brunnels", 0
+        )
 
         # Use folium's template string approach
         self._template = Template(
@@ -54,13 +60,25 @@ class BrunnelLegend(folium.MacroElement):
                 GPX Route
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #E63946; font-weight: bold; font-size: 18px;">—</span>
+                <span style="color: #D23C4C; font-weight: bold; font-size: 18px;">—</span>
                 Included Bridges ({{ this.contained_bridge_count }})
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #6A4C93; font-weight: bold; font-size: 18px;">—</span>
+                <span style="color: #69498F; font-weight: bold; font-size: 18px;">—</span>
                 Included Tunnels ({{ this.contained_tunnel_count }})
             </div>
+            {% if this.not_nearest_bridge_count > 0 %}
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: #DF94A7; font-weight: bold; font-size: 18px;">—</span>
+                Not Nearest Bridges ({{ this.not_nearest_bridge_count }})
+            </div>
+            {% endif %}
+            {% if this.not_nearest_tunnel_count > 0 %}
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: #B495C2; font-weight: bold; font-size: 18px;">—</span>
+                Not Nearest Tunnels ({{ this.not_nearest_tunnel_count }})
+            </div>
+            {% endif %}
         </div>
         {% endmacro %}
         """
@@ -291,26 +309,39 @@ def create_route_map(
         exclusion_reason = brunnel.exclusion_reason
         route_span = brunnel.get_route_span()
 
-        # Only display included brunnels
-        if exclusion_reason != ExclusionReason.NONE:
+        # Display included brunnels and "not nearest" excluded brunnels
+        if exclusion_reason not in [ExclusionReason.NONE, ExclusionReason.NOT_NEAREST]:
             continue
 
-        # Set color and style for included brunnels
-        opacity = 0.9
-        weight = 4
-        if brunnel_type == BrunnelType.BRIDGE:
-            color = "#E63946"  # Included Bridges
-        else:  # TUNNEL
-            color = "#6A4C93"  # Included Tunnels
+        # Set color and style based on inclusion status
+        if exclusion_reason == ExclusionReason.NONE:
+            # Included brunnels with 80% saturation
+            opacity = 0.9
+            weight = 4
+            if brunnel_type == BrunnelType.BRIDGE:
+                color = "#D23C4C"  # Included Bridges (80% saturation)
+            else:  # TUNNEL
+                color = "#69498F"  # Included Tunnels (80% saturation)
+        else:  # NOT_NEAREST
+            # Not nearest brunnels with lighter colors
+            opacity = 0.6
+            weight = 3
+            if brunnel_type == BrunnelType.BRIDGE:
+                color = "#DF94A7"  # Not Nearest Bridges (lighter)
+            else:  # TUNNEL
+                color = "#B495C2"  # Not Nearest Tunnels (lighter)
 
         # Create popup text with full metadata
-        if route_span:
-            status = (
-                f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
-                f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
-            )
-        else:
-            status = "included (reason: none)"
+        if exclusion_reason == ExclusionReason.NONE:
+            if route_span:
+                status = (
+                    f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
+                    f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
+                )
+            else:
+                status = "included (reason: none)"
+        else:  # NOT_NEAREST
+            status = "not nearest among overlapping brunnels"
 
         popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
 
@@ -352,5 +383,5 @@ def create_route_map(
     route_map.save(output_filename)
 
     logger.debug(
-        f"Map saved to {output_filename} with {metrics.contained_bridge_count}/{metrics.bridge_count} bridges and {metrics.contained_tunnel_count}/{metrics.tunnel_count} tunnels contained in route buffer"
+        f"Map saved to {output_filename} with {metrics.bridge_counts.get('contained', 0)}/{metrics.bridge_counts.get('total', 0)} bridges and {metrics.tunnel_counts.get('contained', 0)}/{metrics.tunnel_counts.get('total', 0)} tunnels contained in route buffer"
     )
