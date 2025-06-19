@@ -129,35 +129,41 @@ class Brunnel:
     def get_display_name(self) -> str:
         """Get the display name for this brunnel.
 
-        Retrieves the 'name' tag from OSM metadata. If no 'name' tag exists,
-        returns "unnamed".
+        For compound brunnels, returns the common name if all components share the same name,
+        otherwise returns a formatted OSM ID. For simple brunnels, retrieves the 'name' tag
+        from OSM metadata, or returns a formatted OSM ID if no name exists.
 
         Returns:
-            str: The OSM name or "unnamed".
+            str: The OSM name or "<OSM {id}>" if unnamed or names don't match.
         """
         if self.compound_group is not None:
-            # For compound brunnels, use the name of the first named component
+            names = []
             for component in self.compound_group:
                 if "name" in component.metadata["tags"]:
-                    return component.metadata["tags"]["name"]
-            logging.debug("No names in compound group")
-            return "unnamed"
-        return self.metadata["tags"].get("name", "unnamed")
+                    names.append(component.metadata["tags"]["name"])
+            # Use ID if there are no names or if the names are not all the same
+            if len(set(names)) != 1:
+                return f"<OSM {self.get_id()}>"
+            return names[0]
+
+        return self.metadata["tags"].get("name", f"<OSM {self.get_id()}>")
 
     def get_short_description(self) -> str:
         """Get a short, human-readable description for logging.
 
-        Includes the brunnel type, display name, ID, and segment count for compound brunnels.
+        Includes the brunnel type, display name, and segment count for compound brunnels.
+        Format: "{Type}: {name}" or "{Type}: {name} [{count} segments]" for compound brunnels.
 
         Returns:
             str: A short descriptive string.
         """
         brunnel_type = self.brunnel_type.value.capitalize()
         name = self.get_display_name()
+        count = ""
         if self.compound_group is not None:
-            component_count = len(self.compound_group)
-            return f"Compound {brunnel_type}: {name} ({self.get_id()}) [{component_count} segments]"
-        return f"{brunnel_type}: {name} ({self.get_id()})"
+            count = f" [{len(self.compound_group)} segments]"
+
+        return f"{brunnel_type}: {name}{count}"
 
     def get_route_span(self) -> Optional[RouteSpan]:
         """

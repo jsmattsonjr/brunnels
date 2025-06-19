@@ -216,7 +216,17 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         key=lambda b: (b.route_span.start_distance if b.route_span else 0.0)
     )
 
-    print(f"Contained brunnels ({len(contained_brunnels)}):")
+    # Count bridges and tunnels separately
+    contained_bridges = [
+        b for b in contained_brunnels if b.brunnel_type == BrunnelType.BRIDGE
+    ]
+    contained_tunnels = [
+        b for b in contained_brunnels if b.brunnel_type == BrunnelType.TUNNEL
+    ]
+
+    print(
+        f"Contained brunnels ({len(contained_bridges)} bridges; {len(contained_tunnels)} tunnels):"
+    )
 
     # Calculate maximum digits needed for formatting alignment
     max_distance = max(
