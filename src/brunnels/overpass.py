@@ -69,10 +69,19 @@ out geom qt;
             return _parse_separated_results(elements)
 
         except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else None
             logger.debug(
-                f"HTTPError caught: status={e.response.status_code if e.response else 'None'}, attempt={attempt}, max_retries={max_retries}"
+                f"HTTPError caught: status={status_code}, attempt={attempt}, max_retries={max_retries}"
             )
-            if e.response and e.response.status_code == 429 and attempt < max_retries:
+            logger.debug(f"Exception message: {str(e)}")
+            logger.debug(f"Response object: {e.response}")
+
+            # Check if this is a 429 error by looking at the exception message
+            is_429_error = (
+                e.response and e.response.status_code == 429
+            ) or "429" in str(e)
+
+            if is_429_error and attempt < max_retries:
                 # Calculate delay with exponential backoff
                 delay = base_delay * (2**attempt)
                 logger.warning(
@@ -82,9 +91,9 @@ out geom qt;
                 attempt += 1
                 continue
             else:
-                # Re-raise for non-429 errors or final attempt
+                # Re-raise for non-retryable errors or final attempt
                 logger.debug(
-                    f"Not retrying: status={e.response.status_code if e.response else 'None'}, attempt={attempt}, max_retries={max_retries}"
+                    f"Not retrying: status={status_code}, attempt={attempt}, max_retries={max_retries}"
                 )
                 raise
 
