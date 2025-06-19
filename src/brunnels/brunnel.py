@@ -59,6 +59,7 @@ class Brunnel:
         exclusion_reason: ExclusionReason = ExclusionReason.NONE,
         route_span: Optional[RouteSpan] = None,
         compound_group: Optional[List["Brunnel"]] = None,
+        overlap_group: Optional[List["Brunnel"]] = None,
         projection: Optional[pyproj.Proj] = None,
     ):
         """Initializes a Brunnel object.
@@ -70,6 +71,7 @@ class Brunnel:
             exclusion_reason: The reason why this brunnel might be excluded.
             route_span: A RouteSpan object indicating where the brunnel intersects with a route.
             compound_group: A list of other Brunnel objects if this is part of a compound structure.
+            overlap_group: A list of other Brunnel objects if this overlaps with other brunnels.
             projection: A pyproj.Proj object for coordinate transformations.
 
         Raises:
@@ -81,6 +83,7 @@ class Brunnel:
         self.exclusion_reason = exclusion_reason
         self.route_span = route_span
         self.compound_group = compound_group
+        self.overlap_group = overlap_group
         self.projection = projection
         if not coords:
             raise ValueError(f"{self.get_short_description()} has no coordinates")

@@ -13,7 +13,7 @@ import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
 
-from .brunnel import Brunnel, BrunnelType, ExclusionReason
+from .brunnel import Brunnel, BrunnelType, ExclusionReason, RouteSpan
 from .overpass import query_overpass_brunnels
 from .geometry import (
     Position,
@@ -215,6 +215,16 @@ class Route:
         excluded_count = 0
         for group in overlap_groups:
             logger.debug(f"Processing overlap group with {len(group)} brunnels")
+
+            # Sort by route span start distance for consistent ordering
+            sorted_group = sorted(
+                group,
+                key=lambda b: (b.get_route_span() or RouteSpan(0, 0)).start_distance,
+            )
+
+            # Assign the same overlap_group list to all brunnels in this group
+            for brunnel in sorted_group:
+                brunnel.overlap_group = sorted_group
 
             # Calculate average distance to route for each brunnel in the group
             brunnel_distances = []
