@@ -291,6 +291,8 @@ def main():
     # Check for containment within the route buffer
     exclude_uncontained_brunnels(route_geometry, brunnels)
 
+    route.calculate_route_spans(brunnels)
+
     # Exclude misaligned brunnels based on bearing tolerance
     if args.bearing_tolerance > 0:
         route.exclude_misaligned_brunnels(brunnels, args.bearing_tolerance)
@@ -309,7 +311,6 @@ def main():
         f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
     )
 
-    route.calculate_route_spans(brunnels)
     find_compound_brunnels(brunnels)
     if not args.no_overlap_exclusion:
         route.exclude_overlapping_brunnels(brunnels)
