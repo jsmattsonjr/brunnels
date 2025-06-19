@@ -16,14 +16,13 @@
     "total_brunnels_found": "95",
     "total_bridges_found": "85",
     "total_tunnels_found": "10",
-    "contained_bridges": "6",
+    "contained_bridges": "7",
     "contained_tunnels": "0",
-    "final_included_individual": "6",
+    "final_included_individual": "7",
     "final_included_compound": "0",
-    "final_included_total": "6",
+    "final_included_total": "7",
     "filtered_brunnels": {
-      "outwith_route_buffer": "88",
-      "not_aligned_with_route": "1"
+      "outwith_route_buffer": "88"
     }
   },
   "known_bridges": [
@@ -62,6 +61,12 @@
       "osm_way_id": 319527833,
       "approximate_km": 28.7,
       "length_km": 0.07
+    },
+    {
+      "name": "Bayshore Bikeway",
+      "osm_way_id": 554351624,
+      "approximate_km": 23.0,
+      "length_km": 0.13
     }
   ],
   "known_tunnels": [],
@@ -115,10 +120,10 @@
         "route_buffer": 5.0,
         "include_bicycle_no": true
       },
-      "expected_final_included_total": "8",
-      "expected_final_included_individual": "7",
+      "expected_final_included_total": "9",
+      "expected_final_included_individual": "8",
       "expected_final_included_compound": "1",
-      "expected_contained_bridges": "7",
+      "expected_contained_bridges": "8",
       "expected_contained_tunnels": "1",
       "expected_total_brunnels_found": "186",
       "notes": "Including bicycle infrastructure reveals compound bridge and tunnel"

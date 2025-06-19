@@ -7,6 +7,7 @@ from enum import Enum
 import logging
 from shapely import Point
 from shapely.geometry import LineString
+from shapely.ops import substring
 import pyproj
 import math
 
@@ -251,51 +252,72 @@ class Brunnel:
 
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """
-        Check if this brunnel's bearing is aligned with the route at their closest point.
+        Check if this brunnel's bearing is aligned with the route within tolerance.
+
+        For each brunnel segment, projects endpoints onto the route to find the
+        corresponding route substring, then checks alignment between each brunnel
+        segment and each route segment in that substring. Returns True if any
+        segment pair is within tolerance.
 
         Args:
             route: Route object representing the route
             tolerance_degrees: Allowed bearing deviation in degrees
 
         Returns:
-            True if brunnel is aligned with route within tolerance, False otherwise
+            True if any brunnel segment is aligned with any route segment within tolerance
         """
-        # Inlined from linestrings_aligned()
-        # Find closest segments between linestrings projected
-        idx1, idx2 = find_closest_segments(self.linestring, route.linestring)
+        cos_max_angle = math.cos(math.radians(tolerance_degrees))
+        brunnel_coords = list(self.linestring.coords)
 
-        coords1 = self.linestring.coords
-        coords2 = route.linestring.coords
+        # Check each brunnel segment
+        for b_idx in range(len(brunnel_coords) - 1):
+            # Get brunnel segment endpoints
+            b_start_point = Point(brunnel_coords[b_idx])
+            b_end_point = Point(brunnel_coords[b_idx + 1])
 
-        # Vector components
-        vec1_x = coords1[idx1 + 1][0] - coords1[idx1][0]
-        vec1_y = coords1[idx1 + 1][1] - coords1[idx1][1]
-        vec2_x = coords2[idx2 + 1][0] - coords2[idx2][0]
-        vec2_y = coords2[idx2 + 1][1] - coords2[idx2][1]
+            # Project brunnel endpoints onto route to get distances
+            d1 = route.linestring.project(b_start_point)
+            d2 = route.linestring.project(b_end_point)
 
-        # Vector magnitudes
-        mag1 = math.sqrt(vec1_x**2 + vec1_y**2)
-        mag2 = math.sqrt(vec2_x**2 + vec2_y**2)
+            route_substring = substring(route.linestring, d1, d2)
+            if route_substring.is_empty:
+                continue
+            route_coords = list(route_substring.coords)
 
-        if mag1 == 0 or mag2 == 0:
-            aligned = False  # Zero-length segment
-        else:
-            # Normalize and dot product
-            # abs() handles both parallel and anti-parallel cases
-            dot_product = abs((vec1_x * vec2_x + vec1_y * vec2_y) / (mag1 * mag2))
+            # Get brunnel segment vector
+            b_vec_x = brunnel_coords[b_idx + 1][0] - brunnel_coords[b_idx][0]
+            b_vec_y = brunnel_coords[b_idx + 1][1] - brunnel_coords[b_idx][1]
+            b_mag = math.sqrt(b_vec_x**2 + b_vec_y**2)
 
-            # Convert angle to cosine threshold
-            # Ensure dot_product is not slightly > 1.0 due to precision errors
-            dot_product = min(dot_product, 1.0)
-            cos_max_angle = math.cos(math.radians(tolerance_degrees))
+            if b_mag == 0:
+                continue  # Skip zero-length brunnel segment
 
-            aligned = dot_product >= cos_max_angle
+            # Check alignment with each route segment in the substring
+            for r_idx in range(len(route_coords) - 1):
+                # Get route segment vector
+                r_vec_x = route_coords[r_idx + 1][0] - route_coords[r_idx][0]
+                r_vec_y = route_coords[r_idx + 1][1] - route_coords[r_idx][1]
+                r_mag = math.sqrt(r_vec_x**2 + r_vec_y**2)
 
-        if not aligned:
-            logger.debug(
-                f"{self.get_short_description()} is not aligned with the route"
-            )
-        return aligned
+                if r_mag == 0:
+                    continue  # Skip zero-length route segment
+
+                # Calculate alignment using dot product
+                # abs() handles both parallel and anti-parallel cases
+                dot_product = abs(
+                    (b_vec_x * r_vec_x + b_vec_y * r_vec_y) / (b_mag * r_mag)
+                )
+
+                # Ensure dot_product is not slightly > 1.0 due to precision errors
+                dot_product = min(dot_product, 1.0)
+
+                # If this segment pair is aligned within tolerance, return True
+                if dot_product >= cos_max_angle:
+                    return True
+
+        # No segment pairs were aligned within tolerance
+        logger.debug(f"{self.get_short_description()} is not aligned with the route")
+        return False
 
     @classmethod
     def from_overpass_data(

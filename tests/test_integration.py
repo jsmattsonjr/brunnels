@@ -1002,10 +1002,10 @@ class TestCoronadoRoute(BaseRouteTest):
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
 
-        # Should have exactly 1 bridge excluded for bearing misalignment
+        # With improved alignment algorithm, no bridges should be excluded for misalignment
         assert (
-            result.exclusion_details.get("not_aligned_with_route", 0) == 1
-        ), f"Expected 1 bearing misalignment, got {result.exclusion_details.get('not_aligned_with_route', 0)}"
+            result.exclusion_details.get("not_aligned_with_route", 0) == 0
+        ), f"Expected 0 bearing misalignment, got {result.exclusion_details.get('not_aligned_with_route', 0)}"
 
         # Test with stricter bearing tolerance should filter more
         strict_result = run_brunnels_cli(gpx_file, bearing_tolerance=10.0)
@@ -1031,10 +1031,10 @@ class TestCoronadoRoute(BaseRouteTest):
         assert result.metrics["total_tunnels_found"] == 14
 
         # Should include compound bridge and tunnel
-        assert result.metrics["final_included_total"] == 8
-        assert result.metrics["final_included_individual"] == 7
+        assert result.metrics["final_included_total"] == 9
+        assert result.metrics["final_included_individual"] == 8
         assert result.metrics["final_included_compound"] == 1
-        assert result.metrics["contained_bridges"] == 7
+        assert result.metrics["contained_bridges"] == 8
         assert result.metrics["contained_tunnels"] == 1
 
         # Collect all OSM IDs from included brunnels
