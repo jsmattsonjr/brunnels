@@ -50,15 +50,15 @@ class BrunnelLegend(folium.MacroElement):
         ">
             <b>Legend</b><br>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #2E86AB; font-weight: bold; font-size: 16px;">—</span>
+                <span style="color: #2E86AB; font-weight: normal; font-size: 18px;">—</span>
                 GPX Route
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #E63946; font-weight: bold; font-size: 16px;">—</span>
+                <span style="color: #E63946; font-weight: bold; font-size: 18px;">—</span>
                 Included Bridges ({{ this.contained_bridge_count }})
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #6A4C93; font-weight: bold; font-size: 16px;">—</span>
+                <span style="color: #6A4C93; font-weight: bold; font-size: 18px;">—</span>
                 Included Tunnels ({{ this.contained_tunnel_count }})
             </div>
         </div>
