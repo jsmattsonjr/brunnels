@@ -210,7 +210,7 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
 
     print(f"Included brunnels ({len(included_brunnels)}):")
     for brunnel in included_brunnels:
-        print(f"  {brunnel.get_log_description()}")
+        print(brunnel.get_log_description())
 
 
 def exclude_uncontained_brunnels(

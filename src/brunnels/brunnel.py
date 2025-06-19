@@ -167,12 +167,9 @@ class Brunnel:
         Returns:
             str: A descriptive string for logging purposes.
         """
-        route_span = self.get_route_span()
-        if route_span is not None:
-            span_info = f"{route_span.start_distance/1000:.2f}-{route_span.end_distance/1000:.2f} km (length: {(route_span.end_distance - route_span.start_distance)/1000:.2f} km)"
-            return f"{self.get_short_description()} {span_info}"
-        else:
-            return f"{self.get_short_description()} (no route span)"
+        route_span = self.get_route_span() or RouteSpan(0, 0)
+        span_info = f"{route_span.start_distance/1000:.2f}-{route_span.end_distance/1000:.2f} km ({(route_span.end_distance - route_span.start_distance)/1000:.2f} km)"
+        return f"{span_info} {self.get_short_description()}"
 
     def get_route_span(self) -> Optional[RouteSpan]:
         """
