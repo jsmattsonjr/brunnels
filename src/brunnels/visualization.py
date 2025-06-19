@@ -53,22 +53,30 @@ class BrunnelLegend(folium.MacroElement):
                 <span style="color: #2E86AB; font-weight: bold; font-size: 16px;">—</span>
                 GPX Route
             </div>
+            {% if this.contained_bridge_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #E63946; font-weight: bold; font-size: 16px;">—</span>
                 Included Bridges ({{ this.contained_bridge_count }})
             </div>
+            {% endif %}
+            {% if this.contained_tunnel_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #6A4C93; font-weight: bold; font-size: 16px;">—</span>
                 Included Tunnels ({{ this.contained_tunnel_count }})
             </div>
+            {% endif %}
+            {% if this.bridge_count - this.contained_bridge_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #A8A8A8; font-weight: bold; font-size: 16px;">—</span>
                 Excluded Bridges ({{ this.bridge_count - this.contained_bridge_count }})
             </div>
+            {% endif %}
+            {% if this.tunnel_count - this.contained_tunnel_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #9B9B9B; font-weight: bold; font-size: 16px;">—</span>
                 Excluded Tunnels ({{ this.tunnel_count - this.contained_tunnel_count }})
             </div>
+            {% endif %}
         </div>
         {% endmacro %}
         """
