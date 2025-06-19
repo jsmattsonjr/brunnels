@@ -244,6 +244,8 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     distance_width = len(f"{max_distance:.0f}") + 3  # +3 for ".XX"
     length_width = len(f"{max_length:.0f}") + 3  # +3 for ".XX"
 
+    current_overlap_group = None
+
     for brunnel in contained_brunnels:
         route_span = brunnel.route_span or RouteSpan(0, 0)
         start_km = route_span.start_distance / 1000
@@ -252,12 +254,17 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
 
         # Format with aligned padding
         span_info = f"{start_km:{distance_width}.2f}-{end_km:{distance_width}.2f} km ({length_km:{length_width}.2f} km)"
-        annotation = (
-            "*"
-            if brunnel.exclusion_reason == ExclusionReason.NONE
-            else "-" if brunnel.exclusion_reason == ExclusionReason.UNALIGNED else " "
-        )
-        print(f"{span_info} {annotation} {brunnel.get_short_description()}")
+        annotation = "*"
+        if brunnel.exclusion_reason != ExclusionReason.NONE:
+            annotation = "-"
+        indent = "" if brunnel.overlap_group is None else "  "
+        if (
+            current_overlap_group is not None or brunnel.overlap_group is not None
+        ) and current_overlap_group != brunnel.overlap_group:
+            print("-" * len(span_info))
+            current_overlap_group = brunnel.overlap_group
+
+        print(f"{span_info} {annotation} {indent}{brunnel.get_short_description()}")
 
 
 def exclude_uncontained_brunnels(
