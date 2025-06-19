@@ -75,9 +75,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--log-level",
         type=str,
-        default="INFO",
+        default="WARNING",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set logging level (default: INFO)",
+        help="Set logging level (default: WARNING)",
     )
     parser.add_argument(
         "--no-open",
