@@ -186,7 +186,7 @@ def setup_logging(args: argparse.Namespace) -> None:
 
 def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     """
-    Log the final list of brunnels that are included in the route (after all processing).
+    Print the final list of brunnels that are included in the route (after all processing).
     This shows the actual brunnels that will appear on the map.
 
     Args:
@@ -200,7 +200,7 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     ]
 
     if not included_brunnels:
-        logger.info("No brunnels included in final map")
+        print("No brunnels included in final map")
         return
 
     # Sort by start distance along route
@@ -208,9 +208,9 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         key=lambda b: (b.route_span.start_distance if b.route_span else 0.0)
     )
 
-    logger.info(f"Included brunnels ({len(included_brunnels)}):")
+    print(f"Included brunnels ({len(included_brunnels)}):")
     for brunnel in included_brunnels:
-        logger.info(f"  {brunnel.get_log_description()}")
+        print(f"  {brunnel.get_log_description()}")
 
 
 def exclude_uncontained_brunnels(

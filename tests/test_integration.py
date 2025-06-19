@@ -118,12 +118,12 @@ class BrunnelsTestResult:
         self._parse_included_brunnels()
 
     def _parse_included_brunnels(self):
-        """Parse individual and compound brunnel details from stderr"""
+        """Parse individual and compound brunnel details from stdout"""
         # Parse individual bridges
         individual_bridge_pattern = (
             r"Bridge: ([^(]+) \(([^)]+)\) ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
         )
-        for match in re.finditer(individual_bridge_pattern, self.stderr):
+        for match in re.finditer(individual_bridge_pattern, self.stdout):
             self.included_brunnels.append(
                 {
                     "name": match.group(1).strip(),
@@ -140,7 +140,7 @@ class BrunnelsTestResult:
         individual_tunnel_pattern = (
             r"Tunnel: ([^(]+) \(([^)]+)\) ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
         )
-        for match in re.finditer(individual_tunnel_pattern, self.stderr):
+        for match in re.finditer(individual_tunnel_pattern, self.stdout):
             self.included_brunnels.append(
                 {
                     "name": match.group(1).strip(),
@@ -155,7 +155,7 @@ class BrunnelsTestResult:
 
         # Parse compound bridges
         compound_bridge_pattern = r"Compound Bridge: ([^(]+) \(([^)]+)\) \[(\d+) segments\] ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
-        for match in re.finditer(compound_bridge_pattern, self.stderr):
+        for match in re.finditer(compound_bridge_pattern, self.stdout):
             self.included_brunnels.append(
                 {
                     "name": match.group(1).strip(),
@@ -171,7 +171,7 @@ class BrunnelsTestResult:
 
         # Parse compound tunnels
         compound_tunnel_pattern = r"Compound Tunnel: ([^(]+) \(([^)]+)\) \[(\d+) segments\] ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
-        for match in re.finditer(compound_tunnel_pattern, self.stderr):
+        for match in re.finditer(compound_tunnel_pattern, self.stdout):
             self.included_brunnels.append(
                 {
                     "name": match.group(1).strip(),
@@ -713,7 +713,7 @@ class TestArea51Route(BaseRouteTest):
         assert result.exit_code == 0
 
         # Should contain the "No brunnels included" message
-        assert "No brunnels included in final map" in result.stderr
+        assert "No brunnels included in final map" in result.stdout
 
     def test_edge_case_various_settings(self, gpx_file: Path):
         """Test zero brunnels scenario with various parameter combinations"""
