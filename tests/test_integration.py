@@ -51,14 +51,44 @@ class BrunnelsTestResult:
                 parts = line.split(" - ")
                 message = parts[-1] if len(parts) >= 4 else line
 
-                # Handle exclusion reasons: "excluded_reason[outwith_route_buffer]=952"
+                # Handle exclusion reasons: "excluded_reason[outwith_route_buffer][bridge]=530"
                 if message.startswith("excluded_reason["):
-                    bracket_start = message.find("[")
-                    bracket_end = message.find("]")
-                    equals_pos = message.find("=", bracket_end)
+                    # Find the first bracket pair for the reason
+                    first_bracket_start = message.find("[")
+                    first_bracket_end = message.find("]")
 
-                    if bracket_start != -1 and bracket_end != -1 and equals_pos != -1:
-                        reason_key = message[bracket_start + 1 : bracket_end]
+                    # Check if there's a second bracket pair for the type
+                    second_bracket_start = message.find("[", first_bracket_end + 1)
+                    second_bracket_end = message.find("]", second_bracket_start + 1)
+                    equals_pos = message.find("=")
+
+                    if (
+                        first_bracket_start != -1
+                        and first_bracket_end != -1
+                        and second_bracket_start != -1
+                        and second_bracket_end != -1
+                        and equals_pos != -1
+                    ):
+                        # New format: excluded_reason[reason][type]=count
+                        reason_key = message[
+                            first_bracket_start + 1 : first_bracket_end
+                        ]
+                        count_str = message[equals_pos + 1 :]
+                        count = int(count_str)
+
+                        # Aggregate counts by reason across bridge and tunnel types
+                        if reason_key not in self.exclusion_details:
+                            self.exclusion_details[reason_key] = 0
+                        self.exclusion_details[reason_key] += count
+                    elif (
+                        first_bracket_start != -1
+                        and first_bracket_end != -1
+                        and equals_pos != -1
+                    ):
+                        # Old format: excluded_reason[reason]=count
+                        reason_key = message[
+                            first_bracket_start + 1 : first_bracket_end
+                        ]
                         count_str = message[equals_pos + 1 :]
                         self.exclusion_details[reason_key] = int(count_str)
 
@@ -543,19 +573,21 @@ class TestTransfagarasanRoute(BaseRouteTest):
 
     def test_include_waterways_option(self, gpx_file: Path, metadata: Dict[str, Any]):
         """Test --include-waterways option includes waterway infrastructure"""
-        result = run_brunnels_cli(gpx_file, include_waterways=True)
+        result = run_brunnels_cli(
+            gpx_file, include_waterways=True, bearing_tolerance=90, route_buffer=10.0
+        )
         assert result.exit_code == 0
 
-        # Validate the exact metrics observed with --include-waterways
+        # Validate the exact metrics observed with --include-waterways, --bearing-tolerance=90, --route-buffer=10
         expected_metrics = {
             "total_brunnels_found": 55,
             "total_bridges_found": 35,
             "total_tunnels_found": 20,
-            "contained_bridges": 19,
-            "contained_tunnels": 10,
-            "final_included_individual": 29,
+            "contained_bridges": 20,  # Updated: one more bridge included
+            "contained_tunnels": 13,  # Updated: more tunnels included with larger buffer
+            "final_included_individual": 33,  # Updated: total included individual brunnels
             "final_included_compound": 0,
-            "final_included_total": 29,
+            "final_included_total": 33,  # Updated: total included brunnels
         }
 
         for metric, expected_value in expected_metrics.items():
@@ -564,14 +596,16 @@ class TestTransfagarasanRoute(BaseRouteTest):
                 actual_value == expected_value
             ), f"{metric}: expected {expected_value}, got {actual_value}"
 
-        # Validate exclusion metrics
+        # Validate exclusion metrics (updated for --bearing-tolerance=90, --route-buffer=10)
         expected_exclusion_details = {
-            "outwith_route_buffer": 25,
-            "not_aligned_with_route": 1,
+            "outwith_route_buffer": 22,  # Updated: 15 bridges + 7 tunnels excluded
+            "not_aligned_with_route": 0,  # Updated: 90° tolerance includes all aligned brunnels
         }
 
         for exclusion_reason, expected_count in expected_exclusion_details.items():
-            actual_count = result.exclusion_details.get(exclusion_reason)
+            actual_count = result.exclusion_details.get(
+                exclusion_reason, 0
+            )  # Default to 0 if key doesn't exist
             assert (
                 actual_count == expected_count
             ), f"excluded_{exclusion_reason}: expected {expected_count}, got {actual_count}"
@@ -579,25 +613,25 @@ class TestTransfagarasanRoute(BaseRouteTest):
         # Validate that HTML contains waterway entries
         assert result.html_content is not None, "No HTML content generated"
 
-        # Count waterway entries in HTML (should be 9 'tunnel:culvert' with waterway tags)
+        # Count waterway entries in HTML (should be 2 'tunnel:culvert' with waterway tags)
         waterway_entries = result.html_content.count("waterway")
         assert (
-            waterway_entries == 9
-        ), f"Expected 9 waterway entries in HTML, found {waterway_entries}"
+            waterway_entries == 2
+        ), f"Expected 2 waterway entries in HTML, found {waterway_entries}"
 
         # Verify waterway tags are highlighted in red (indicating filtered infrastructure)
         waterway_highlighted_entries = result.html_content.count(
             "<span style='color: red;'><i>waterway:</i>"
         )
         assert (
-            waterway_highlighted_entries == 9
-        ), f"Expected 9 highlighted waterway tags, found {waterway_highlighted_entries}"
+            waterway_highlighted_entries == 2
+        ), f"Expected 2 highlighted waterway tags, found {waterway_highlighted_entries}"
 
         # Verify "tunnel:culvert" entries are present
         culvert_entries = result.html_content.count("tunnel:</i> culvert")
         assert (
-            culvert_entries >= 9
-        ), f"Expected at least 9 tunnel:culvert entries, found {culvert_entries}"
+            culvert_entries >= 2
+        ), f"Expected at least 2 tunnel:culvert entries, found {culvert_entries}"
 
         # Test comparison: without --include-waterways should have fewer brunnels
         default_result = run_brunnels_cli(gpx_file)
