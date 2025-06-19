@@ -365,8 +365,8 @@ def create_route_map(
         if exclusion_reason == ExclusionReason.NONE:
             if route_span:
                 status = (
-                    f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
-                    f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
+                    f"{route_span.start_distance/1000:.2f} - {route_span.end_distance/1000:.2f} km; "
+                    f"length: {(route_span.end_distance - route_span.start_distance)/1000:.2f} km"
                 )
             else:
                 status = "included (reason: none)"

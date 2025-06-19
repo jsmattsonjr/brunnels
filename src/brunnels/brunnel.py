@@ -44,8 +44,8 @@ class ExclusionReason(Enum):
 class RouteSpan(NamedTuple):
     """Information about where a brunnel spans along a route."""
 
-    start_distance: float  # Distance from route start where brunnel begins
-    end_distance: float  # Distance from route start where brunnel ends
+    start_distance: float  # Distance from route start where brunnel begins (in meters)
+    end_distance: float  # Distance from route start where brunnel ends (in meters)
 
 
 class Brunnel:
@@ -166,7 +166,7 @@ class Brunnel:
         """
         route_span = self.get_route_span()
         if route_span is not None:
-            span_info = f"{route_span.start_distance:.2f}-{route_span.end_distance:.2f} km (length: {route_span.end_distance - route_span.start_distance:.2f} km)"
+            span_info = f"{route_span.start_distance/1000:.2f}-{route_span.end_distance/1000:.2f} km (length: {(route_span.end_distance - route_span.start_distance)/1000:.2f} km)"
             return f"{self.get_short_description()} {span_info}"
         else:
             return f"{self.get_short_description()} (no route span)"
@@ -242,7 +242,7 @@ class Brunnel:
         points = [Point(coord) for coord in self.linestring.coords]
         # Find the closest route point for each brunnel coordinate
         for point in points:
-            distance = route.linestring.project(point) / 1000.0  # Convert to kilometers
+            distance = route.linestring.project(point)  # Keep in meters
 
             min_distance = min(min_distance, distance)
             max_distance = max(max_distance, distance)
