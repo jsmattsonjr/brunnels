@@ -75,17 +75,36 @@ out geom qt;
             )
             logger.debug(f"Exception message: {str(e)}")
             logger.debug(f"Response object: {e.response}")
+            if e.response:
+                logger.debug(
+                    f"Response status_code attribute: {getattr(e.response, 'status_code', 'MISSING')}"
+                )
+                logger.debug(f"Response type: {type(e.response)}")
 
-            # Check if this is a 429 error by looking at the exception message
-            is_429_error = (
-                e.response and e.response.status_code == 429
-            ) or "429" in str(e)
+            # Check if this is a retryable error (429 rate limit or 5xx server errors)
+            is_retryable = False
+            if e.response and hasattr(e.response, "status_code"):
+                # 429 rate limit or 5xx server errors
+                is_retryable = (
+                    e.response.status_code == 429 or e.response.status_code >= 500
+                )
+            else:
+                # Fallback: check exception message for retryable errors
+                error_msg = str(e).lower()
+                is_retryable = any(
+                    code in error_msg for code in ["429", "500", "502", "503", "504"]
+                )
 
-            if is_429_error and attempt < max_retries:
+            if is_retryable and attempt < max_retries:
                 # Calculate delay with exponential backoff
                 delay = base_delay * (2**attempt)
+                error_type = (
+                    "Server error"
+                    if status_code and status_code >= 500
+                    else "Rate limited"
+                )
                 logger.warning(
-                    f"Rate limited (429), retrying in {delay:.0f}s (attempt {attempt + 1} of {max_retries + 1})"
+                    f"{error_type} ({status_code or 'unknown'}), retrying in {delay:.0f}s (attempt {attempt + 1} of {max_retries + 1})"
                 )
                 time.sleep(delay)
                 attempt += 1
