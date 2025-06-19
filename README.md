@@ -136,7 +136,6 @@ The generated HTML map includes:
 - **Blue line**: Your GPX route
 - **Red lines**: Bridges that your route crosses
 - **Purple lines**: Tunnels that your route passes through
-- **Light colored lines**: Nearby bridges/tunnels that you don't cross (or are excluded)
 - **Green marker**: Route start
 - **Red marker**: Route end
 
@@ -153,7 +152,6 @@ The tool applies smart exclusion criteria for cycling routes:
 - **Keeps**: Bridges/tunnels with bicycle access allowed or `highway=cycleway`
 - **Excludes**: Infrastructure marked `bicycle=no`, pure waterways, active railways
 - **Bearing alignment**: Excludes brunnels whose direction doesn't align with your route (±20° tolerance by default)
-- **Greys out**: Non-contained or excluded brunnels for context
 
 ### Bearing Alignment
 
@@ -172,9 +170,9 @@ The tool automatically excludes overlapping brunnels to reduce visual clutter wh
 
 Distance calculation: The tool calculates the average distance from each brunnel to your route
 Nearest selection: Only the closest brunnel in each overlapping group is kept
-Excluded display: Non-nearest brunnels are shown in muted colors with "excluded: not nearest among overlapping brunnels" status
+Excluded brunnels: Non-nearest brunnels are excluded from the map display
 
-This feature can be disabled with `--no-overlap-exclusion` if you want to see all detected infrastructure.
+This feature can be disabled with `--no-overlap-exclusion` if you want to include all detected infrastructure.
 
 ### Merging
 

@@ -35,8 +35,8 @@ class BrunnelLegend(folium.MacroElement):
             bottom: 50px;
             left: 50px;
             width: 230px;
-            min-height: 140px;
-            max-height: 250px;
+            min-height: 90px;
+            max-height: 150px;
             background-color: white;
             border: 2px solid grey;
             z-index: 9999;
@@ -63,18 +63,6 @@ class BrunnelLegend(folium.MacroElement):
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #6A4C93; font-weight: bold; font-size: 16px;">—</span>
                 Included Tunnels ({{ this.contained_tunnel_count }})
-            </div>
-            {% endif %}
-            {% if this.bridge_count - this.contained_bridge_count > 0 %}
-            <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #A8A8A8; font-weight: bold; font-size: 16px;">—</span>
-                Excluded Bridges ({{ this.bridge_count - this.contained_bridge_count }})
-            </div>
-            {% endif %}
-            {% if this.tunnel_count - this.contained_tunnel_count > 0 %}
-            <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #9B9B9B; font-weight: bold; font-size: 16px;">—</span>
-                Excluded Tunnels ({{ this.tunnel_count - this.contained_tunnel_count }})
             </div>
             {% endif %}
         </div>
@@ -297,7 +285,7 @@ def create_route_map(
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(route_map)
 
-    # Process and add brunnels to map (metrics already collected)
+    # Process and add included brunnels to map (metrics already collected)
     for brunnel in brunnels.values():
         brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
         if not brunnel_coords:
@@ -307,36 +295,26 @@ def create_route_map(
         exclusion_reason = brunnel.exclusion_reason
         route_span = brunnel.get_route_span()
 
-        # Determine color and opacity based on containment status and exclusion
-        if exclusion_reason == ExclusionReason.NONE:
-            opacity = 0.9
-            weight = 4
-            if brunnel_type == BrunnelType.BRIDGE:
-                color = "#E63946"  # Included Bridges
-            else:  # TUNNEL
-                color = "#6A4C93"  # Included Tunnels
-        else:
-            # Use muted colors for excluded or non-contained brunnels
-            opacity = 0.3
-            weight = 2
-            if brunnel_type == BrunnelType.BRIDGE:
-                color = "#A8A8A8"  # Excluded Bridges
-            else:  # TUNNEL
-                color = "#9B9B9B"  # Excluded Tunnels
+        # Only display included brunnels
+        if exclusion_reason != ExclusionReason.NONE:
+            continue
+
+        # Set color and style for included brunnels
+        opacity = 0.9
+        weight = 4
+        if brunnel_type == BrunnelType.BRIDGE:
+            color = "#E63946"  # Included Bridges
+        else:  # TUNNEL
+            color = "#6A4C93"  # Included Tunnels
 
         # Create popup text with full metadata
-        if exclusion_reason == ExclusionReason.NONE:
-            if route_span:
-                status = (
-                    f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
-                    f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
-                )
-            else:
-                status = "included (reason: none)"
-        elif exclusion_reason == ExclusionReason.NOT_CONTAINED:
-            status = "excluded: not contained in route buffer"
+        if route_span:
+            status = (
+                f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
+                f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
+            )
         else:
-            status = f"excluded: {exclusion_reason}"
+            status = "included (reason: none)"
 
         popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
 
