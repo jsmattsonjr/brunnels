@@ -24,7 +24,13 @@ from . import __version__
 from . import visualization
 from .metrics import collect_metrics, log_metrics
 from .route import Route
-from .brunnel import Brunnel, BrunnelType, ExclusionReason, find_compound_brunnels
+from .brunnel import (
+    Brunnel,
+    BrunnelType,
+    ExclusionReason,
+    RouteSpan,
+    find_compound_brunnels,
+)
 from .file_utils import generate_output_filename
 
 # Configure logging
@@ -209,8 +215,32 @@ def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     )
 
     print(f"Included brunnels ({len(included_brunnels)}):")
+
+    # Calculate maximum digits needed for formatting alignment
+    max_distance = max(
+        brunnel.route_span.end_distance / 1000
+        for brunnel in included_brunnels
+        if brunnel.route_span
+    )
+    max_length = max(
+        (brunnel.route_span.end_distance - brunnel.route_span.start_distance) / 1000
+        for brunnel in included_brunnels
+        if brunnel.route_span
+    )
+
+    # Determine width needed for distances (digits before decimal point)
+    distance_width = len(f"{max_distance:.0f}") + 3  # +3 for ".XX"
+    length_width = len(f"{max_length:.0f}") + 3  # +3 for ".XX"
+
     for brunnel in included_brunnels:
-        print(brunnel.get_log_description())
+        route_span = brunnel.route_span or RouteSpan(0, 0)
+        start_km = route_span.start_distance / 1000
+        end_km = route_span.end_distance / 1000
+        length_km = (route_span.end_distance - route_span.start_distance) / 1000
+
+        # Format with aligned padding
+        span_info = f"{start_km:{distance_width}.2f}-{end_km:{distance_width}.2f} km ({length_km:{length_width}.2f} km)"
+        print(f"{span_info} {brunnel.get_short_description()}")
 
 
 def exclude_uncontained_brunnels(

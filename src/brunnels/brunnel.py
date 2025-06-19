@@ -159,18 +159,6 @@ class Brunnel:
             return f"Compound {brunnel_type}: {name} ({self.get_id()}) [{component_count} segments]"
         return f"{brunnel_type}: {name} ({self.get_id()})"
 
-    def get_log_description(self) -> str:
-        """Get a standardized description for logging, including route span information.
-
-        Combines the short description with formatted route span distances if available.
-
-        Returns:
-            str: A descriptive string for logging purposes.
-        """
-        route_span = self.get_route_span() or RouteSpan(0, 0)
-        span_info = f"{route_span.start_distance/1000:.2f}-{route_span.end_distance/1000:.2f} km ({(route_span.end_distance - route_span.start_distance)/1000:.2f} km)"
-        return f"{span_info} {self.get_short_description()}"
-
     def get_route_span(self) -> Optional[RouteSpan]:
         """
         Get the RouteSpan for this brunnel.
