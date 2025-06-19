@@ -19,14 +19,12 @@ logger = logging.getLogger(__name__)
 class BrunnelLegend(folium.MacroElement):
     """Custom legend for brunnel visualization with dynamic counts."""
 
-    def __init__(
-        self, bridge_count, tunnel_count, contained_bridge_count, contained_tunnel_count
-    ):
+    def __init__(self, metrics: BrunnelMetrics):
         super().__init__()
-        self.bridge_count = bridge_count
-        self.tunnel_count = tunnel_count
-        self.contained_bridge_count = contained_bridge_count
-        self.contained_tunnel_count = contained_tunnel_count
+        self.bridge_count = metrics.bridge_count
+        self.tunnel_count = metrics.tunnel_count
+        self.contained_bridge_count = metrics.contained_bridge_count
+        self.contained_tunnel_count = metrics.contained_tunnel_count
 
         # Use folium's template string approach
         self._template = Template(
@@ -362,12 +360,7 @@ def create_route_map(
             ).add_to(route_map)
 
     # Add legend with dynamic counts from metrics
-    legend = BrunnelLegend(
-        metrics.bridge_count,
-        metrics.tunnel_count,
-        metrics.contained_bridge_count,
-        metrics.contained_tunnel_count,
-    )
+    legend = BrunnelLegend(metrics)
     route_map.add_child(legend)
 
     # Fit map bounds to buffered route area
