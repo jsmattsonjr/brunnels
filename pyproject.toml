@@ -44,6 +44,7 @@ dev = [
     "mypy",
     "psutil",
     "types-requests",
+    "types-shapely",
 ]
 
 [project.urls]
@@ -66,7 +67,6 @@ target-version = ['py39']
 python_version = "3.9"
 warn_return_any = false  # Allow Any returns for third-party libraries
 warn_unused_configs = true
-ignore_missing_imports = true  # Ignore missing stubs for third-party libraries
 
 [tool.setuptools_scm]
 write_to = "src/brunnels/_version.py"

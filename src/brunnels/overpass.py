@@ -1,5 +1,5 @@
 from typing import Dict, Any, Tuple, List
-import requests  # type: ignore[import-untyped]
+import requests
 import logging
 import argparse
 import time
