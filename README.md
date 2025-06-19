@@ -133,9 +133,9 @@ If the output file already exists, numbered versions are automatically tried:
 
 The generated HTML map includes:
 
-- **Red line**: Your GPX route
-- **Blue solid lines**: Bridges that your route crosses
-- **Brown dashed lines**: Tunnels that your route passes through
+- **Blue line**: Your GPX route
+- **Red lines**: Bridges that your route crosses
+- **Purple lines**: Tunnels that your route passes through
 - **Light colored lines**: Nearby bridges/tunnels that you don't cross (or are excluded)
 - **Green marker**: Route start
 - **Red marker**: Route end

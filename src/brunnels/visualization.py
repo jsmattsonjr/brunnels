@@ -339,7 +339,6 @@ def create_route_map(
 
         # Style and add brunnel based on type
         if brunnel_type == BrunnelType.TUNNEL:
-            # Use dashed line for ALL tunnels (both contained and non-contained)
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
@@ -351,7 +350,6 @@ def create_route_map(
                 z_index=2,  # Ensure tunnels are above route
             ).add_to(route_map)
         else:
-            # Solid line for all bridges
             folium.PolyLine(
                 brunnel_coords,
                 color=color,
