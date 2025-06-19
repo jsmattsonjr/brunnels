@@ -132,38 +132,3 @@ def find_closest_segments(
     segment1 = linestring_distance_to_index(linestring1, distance1)
     segment2 = linestring_distance_to_index(linestring2, distance2)
     return (segment1, segment2)
-
-
-def linestrings_aligned(
-    linestring1: LineString, linestring2: LineString, max_angle_degrees: float
-):
-    # Find closest segments between linestrings projected
-    idx1, idx2 = find_closest_segments(linestring1, linestring2)
-
-    coords1 = linestring1.coords
-    coords2 = linestring2.coords
-
-    # Vector components
-    # vec1_x = end_x - start_x
-    vec1_x = coords1[idx1 + 1][0] - coords1[idx1][0]
-    vec1_y = coords1[idx1 + 1][1] - coords1[idx1][1]
-    vec2_x = coords2[idx2 + 1][0] - coords2[idx2][0]
-    vec2_y = coords2[idx2 + 1][1] - coords2[idx2][1]
-
-    # Vector magnitudes
-    mag1 = math.sqrt(vec1_x**2 + vec1_y**2)
-    mag2 = math.sqrt(vec2_x**2 + vec2_y**2)
-
-    if mag1 == 0 or mag2 == 0:
-        return False  # Zero-length segment
-
-    # Normalize and dot product
-    # abs() handles both parallel and anti-parallel cases
-    dot_product = abs((vec1_x * vec2_x + vec1_y * vec2_y) / (mag1 * mag2))
-
-    # Convert angle to cosine threshold
-    # Ensure dot_product is not slightly > 1.0 due to precision errors
-    dot_product = min(dot_product, 1.0)
-    cos_max_angle = math.cos(math.radians(max_angle_degrees))
-
-    return dot_product >= cos_max_angle

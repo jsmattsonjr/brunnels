@@ -8,11 +8,12 @@ import logging
 from shapely import Point
 from shapely.geometry import LineString
 import pyproj
+import math
 
 from .geometry import (
     Position,
     coords_to_polyline,
-    linestrings_aligned,
+    find_closest_segments,
 )
 
 logger = logging.getLogger(__name__)
@@ -259,10 +260,37 @@ class Brunnel:
         Returns:
             True if brunnel is aligned with route within tolerance, False otherwise
         """
+        # Inlined from linestrings_aligned()
+        # Find closest segments between linestrings projected
+        idx1, idx2 = find_closest_segments(self.linestring, route.linestring)
 
-        aligned = linestrings_aligned(
-            self.linestring, route.linestring, tolerance_degrees
-        )
+        coords1 = self.linestring.coords
+        coords2 = route.linestring.coords
+
+        # Vector components
+        vec1_x = coords1[idx1 + 1][0] - coords1[idx1][0]
+        vec1_y = coords1[idx1 + 1][1] - coords1[idx1][1]
+        vec2_x = coords2[idx2 + 1][0] - coords2[idx2][0]
+        vec2_y = coords2[idx2 + 1][1] - coords2[idx2][1]
+
+        # Vector magnitudes
+        mag1 = math.sqrt(vec1_x**2 + vec1_y**2)
+        mag2 = math.sqrt(vec2_x**2 + vec2_y**2)
+
+        if mag1 == 0 or mag2 == 0:
+            aligned = False  # Zero-length segment
+        else:
+            # Normalize and dot product
+            # abs() handles both parallel and anti-parallel cases
+            dot_product = abs((vec1_x * vec2_x + vec1_y * vec2_y) / (mag1 * mag2))
+
+            # Convert angle to cosine threshold
+            # Ensure dot_product is not slightly > 1.0 due to precision errors
+            dot_product = min(dot_product, 1.0)
+            cos_max_angle = math.cos(math.radians(tolerance_degrees))
+
+            aligned = dot_product >= cos_max_angle
+
         if not aligned:
             logger.debug(
                 f"{self.get_short_description()} is not aligned with the route"
