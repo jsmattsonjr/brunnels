@@ -4,11 +4,17 @@ Module for collecting and logging metrics related to brunnels.
 
 import argparse
 import collections
-import logging
+import sys
 from typing import Dict, NamedTuple
 from .brunnel import Brunnel, BrunnelType, ExclusionReason
 
-logger = logging.getLogger(__name__)
+
+def eprint(*args, **kwargs):
+    """
+    Prints the given arguments to standard error (stderr).
+    Accepts the same arguments as the built-in print() function.
+    """
+    print(*args, file=sys.stderr, **kwargs)
 
 
 class BrunnelMetrics(NamedTuple):
@@ -72,7 +78,7 @@ def log_metrics(
     brunnels: Dict[str, Brunnel], metrics: BrunnelMetrics, args: argparse.Namespace
 ) -> None:
     """
-    Log detailed metrics after creating the route map.
+    Output detailed metrics after creating the route map directly to stderr.
 
     Args:
         brunnels: Dictionary of Brunnel objects (for total count)
@@ -82,31 +88,31 @@ def log_metrics(
     if not args.metrics:
         return
 
-    # Log detailed metrics
-    logger.debug("=== BRUNNELS_METRICS ===")
-    logger.debug(f"total_brunnels_found={len(brunnels)}")
-    logger.debug(f"total_bridges_found={metrics.bridge_counts.get('total', 0)}")
-    logger.debug(f"total_tunnels_found={metrics.tunnel_counts.get('total', 0)}")
+    # Output detailed metrics directly to stderr
+    eprint("=== BRUNNELS_METRICS ===")
+    eprint(f"total_brunnels_found={len(brunnels)}")
+    eprint(f"total_bridges_found={metrics.bridge_counts.get('total', 0)}")
+    eprint(f"total_tunnels_found={metrics.tunnel_counts.get('total', 0)}")
 
-    # Log exclusion reasons for bridges
+    # Output exclusion reasons for bridges
     for key, count in metrics.bridge_counts.items():
         if key not in ["total", "contained", "individual", "compound"] and count > 0:
-            logger.debug(f"excluded_reason[{key}][bridge]={count}")
+            eprint(f"excluded_reason[{key}][bridge]={count}")
 
-    # Log exclusion reasons for tunnels
+    # Output exclusion reasons for tunnels
     for key, count in metrics.tunnel_counts.items():
         if key not in ["total", "contained", "individual", "compound"] and count > 0:
-            logger.debug(f"excluded_reason[{key}][tunnel]={count}")
+            eprint(f"excluded_reason[{key}][tunnel]={count}")
 
-    logger.debug(f"contained_bridges={metrics.bridge_counts.get('contained', 0)}")
-    logger.debug(f"contained_tunnels={metrics.tunnel_counts.get('contained', 0)}")
-    logger.debug(
+    eprint(f"contained_bridges={metrics.bridge_counts.get('contained', 0)}")
+    eprint(f"contained_tunnels={metrics.tunnel_counts.get('contained', 0)}")
+    eprint(
         f"final_included_individual={metrics.bridge_counts.get('individual', 0) + metrics.tunnel_counts.get('individual', 0)}"
     )
-    logger.debug(
+    eprint(
         f"final_included_compound={metrics.bridge_counts.get('compound', 0) + metrics.tunnel_counts.get('compound', 0)}"
     )
-    logger.debug(
+    eprint(
         f"final_included_total={metrics.bridge_counts.get('contained', 0) + metrics.tunnel_counts.get('contained', 0)}"
     )
-    logger.debug("=== END_BRUNNELS_METRICS ===")
+    eprint("=== END_BRUNNELS_METRICS ===")

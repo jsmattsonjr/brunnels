@@ -46,10 +46,8 @@ class BrunnelsTestResult:
             elif "=== END_BRUNNELS_METRICS ===" in line:
                 break
             elif in_metrics and "=" in line:
-                # Extract the message part from log line format: "timestamp - module - level - message"
-                # Split on " - " and take the last part (message)
-                parts = line.split(" - ")
-                message = parts[-1] if len(parts) >= 4 else line
+                # Direct stderr output format (no logging prefixes)
+                message = line
 
                 # Handle exclusion reasons: "excluded_reason[outwith_route_buffer][bridge]=530"
                 if message.startswith("excluded_reason["):

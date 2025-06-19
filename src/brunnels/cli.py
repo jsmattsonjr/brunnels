@@ -245,9 +245,6 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    if args.metrics:
-        args.log_level = "DEBUG"
-
     # Setup logging
     setup_logging(args)
 
