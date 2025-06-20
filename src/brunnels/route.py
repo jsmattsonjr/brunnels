@@ -246,7 +246,7 @@ class Route:
             )
 
             for brunnel, distance in brunnel_distances[1:]:
-                brunnel.exclusion_reason = ExclusionReason.NOT_NEAREST
+                brunnel.exclusion_reason = ExclusionReason.ALTERNATIVE
                 excluded_count += 1
 
                 logger.debug(

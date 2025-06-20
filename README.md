@@ -169,8 +169,7 @@ This prevents including nearby infrastructure that intersects your route buffer 
 The tool automatically excludes overlapping brunnels to reduce visual clutter when multiple parallel bridges or tunnels span similar portions of your route. When brunnels have overlapping route spans:
 
 Distance calculation: The tool calculates the average distance from each brunnel to your route
-Nearest selection: Only the closest brunnel in each overlapping group is kept
-Excluded brunnels: Non-nearest brunnels are excluded from the map display
+Nearest selection: The closest brunnel in each overlapping group is highlighted
 
 This feature can be disabled with `--no-overlap-exclusion` if you want to include all detected infrastructure.
 

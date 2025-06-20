@@ -763,10 +763,8 @@ class TestPaulRevereRoute(BaseRouteTest):
         assert result.exit_code == 0
 
         # Should have overlap exclusion active
-        assert "not_nearest_among_overlapping_brunnels" in result.exclusion_details
-        overlap_excluded = result.exclusion_details[
-            "not_nearest_among_overlapping_brunnels"
-        ]
+        assert "alternative" in result.exclusion_details
+        overlap_excluded = result.exclusion_details["alternative"]
         assert (
             overlap_excluded >= 1
         ), f"Expected >=1 overlap excluded, got {overlap_excluded}"

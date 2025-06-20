@@ -35,7 +35,7 @@ class ExclusionReason(Enum):
     NONE = "none"
     NOT_CONTAINED = "outwith_route_buffer"
     UNALIGNED = "not_aligned_with_route"
-    NOT_NEAREST = "not_nearest_among_overlapping_brunnels"
+    ALTERNATIVE = "alternative"
 
     def __str__(self) -> str:
         return self.value

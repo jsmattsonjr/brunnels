@@ -192,7 +192,7 @@ def setup_logging(args: argparse.Namespace) -> None:
 
 def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     """
-    Print all contained brunnels (included, unaligned, and not nearest from overlaps).
+    Print all contained brunnels (included, unaligned, and alternatives from overlap groups).
     Shows detailed analysis of what was found and why some were excluded.
 
     Args:
