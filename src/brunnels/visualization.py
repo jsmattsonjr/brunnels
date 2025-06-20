@@ -59,11 +59,11 @@ class BrunnelLegend(folium.MacroElement):
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #D23C4C; font-weight: bold; font-size: 18px;">—</span>
-                Included Bridges ({{ this.contained_bridge_count }})
+                Bridges ({{ this.contained_bridge_count }})
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #69498F; font-weight: bold; font-size: 18px;">—</span>
-                Included Tunnels ({{ this.contained_tunnel_count }})
+                Tunnels ({{ this.contained_tunnel_count }})
             </div>
             {% if this.alternative_bridge_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
