@@ -467,7 +467,7 @@ class Route:
             self: The Route instance.
 
         """
-        unaligned_count = 0
+        misaligned_count = 0
 
         for brunnel in brunnels.values():
 
@@ -475,12 +475,12 @@ class Route:
                 brunnel.exclusion_reason == ExclusionReason.NONE
                 and not brunnel.is_aligned_with_route(self, bearing_tolerance_degrees)
             ):
-                brunnel.exclusion_reason = ExclusionReason.UNALIGNED
-                unaligned_count += 1
+                brunnel.exclusion_reason = ExclusionReason.MISALIGNED
+                misaligned_count += 1
 
-        if unaligned_count > 0:
+        if misaligned_count > 0:
             logger.debug(
-                f"Excluded {unaligned_count} brunnels out of {len(brunnels)} "
+                f"Excluded {misaligned_count} brunnels out of {len(brunnels)} "
                 f"contained brunnels due to bearing misalignment (tolerance: {bearing_tolerance_degrees}°)"
             )
 

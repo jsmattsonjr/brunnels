@@ -27,12 +27,8 @@ class BrunnelLegend(folium.MacroElement):
         self.contained_tunnel_count = metrics.tunnel_counts.get("contained", 0)
         self.alternative_bridge_count = metrics.bridge_counts.get("alternative", 0)
         self.alternative_tunnel_count = metrics.tunnel_counts.get("alternative", 0)
-        self.unaligned_bridge_count = metrics.bridge_counts.get(
-            "not_aligned_with_route", 0
-        )
-        self.unaligned_tunnel_count = metrics.tunnel_counts.get(
-            "not_aligned_with_route", 0
-        )
+        self.misaligned_bridge_count = metrics.bridge_counts.get("misaligned", 0)
+        self.misaligned_tunnel_count = metrics.tunnel_counts.get("misaligned", 0)
 
         # Use folium's template string approach
         self._template = Template(
@@ -81,16 +77,16 @@ class BrunnelLegend(folium.MacroElement):
                 Alternative Tunnels ({{ this.alternative_tunnel_count }})
             </div>
             {% endif %}
-            {% if this.unaligned_bridge_count > 0 %}
+            {% if this.misaligned_bridge_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #DC2626; font-weight: bold; font-size: 18px;">—</span>
-                Unaligned Bridges ({{ this.unaligned_bridge_count }})
+                Misaligned Bridges ({{ this.misaligned_bridge_count }})
             </div>
             {% endif %}
-            {% if this.unaligned_tunnel_count > 0 %}
+            {% if this.misaligned_tunnel_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
                 <span style="color: #7C3AED; font-weight: bold; font-size: 18px;">—</span>
-                Unaligned Tunnels ({{ this.unaligned_tunnel_count }})
+                Misaligned Tunnels ({{ this.misaligned_tunnel_count }})
             </div>
             {% endif %}
         </div>
@@ -323,11 +319,11 @@ def create_route_map(
         exclusion_reason = brunnel.exclusion_reason
         route_span = brunnel.get_route_span()
 
-        # Display included brunnels, "alternative", and "unaligned" excluded brunnels
+        # Display included brunnels, "alternative", and "misaligned" excluded brunnels
         if exclusion_reason not in [
             ExclusionReason.NONE,
             ExclusionReason.ALTERNATIVE,
-            ExclusionReason.UNALIGNED,
+            ExclusionReason.MISALIGNED,
         ]:
             continue
 
@@ -348,14 +344,14 @@ def create_route_map(
                 color = "#FF6B35"  # Alternative Bridges (red-orange, yellow tinge)
             else:  # TUNNEL
                 color = "#9D4EDD"  # Alternative Tunnels (purple with yellow tinge)
-        else:  # UNALIGNED
-            # Unaligned brunnels with green tinge (fully saturated)
+        else:  # MISALIGNED
+            # Misaligned brunnels with green tinge (fully saturated)
             opacity = 0.9
             weight = 3
             if brunnel_type == BrunnelType.BRIDGE:
-                color = "#DC2626"  # Unaligned Bridges (deep red with green tinge)
+                color = "#DC2626"  # Misaligned Bridges (deep red with green tinge)
             else:  # TUNNEL
-                color = "#7C3AED"  # Unaligned Tunnels (blue-purple with green tinge)
+                color = "#7C3AED"  # Misaligned Tunnels (blue-purple with green tinge)
 
         # Create popup text with full metadata
         if exclusion_reason == ExclusionReason.NONE:
@@ -365,10 +361,10 @@ def create_route_map(
                     f"length: {(route_span.end_distance - route_span.start_distance)/1000:.2f} km"
                 )
             else:
-                status = "included (reason: none)"
+                status = "included"
         elif exclusion_reason == ExclusionReason.ALTERNATIVE:
             status = "alternative overlapping brunnel"
-        else:  # UNALIGNED
+        else:  # MISALIGNED
             status = "not aligned with route"
 
         popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"

@@ -34,7 +34,7 @@ class ExclusionReason(Enum):
 
     NONE = "none"
     NOT_CONTAINED = "outwith_route_buffer"
-    UNALIGNED = "not_aligned_with_route"
+    MISALIGNED = "misaligned"
     ALTERNATIVE = "alternative"
 
     def __str__(self) -> str:
