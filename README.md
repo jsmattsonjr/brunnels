@@ -227,22 +227,62 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 ## Example Output
 
 ```
-06:53:46 - brunnels - INFO - Loaded GPX route with 4183 points
-06:53:47 - overpass - INFO - Found 1556 brunnels near route
-06:53:47 - geometry - INFO - Total route distance: 22.39 km
-06:53:47 - geometry - DEBUG - Excluded 3 brunnels due to bearing misalignment
-06:53:47 - overpass - INFO - Found 11/680 contained bridges and 0/876 contained tunnels
-06:53:47 - merge - WARNING - Tag conflict during merge: surface='asphalt' vs 'metal_grid'; keeping first value
-06:53:47 - merge - INFO - Included brunnels (post-merge):
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (222183028) 5.38-5.41 km (length: 0.03 km)
-06:53:47 - merge - INFO - Bridge: Cherry Street (24382063;1330056252;1330056251) 7.73-7.85 km (length: 0.12 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (1101486832;1352972087;1352972086) 8.14-8.25 km (length: 0.11 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (1352972070) 8.61-8.67 km (length: 0.06 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (146154648) 11.82-11.84 km (length: 0.02 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (33398082) 19.30-19.43 km (length: 0.13 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (33539707) 20.87-20.91 km (length: 0.05 km)
-
+Nearby brunnels (14/21 bridges; 0/2 tunnels):
+ 1.45- 1.47 km (0.01 km) * Bridge: <OSM 852560833> 
+ 1.47- 1.49 km (0.01 km) * Bridge: <OSM 852560831> 
+ 1.50- 1.52 km (0.02 km) * Bridge: <OSM 852560828> 
+ 1.60- 1.61 km (0.00 km) * Bridge: <OSM 1316061571> 
+--- Overlapping -------
+ 3.89- 3.91 km (0.02 km) *   Bridge: <OSM 1338748628> 
+ 3.89- 3.91 km (0.02 km) -   Bridge: <OSM 778940105>  (alternative)
+--- Overlapping -------
+ 4.28- 4.36 km (0.08 km) -   Bridge: <OSM 1387582368>  (alternative)
+ 4.28- 4.40 km (0.13 km) *   Bridge: <OSM 845577316> 
+--- Overlapping -------
+10.07-10.11 km (0.03 km) -   Bridge: <OSM 1219117639>  (alternative)
+10.08-10.11 km (0.03 km) *   Bridge: Main Street 
+------------------------
+13.74-13.76 km (0.01 km) * Bridge: <OSM 169505851;591294837> [2 segments] 
+15.97-15.98 km (0.02 km) * Bridge: Minuteman Bikeway 
+16.41-16.42 km (0.01 km) * Bridge: Minuteman Bikeway 
+17.15-17.15 km (0.00 km) - Tunnel: <OSM 1361395997>  (misaligned)
+17.14-17.16 km (0.02 km) * Bridge: Minuteman Bikeway 
+17.16-17.16 km (0.00 km) - Tunnel: <OSM 1361398538>  (misaligned)
+17.55-17.56 km (0.01 km) - Bridge: <OSM 697892791>  (misaligned)
+17.56-17.57 km (0.02 km) - Bridge: Lowell Street  (misaligned)
+18.01-18.02 km (0.00 km) * Bridge: Minuteman Bikeway 
+18.29-18.29 km (0.00 km) - Bridge: <OSM 697892834>  (misaligned)
+18.30-18.30 km (0.00 km) - Bridge: <OSM 697893586>  (misaligned)
+22.31-22.33 km (0.02 km) * Bridge: Minuteman Bikeway 
+25.01-25.09 km (0.08 km) * Bridge: Massachusetts Avenue 
 ```
+
+### Understanding the Output Format
+
+**Header:**
+```
+Nearby brunnels (14/21 bridges; 0/2 tunnels):
+```
+Shows included/total counts for each type of infrastructure found near your route.
+
+**Individual Brunnel Lines:**
+Each line follows this format:
+```
+start-end km (length km) [annotation] Name/ID [exclusion reason]
+```
+
+- **Distance Information:** `1.45-1.47 km` shows the route span where the brunnel intersects your path, `(0.01 km)` shows the length of the brunnel crossing
+- **Annotations:** `*` = included brunnel (full color on map), `-` = excluded brunnel (grayed out or alternate colors)
+- **Names/IDs:** Named infrastructure like `Bridge: Main Street`, unnamed ways like `Bridge: <OSM 852560833>`, or compound brunnels like `Bridge: <OSM 169505851;591294837> [2 segments]`
+- **Exclusion Reasons:** `(alternative)` = excluded because a closer overlapping brunnel was kept, `(misaligned)` = excluded because it doesn't align with your route direction
+
+**Overlap Groups:**
+```
+--- Overlapping -------
+ 3.89- 3.91 km (0.02 km) *   Bridge: <OSM 1338748628> 
+ 3.89- 3.91 km (0.02 km) -   Bridge: <OSM 778940105>  (alternative)
+```
+When multiple brunnels span the same portion of your route, they're grouped together. The closest one to your actual path is kept (`*`), while others are marked as alternatives (`-`). The dashed lines separate different overlap groups and standalone brunnels for easier reading.
 
 ## Contributing
 
