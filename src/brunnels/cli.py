@@ -190,16 +190,16 @@ def setup_logging(args: argparse.Namespace) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
+def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     """
-    Print all contained brunnels (included, misaligned, and alternatives from overlap groups).
+    Print all nearby brunnels (included, misaligned, and alternatives from overlap groups).
     Shows detailed analysis of what was found and why some were excluded.
 
     Args:
         brunnels: Dictionary of all brunnels to analyze
     """
-    # Find all contained brunnels (those with route spans, regardless of other exclusion reasons)
-    contained_brunnels = [
+    # Find all nearby brunnels (those with route spans, regardless of other exclusion reasons)
+    nearby_brunnels = [
         b
         for b in brunnels.values()
         if b.is_representative()
@@ -207,12 +207,12 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         and b.exclusion_reason != ExclusionReason.OUTLIER
     ]
 
-    if not contained_brunnels:
-        print("No contained brunnels found")
+    if not nearby_brunnels:
+        print("No nearby brunnels found")
         return
 
     # Sort by start distance in decameters, then by end distance
-    contained_brunnels.sort(
+    nearby_brunnels.sort(
         key=lambda b: (
             int(b.route_span.start_distance / 10) if b.route_span else 0,
             b.route_span.end_distance if b.route_span else 0.0,
@@ -223,7 +223,7 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     bridge_count = tunnel_count = 0
     included_bridge_count = included_tunnel_count = 0
 
-    for brunnel in contained_brunnels:
+    for brunnel in nearby_brunnels:
         is_included = brunnel.exclusion_reason == ExclusionReason.NONE
         if brunnel.brunnel_type == BrunnelType.BRIDGE:
             bridge_count += 1
@@ -241,12 +241,12 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     # Calculate maximum digits needed for formatting alignment
     max_distance = max(
         brunnel.route_span.end_distance / 1000
-        for brunnel in contained_brunnels
+        for brunnel in nearby_brunnels
         if brunnel.route_span
     )
     max_length = max(
         (brunnel.route_span.end_distance - brunnel.route_span.start_distance) / 1000
-        for brunnel in contained_brunnels
+        for brunnel in nearby_brunnels
         if brunnel.route_span
     )
 
@@ -256,7 +256,7 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
 
     current_overlap_group = None
 
-    for brunnel in contained_brunnels:
+    for brunnel in nearby_brunnels:
         route_span = brunnel.route_span or RouteSpan(0, 0)
         start_km = route_span.start_distance / 1000
         end_km = route_span.end_distance / 1000
@@ -383,8 +383,8 @@ def main():
     if not args.no_overlap_exclusion:
         route.exclude_overlapping_brunnels(brunnels)
 
-    # Log all contained brunnels (included and excluded with reasons)
-    log_contained_brunnels(brunnels)
+    # Log all nearby brunnels (included and excluded with reasons)
+    log_nearby_brunnels(brunnels)
 
     # Collect metrics before creating map
     metrics = collect_metrics(brunnels)
