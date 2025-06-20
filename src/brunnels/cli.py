@@ -264,8 +264,11 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         if (
             current_overlap_group is not None or brunnel.overlap_group is not None
         ) and current_overlap_group != brunnel.overlap_group:
-            print("-" * len(span_info))
             current_overlap_group = brunnel.overlap_group
+            if current_overlap_group is not None:
+                print("--- Overlapping ---" + "-" * (len(span_info) - 20))
+            else:
+                print("-" * len(span_info))
 
         print(f"{span_info} {annotation} {indent}{brunnel.get_short_description()}")
 
