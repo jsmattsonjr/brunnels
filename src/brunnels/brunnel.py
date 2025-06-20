@@ -129,22 +129,29 @@ class Brunnel:
     def get_display_name(self) -> str:
         """Get the display name for this brunnel.
 
-        For compound brunnels, returns the common name if all components share the same name,
-        otherwise returns a formatted OSM ID. For simple brunnels, retrieves the 'name' tag
-        from OSM metadata, or returns a formatted OSM ID if no name exists.
+        For compound brunnels, collects names from all components (using "<OSM id>" for unnamed
+        components). If all names match, returns the common name; otherwise joins names with ';'.
+        For simple brunnels, retrieves the 'name' tag from OSM metadata, or returns a formatted
+        OSM ID if no name exists.
 
         Returns:
-            str: The OSM name or "<OSM {id}>" if unnamed or names don't match.
+            str: The OSM name, joined names, or "<OSM {id}>" for unnamed brunnels.
         """
         if self.compound_group is not None:
             names = []
             for component in self.compound_group:
                 if "name" in component.metadata["tags"]:
                     names.append(component.metadata["tags"]["name"])
-            # Use ID if there are no names or if the names are not all the same
-            if len(set(names)) != 1:
-                return f"<OSM {self.get_id()}>"
-            return names[0]
+                else:
+                    # Use <OSM id> format for unnamed components
+                    component_id = component.metadata.get("id", "unknown")
+                    names.append(f"<OSM {component_id}>")
+
+            # If all names are the same, return the common name
+            if len(set(names)) == 1:
+                return names[0]
+            # Otherwise, join all names with ';'
+            return "; ".join(names)
 
         return self.metadata["tags"].get("name", f"<OSM {self.get_id()}>")
 
