@@ -219,16 +219,23 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         )
     )
 
-    # Count bridges and tunnels separately
-    contained_bridges = [
-        b for b in contained_brunnels if b.brunnel_type == BrunnelType.BRIDGE
-    ]
-    contained_tunnels = [
-        b for b in contained_brunnels if b.brunnel_type == BrunnelType.TUNNEL
-    ]
+    # Count bridges and tunnels by type and inclusion status
+    bridge_count = tunnel_count = 0
+    included_bridge_count = included_tunnel_count = 0
+
+    for brunnel in contained_brunnels:
+        is_included = brunnel.exclusion_reason == ExclusionReason.NONE
+        if brunnel.brunnel_type == BrunnelType.BRIDGE:
+            bridge_count += 1
+            if is_included:
+                included_bridge_count += 1
+        else:  # TUNNEL
+            tunnel_count += 1
+            if is_included:
+                included_tunnel_count += 1
 
     print(
-        f"Contained brunnels ({len(contained_bridges)} bridges; {len(contained_tunnels)} tunnels):"
+        f"Nearby brunnels ({included_bridge_count}/{bridge_count} bridges; {included_tunnel_count}/{tunnel_count} tunnels):"
     )
 
     # Calculate maximum digits needed for formatting alignment
