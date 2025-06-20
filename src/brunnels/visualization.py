@@ -79,13 +79,13 @@ class BrunnelLegend(folium.MacroElement):
             {% endif %}
             {% if this.misaligned_bridge_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #DC2626; font-weight: bold; font-size: 18px;">—</span>
+                <span style="color: #FF8C00; font-weight: bold; font-size: 18px;">—</span>
                 Misaligned Bridges ({{ this.misaligned_bridge_count }})
             </div>
             {% endif %}
             {% if this.misaligned_tunnel_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #7C3AED; font-weight: bold; font-size: 18px;">—</span>
+                <span style="color: #DAA520; font-weight: bold; font-size: 18px;">—</span>
                 Misaligned Tunnels ({{ this.misaligned_tunnel_count }})
             </div>
             {% endif %}
@@ -345,13 +345,13 @@ def create_route_map(
             else:  # TUNNEL
                 color = "#9D4EDD"  # Alternative Tunnels (purple with yellow tinge)
         else:  # MISALIGNED
-            # Misaligned brunnels with green tinge (fully saturated)
+            # Misaligned brunnels with more yellow tinge than alternatives
             opacity = 0.9
             weight = 3
             if brunnel_type == BrunnelType.BRIDGE:
-                color = "#DC2626"  # Misaligned Bridges (deep red with green tinge)
+                color = "#FF8C00"  # Misaligned Bridges (dark orange, more yellow)
             else:  # TUNNEL
-                color = "#7C3AED"  # Misaligned Tunnels (blue-purple with green tinge)
+                color = "#DAA520"  # Misaligned Tunnels (goldenrod, more yellow)
 
         # Create popup text with full metadata
         if exclusion_reason == ExclusionReason.NONE:
