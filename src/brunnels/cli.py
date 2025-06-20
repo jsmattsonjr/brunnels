@@ -211,9 +211,12 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         print("No contained brunnels found")
         return
 
-    # Sort by start distance along route
+    # Sort by start distance in decameters, then by end distance
     contained_brunnels.sort(
-        key=lambda b: (b.route_span.start_distance if b.route_span else 0.0)
+        key=lambda b: (
+            int(b.route_span.start_distance / 10) if b.route_span else 0,
+            b.route_span.end_distance if b.route_span else 0.0,
+        )
     )
 
     # Count bridges and tunnels separately
