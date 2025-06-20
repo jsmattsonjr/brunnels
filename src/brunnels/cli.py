@@ -204,7 +204,7 @@ def log_contained_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         for b in brunnels.values()
         if b.is_representative()
         and b.route_span is not None
-        and b.exclusion_reason != ExclusionReason.NOT_CONTAINED
+        and b.exclusion_reason != ExclusionReason.OUTLIER
     ]
 
     if not contained_brunnels:
@@ -290,7 +290,7 @@ def exclude_uncontained_brunnels(
             brunnel.exclusion_reason == ExclusionReason.NONE
             and not brunnel.is_contained_by(route_geometry)
         ):
-            brunnel.exclusion_reason = ExclusionReason.NOT_CONTAINED
+            brunnel.exclusion_reason = ExclusionReason.OUTLIER
 
 
 def main():

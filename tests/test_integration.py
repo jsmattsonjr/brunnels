@@ -49,7 +49,7 @@ class BrunnelsTestResult:
                 # Direct stderr output format (no logging prefixes)
                 message = line
 
-                # Handle exclusion reasons: "excluded_reason[outwith_route_buffer][bridge]=530"
+                # Handle exclusion reasons: "excluded_reason[outlier][bridge]=530"
                 if message.startswith("excluded_reason["):
                     # Find the first bracket pair for the reason
                     first_bracket_start = message.find("[")
@@ -596,8 +596,8 @@ class TestTransfagarasanRoute(BaseRouteTest):
 
         # Validate exclusion metrics (updated for --bearing-tolerance=90, --route-buffer=10)
         expected_exclusion_details = {
-            "outwith_route_buffer": 22,  # Updated: 15 bridges + 7 tunnels excluded
-            "not_aligned_with_route": 0,  # Updated: 90° tolerance includes all aligned brunnels
+            "outlier": 22,  # Updated: 15 bridges + 7 tunnels excluded
+            "misaligned": 0,  # Updated: 90° tolerance includes all aligned brunnels
         }
 
         for exclusion_reason, expected_count in expected_exclusion_details.items():
@@ -949,9 +949,9 @@ class TestPaulRevereRoute(BaseRouteTest):
         ), "Stricter bearing tolerance should not increase included brunnels"
 
         # Check that some brunnels were excluded for bearing misalignment
-        if "not_aligned_with_route" in default_result.exclusion_details:
+        if "misaligned" in default_result.exclusion_details:
             assert (
-                default_result.exclusion_details["not_aligned_with_route"] >= 3
+                default_result.exclusion_details["misaligned"] >= 3
             ), "Expected some bearing misalignment exclusion"
 
 
@@ -1000,8 +1000,8 @@ class TestCoronadoRoute(BaseRouteTest):
 
         # With improved alignment algorithm, no bridges should be excluded for misalignment
         assert (
-            result.exclusion_details.get("not_aligned_with_route", 0) == 0
-        ), f"Expected 0 bearing misalignment, got {result.exclusion_details.get('not_aligned_with_route', 0)}"
+            result.exclusion_details.get("misaligned", 0) == 0
+        ), f"Expected 0 bearing misalignment, got {result.exclusion_details.get('misaligned', 0)}"
 
         # Test with stricter bearing tolerance should filter more
         strict_result = run_brunnels_cli(gpx_file, bearing_tolerance=10.0)

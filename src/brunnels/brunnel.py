@@ -33,7 +33,7 @@ class ExclusionReason(Enum):
     """Enumeration for brunnel exclusion reasons."""
 
     NONE = "none"
-    NOT_CONTAINED = "outwith_route_buffer"
+    OUTLIER = "outlier"
     MISALIGNED = "misaligned"
     ALTERNATIVE = "alternative"
 

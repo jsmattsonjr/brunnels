@@ -22,7 +22,7 @@
     "final_included_compound": "0",
     "final_included_total": "7",
     "filtered_brunnels": {
-      "outwith_route_buffer": "88"
+      "outlier": "88"
     }
   },
   "known_bridges": [

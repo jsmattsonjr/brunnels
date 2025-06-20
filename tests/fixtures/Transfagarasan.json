@@ -22,8 +22,8 @@
     "final_included_compound": "0-2",
     "final_included_total": "25-33",
     "filtered_brunnels": {
-      "outwith_route_buffer": "12-20",
-      "not_aligned_with_route": "0-3"
+      "outlier": "12-20",
+      "misaligned": "0-3"
     }
   },
   "known_bridges": [
