@@ -119,71 +119,48 @@ class BrunnelsTestResult:
 
     def _parse_included_brunnels(self):
         """Parse individual and compound brunnel details from stdout"""
-        # Parse individual bridges
-        individual_bridge_pattern = (
-            r"Bridge: ([^(]+) \(([^)]+)\) ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
-        )
-        for match in re.finditer(individual_bridge_pattern, self.stdout):
-            self.included_brunnels.append(
-                {
-                    "name": match.group(1).strip(),
-                    "osm_id": match.group(2),
-                    "start_km": float(match.group(3)),
-                    "end_km": float(match.group(4)),
-                    "length_km": float(match.group(5)),
-                    "type": "individual",
-                    "brunnel_type": "bridge",
-                }
-            )
+        # New format: " 5.39- 5.42 km (0.03 km) * Bridge: Waterfront Recreational Trail "
+        # or: " 7.74- 7.79 km (0.04 km) * Bridge: Cherry Street [3 segments] "
 
-        # Parse individual tunnels
-        individual_tunnel_pattern = (
-            r"Tunnel: ([^(]+) \(([^)]+)\) ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
-        )
-        for match in re.finditer(individual_tunnel_pattern, self.stdout):
-            self.included_brunnels.append(
-                {
-                    "name": match.group(1).strip(),
-                    "osm_id": match.group(2),
-                    "start_km": float(match.group(3)),
-                    "end_km": float(match.group(4)),
-                    "length_km": float(match.group(5)),
-                    "type": "individual",
-                    "brunnel_type": "tunnel",
-                }
-            )
+        # Parse all brunnels (bridges and tunnels, individual and compound)
+        # Pattern matches: distance range, length, annotation (*/-), type, name, optional segments
+        brunnel_pattern = r"\s*([\d.]+)-\s*([\d.]+) km \(([\d.]+) km\) ([*-])\s+(Bridge|Tunnel): ([^\[\(]+?)(?:\s*\[(\d+) segments\])?\s*(?:\([^)]+\))?\s*$"
 
-        # Parse compound bridges
-        compound_bridge_pattern = r"Compound Bridge: ([^(]+) \(([^)]+)\) \[(\d+) segments\] ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
-        for match in re.finditer(compound_bridge_pattern, self.stdout):
-            self.included_brunnels.append(
-                {
-                    "name": match.group(1).strip(),
-                    "osm_id": match.group(2),
-                    "segments": int(match.group(3)),
-                    "start_km": float(match.group(4)),
-                    "end_km": float(match.group(5)),
-                    "length_km": float(match.group(6)),
-                    "type": "compound",
-                    "brunnel_type": "bridge",
-                }
-            )
+        for match in re.finditer(brunnel_pattern, self.stdout, re.MULTILINE):
+            start_km = float(match.group(1))
+            end_km = float(match.group(2))
+            length_km = float(match.group(3))
+            annotation = match.group(4)
+            brunnel_type_str = match.group(5).lower()
+            name = match.group(6).strip()
+            segments = match.group(7)
 
-        # Parse compound tunnels
-        compound_tunnel_pattern = r"Compound Tunnel: ([^(]+) \(([^)]+)\) \[(\d+) segments\] ([\d.]+)-([\d.]+) km \(length: ([\d.]+) km\)"
-        for match in re.finditer(compound_tunnel_pattern, self.stdout):
-            self.included_brunnels.append(
-                {
-                    "name": match.group(1).strip(),
-                    "osm_id": match.group(2),
-                    "segments": int(match.group(3)),
-                    "start_km": float(match.group(4)),
-                    "end_km": float(match.group(5)),
-                    "length_km": float(match.group(6)),
-                    "type": "compound",
-                    "brunnel_type": "tunnel",
-                }
-            )
+            # Only include brunnels marked with '*' (included)
+            if annotation != "*":
+                continue
+
+            # Determine if compound based on segments
+            is_compound = segments is not None
+
+            # Extract OSM ID from name if it's in <OSM xxx> format or <OSM xxx;yyy;zzz> format
+            osm_id = "unknown"
+            if name.startswith("<OSM ") and name.endswith(">"):
+                osm_id = name[5:-1]  # Remove "<OSM " and ">"
+
+            brunnel_data = {
+                "name": name,
+                "osm_id": osm_id,
+                "start_km": start_km,
+                "end_km": end_km,
+                "length_km": length_km,
+                "type": "compound" if is_compound else "individual",
+                "brunnel_type": brunnel_type_str,
+            }
+
+            if is_compound:
+                brunnel_data["segments"] = int(segments)
+
+            self.included_brunnels.append(brunnel_data)
 
 
 def run_brunnels_cli(gpx_file: Path, **kwargs) -> BrunnelsTestResult:
@@ -389,28 +366,40 @@ class TestTorontoWaterfrontRoute(BaseRouteTest):
 
         known_bridges = metadata["known_bridges"]
 
-        # Collect all OSM IDs from both individual and compound brunnels
+        # Collect all OSM IDs and names from both individual and compound brunnels
         included_osm_ids = set()
+        included_names = set()
         for brunnel in result.included_brunnels:
             if brunnel["type"] == "compound":
                 # For compound brunnels, split the semicolon-separated IDs
-                ids = brunnel["osm_id"].split(";")
-                included_osm_ids.update(ids)
+                if brunnel["osm_id"] != "unknown":
+                    ids = brunnel["osm_id"].split(";")
+                    included_osm_ids.update(ids)
             else:
-                included_osm_ids.add(brunnel["osm_id"])
+                if brunnel["osm_id"] != "unknown":
+                    included_osm_ids.add(brunnel["osm_id"])
+            # Always collect the name for name-based matching
+            included_names.add(brunnel["name"])
 
-        # Check that major known bridges are found
+        # Check that major known bridges are found (by name or OSM ID)
         for bridge in known_bridges:
             if "osm_way_id" in bridge:
-                assert (
+                bridge_found = (
                     str(bridge["osm_way_id"]) in included_osm_ids
+                    or bridge["name"] in included_names
+                )
+                assert (
+                    bridge_found
                 ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
             elif "osm_way_ids" in bridge and bridge["type"] == "compound_bridge":
-                # For compound bridges, check if any component is found
+                # For compound bridges, check if components are found (by name or OSM ID)
                 bridge_ids = {str(oid) for oid in bridge["osm_way_ids"]}
                 found_ids = bridge_ids & included_osm_ids
+                # For compound bridges, check if the bridge name appears in any of the included names
+                name_found = any(bridge["name"] in name for name in included_names)
+                bridge_found = len(found_ids) > 0 or name_found
                 assert (
-                    len(found_ids) > 0
+                    bridge_found
                 ), f"Compound bridge {bridge['name']} components not found. Expected: {bridge_ids}, Found: {included_osm_ids}"
 
     def test_strict_bearing_tolerance(self, gpx_file: Path, metadata: Dict[str, Any]):
@@ -497,25 +486,38 @@ class TestTransfagarasanRoute(BaseRouteTest):
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
 
-        # Collect all OSM IDs from included brunnels
+        # Collect all OSM IDs and names from included brunnels
         included_osm_ids = set()
+        included_names = set()
         for brunnel in result.included_brunnels:
             if brunnel["type"] == "compound":
-                ids = brunnel["osm_id"].split(";")
-                included_osm_ids.update(ids)
+                if brunnel["osm_id"] != "unknown":
+                    ids = brunnel["osm_id"].split(";")
+                    included_osm_ids.update(ids)
             else:
-                included_osm_ids.add(brunnel["osm_id"])
+                if brunnel["osm_id"] != "unknown":
+                    included_osm_ids.add(brunnel["osm_id"])
+            # Always collect the name for name-based matching
+            included_names.add(brunnel["name"])
 
-        # Check known bridges
+        # Check known bridges (by name or OSM ID)
         for bridge in metadata["known_bridges"]:
-            assert (
+            bridge_found = (
                 str(bridge["osm_way_id"]) in included_osm_ids
+                or bridge["name"] in included_names
+            )
+            assert (
+                bridge_found
             ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
 
-        # Check known tunnels
+        # Check known tunnels (by name or OSM ID)
         for tunnel in metadata["known_tunnels"]:
-            assert (
+            tunnel_found = (
                 str(tunnel["osm_way_id"]) in included_osm_ids
+                or tunnel["name"] in included_names
+            )
+            assert (
+                tunnel_found
             ), f"Known tunnel {tunnel['name']} (OSM {tunnel['osm_way_id']}) not found"
 
     def test_tunnel_concentration_area(self, gpx_file: Path, metadata: Dict[str, Any]):
@@ -712,8 +714,8 @@ class TestArea51Route(BaseRouteTest):
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
 
-        # Should contain the "No brunnels included" message
-        assert "No brunnels included in final map" in result.stdout
+        # Should contain the "No brunnels found" message
+        assert "No nearby brunnels found" in result.stdout
 
     def test_edge_case_various_settings(self, gpx_file: Path):
         """Test zero brunnels scenario with various parameter combinations"""
@@ -788,28 +790,40 @@ class TestPaulRevereRoute(BaseRouteTest):
 
         known_bridges = metadata["known_bridges"]
 
-        # Collect all OSM IDs from both individual and compound brunnels
+        # Collect all OSM IDs and names from both individual and compound brunnels
         included_osm_ids = set()
+        included_names = set()
         for brunnel in result.included_brunnels:
             if brunnel["type"] == "compound":
                 # For compound brunnels, split the semicolon-separated IDs
-                ids = brunnel["osm_id"].split(";")
-                included_osm_ids.update(ids)
+                if brunnel["osm_id"] != "unknown":
+                    ids = brunnel["osm_id"].split(";")
+                    included_osm_ids.update(ids)
             else:
-                included_osm_ids.add(brunnel["osm_id"])
+                if brunnel["osm_id"] != "unknown":
+                    included_osm_ids.add(brunnel["osm_id"])
+            # Always collect the name for name-based matching
+            included_names.add(brunnel["name"])
 
-        # Check that major known bridges are found
+        # Check that major known bridges are found (by name or OSM ID)
         for bridge in known_bridges:
             if "osm_way_id" in bridge:
-                assert (
+                bridge_found = (
                     str(bridge["osm_way_id"]) in included_osm_ids
+                    or bridge["name"] in included_names
+                )
+                assert (
+                    bridge_found
                 ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
             elif "osm_way_ids" in bridge and bridge["type"] == "compound_bridge":
-                # For compound bridges, check if components are found
+                # For compound bridges, check if components are found (by name or OSM ID)
                 bridge_ids = {str(oid) for oid in bridge["osm_way_ids"]}
                 found_ids = bridge_ids & included_osm_ids
+                # For compound bridges, check if the bridge name appears in any of the included names
+                name_found = any(bridge["name"] in name for name in included_names)
+                bridge_found = len(found_ids) > 0 or name_found
                 assert (
-                    len(found_ids) > 0
+                    bridge_found
                 ), f"Compound bridge {bridge['name']} components not found. Expected: {bridge_ids}, Found: {included_osm_ids}"
 
     def test_compound_brunnel_creation(self, gpx_file: Path, metadata: Dict[str, Any]):
@@ -903,10 +917,12 @@ class TestPaulRevereRoute(BaseRouteTest):
 
         # Should have good mix of named and unnamed bridges
         named_bridges = [
-            b for b in result.included_brunnels if b.get("name", "unnamed") != "unnamed"
+            b
+            for b in result.included_brunnels
+            if not b.get("name", "").startswith("<OSM ")
         ]
         unnamed_bridges = [
-            b for b in result.included_brunnels if b.get("name", "unnamed") == "unnamed"
+            b for b in result.included_brunnels if b.get("name", "").startswith("<OSM ")
         ]
 
         assert (
@@ -977,20 +993,29 @@ class TestCoronadoRoute(BaseRouteTest):
 
         known_bridges = metadata["known_bridges"]
 
-        # Collect all OSM IDs from included brunnels
+        # Collect all OSM IDs and names from included brunnels
         included_osm_ids = set()
+        included_names = set()
         for brunnel in result.included_brunnels:
             if brunnel["type"] == "compound":
                 # For compound brunnels, split the semicolon-separated IDs
-                ids = brunnel["osm_id"].split(";")
-                included_osm_ids.update(ids)
+                if brunnel["osm_id"] != "unknown":
+                    ids = brunnel["osm_id"].split(";")
+                    included_osm_ids.update(ids)
             else:
-                included_osm_ids.add(brunnel["osm_id"])
+                if brunnel["osm_id"] != "unknown":
+                    included_osm_ids.add(brunnel["osm_id"])
+            # Always collect the name for name-based matching
+            included_names.add(brunnel["name"])
 
-        # Check that all known bridges are found
+        # Check that all known bridges are found (by name or OSM ID)
         for bridge in known_bridges:
-            assert (
+            bridge_found = (
                 str(bridge["osm_way_id"]) in included_osm_ids
+                or bridge["name"] in included_names
+            )
+            assert (
+                bridge_found
             ), f"Known bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
 
     def test_bearing_alignment_exclusion(self, gpx_file: Path):
@@ -1033,39 +1058,59 @@ class TestCoronadoRoute(BaseRouteTest):
         assert result.metrics["contained_bridges"] == 8
         assert result.metrics["contained_tunnels"] == 1
 
-        # Collect all OSM IDs from included brunnels
+        # Collect all OSM IDs and names from included brunnels
         included_osm_ids = set()
+        included_names = set()
         for brunnel in result.included_brunnels:
             if brunnel["type"] == "compound":
-                ids = brunnel["osm_id"].split(";")
-                included_osm_ids.update(ids)
+                if brunnel["osm_id"] != "unknown":
+                    ids = brunnel["osm_id"].split(";")
+                    included_osm_ids.update(ids)
             else:
-                included_osm_ids.add(brunnel["osm_id"])
+                if brunnel["osm_id"] != "unknown":
+                    included_osm_ids.add(brunnel["osm_id"])
+            # Always collect the name for name-based matching
+            included_names.add(brunnel["name"])
 
-        # Check default bridges are still found
+        # Check default bridges are still found (by name or OSM ID)
         for bridge in metadata["known_bridges"]:
-            assert (
+            bridge_found = (
                 str(bridge["osm_way_id"]) in included_osm_ids
+                or bridge["name"] in included_names
+            )
+            assert (
+                bridge_found
             ), f"Default bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found with bicycle infrastructure"
 
-        # Check bicycle infrastructure bridges
+        # Check bicycle infrastructure bridges (by name or OSM ID)
         for bridge in metadata["known_bridges_bicycle_infrastructure"]:
             if "osm_way_ids" in bridge:
-                # Compound bridge - check if components are found
+                # Compound bridge - check if components are found (by name or OSM ID)
                 bridge_ids = {str(oid) for oid in bridge["osm_way_ids"]}
                 found_ids = bridge_ids & included_osm_ids
+                # For compound bridges, check if the bridge name appears in any of the included names
+                name_found = any(bridge["name"] in name for name in included_names)
+                bridge_found = len(found_ids) > 0 or name_found
                 assert (
-                    len(found_ids) > 0
+                    bridge_found
                 ), f"Bicycle infrastructure compound bridge {bridge['name']} components not found"
             else:
-                assert (
+                bridge_found = (
                     str(bridge["osm_way_id"]) in included_osm_ids
+                    or bridge["name"] in included_names
+                )
+                assert (
+                    bridge_found
                 ), f"Bicycle infrastructure bridge {bridge['name']} (OSM {bridge['osm_way_id']}) not found"
 
-        # Check bicycle infrastructure tunnels
+        # Check bicycle infrastructure tunnels (by name or OSM ID)
         for tunnel in metadata["known_tunnels_bicycle_infrastructure"]:
-            assert (
+            tunnel_found = (
                 str(tunnel["osm_way_id"]) in included_osm_ids
+                or tunnel["name"] in included_names
+            )
+            assert (
+                tunnel_found
             ), f"Bicycle infrastructure tunnel {tunnel['name']} (OSM {tunnel['osm_way_id']}) not found"
 
         # Compare with default settings - should find more
