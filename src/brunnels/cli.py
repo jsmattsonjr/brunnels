@@ -168,6 +168,15 @@ def open_file_in_browser(filename: str) -> None:
 
 def setup_logging(args: argparse.Namespace) -> None:
     """Setup logging configuration."""
+    if hasattr(sys.stdout, 'reconfigure') and sys.stdout.encoding != 'utf-8':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+            # Also reconfigure stderr for completeness, though the error was on stdout
+            if hasattr(sys.stderr, 'reconfigure') and sys.stderr.encoding != 'utf-8':
+                sys.stderr.reconfigure(encoding='utf-8')
+            logger.debug("Reconfigured stdout and stderr to UTF-8 encoding.")
+        except Exception as e:
+            logger.debug(f"Could not reconfigure stdout/stderr to UTF-8: {e}")
     level = getattr(logging, args.log_level)
 
     # Create formatter
