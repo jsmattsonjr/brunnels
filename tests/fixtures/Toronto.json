@@ -13,16 +13,16 @@
     "area_sq_km": 107.4
   },
   "expected_results": {
-    "total_brunnels_found": "950-1000",
-    "total_bridges_found": "425-475",
-    "total_tunnels_found": "500-550",
-    "contained_bridges": "6-8",
-    "contained_tunnels": "0-1",
-    "final_included_individual": "4-6",
-    "final_included_compound": "1-3",
-    "final_included_total": "6-8",
+    "total_brunnels_found": "1010",
+    "total_bridges_found": "459",
+    "total_tunnels_found": "547",
+    "contained_bridges": "7",
+    "contained_tunnels": "0",
+    "final_included_individual": "5",
+    "final_included_compound": "2",
+    "final_included_total": "7",
     "filtered_brunnels": {
-      "outlier": "900-970"
+      "outlier": "999"
     }
   },
   "known_bridges": [

@@ -36,22 +36,41 @@ def query_overpass_brunnels(
     if not args.include_bicycle_no:
         base_filters += '["bicycle"!="no"]'
 
-    railway_filter = ""
-    if not args.include_active_railways:
-        railway_filter = ' && (!t["railway"] || t["railway"] == "abandoned" || t["railway"] == "dismantled" || t["railway"] == "disused" || t["railway"] == "historic" || t["railway"] == "razed" || t["railway"] == "removed")'
+    # Build railway exclusion using set difference with positive matching for active railways
+    active_railway_types = "rail|light_rail|subway|tram|narrow_gauge|funicular|monorail|miniature|preserved"
+
+    if args.include_active_railways:
+        railway_exclusion = ""
+    else:
+        railway_exclusion = (
+            f'["railway"~"^({active_railway_types})$"]{base_filters}(if:!is_closed());'
+        )
+
+    if railway_exclusion:
+        bridge_railway_exclusion = f"""
+  - way[bridge]{railway_exclusion}"""
+        tunnel_railway_exclusion = f"""
+  - way[tunnel]{railway_exclusion}"""
+    else:
+        bridge_railway_exclusion = ""
+        tunnel_railway_exclusion = ""
 
     # Overpass QL query with count separators to distinguish bridges from tunnels
-    # Uses unions to include both filtered results and explicit cycleway matches
+    # Uses set difference for railway exclusion and unions for cycleway inclusion
     query = f"""
 [out:json][timeout:{DEFAULT_API_TIMEOUT}][bbox:{south},{west},{north},{east}];
 (
-  way[bridge]{base_filters}(if:!is_closed(){railway_filter});
+  (
+    way[bridge]{base_filters}(if:!is_closed());{bridge_railway_exclusion}
+  );
   way[bridge][cycleway];
 );
 out count;
 out geom qt;
 (
-  way[tunnel]{base_filters}(if:!is_closed(){railway_filter});
+  (
+    way[tunnel]{base_filters}(if:!is_closed());{tunnel_railway_exclusion}
+  );
   way[tunnel][cycleway];
 );
 out count;
