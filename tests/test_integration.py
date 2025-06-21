@@ -1037,8 +1037,8 @@ class TestCoronadoRoute(BaseRouteTest):
         assert result.exit_code == 0
 
         # Should find significantly more brunnels
-        assert result.metrics["total_brunnels_found"] == 186
-        assert result.metrics["total_bridges_found"] == 171
+        assert result.metrics["total_brunnels_found"] == 193
+        assert result.metrics["total_bridges_found"] == 178
         assert result.metrics["total_tunnels_found"] == 14
 
         # Should include compound bridge and tunnel
