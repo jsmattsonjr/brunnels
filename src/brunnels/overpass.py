@@ -38,7 +38,7 @@ def query_overpass_brunnels(
 
     railway_filter = ""
     if not args.include_active_railways:
-        railway_filter = ' && (!t["railway"] || t["railway"] == "abandoned")'
+        railway_filter = ' && (!t["railway"] || t["railway"] == "abandoned" || t["railway"] == "dismantled" || t["railway"] == "disused" || t["railway"] == "historic" || t["railway"] == "razed" || t["railway"] == "removed")'
 
     # Overpass QL query with count separators to distinguish bridges from tunnels
     query = f"""
