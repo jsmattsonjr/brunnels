@@ -12,6 +12,77 @@ OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 logger = logging.getLogger(__name__)
 
 
+def _build_base_filters(args: argparse.Namespace) -> str:
+    """Build base filter string for Overpass query."""
+    base_filters = ""
+
+    if not args.include_waterways:
+        base_filters += "[!waterway]"
+
+    if not args.include_bicycle_no:
+        base_filters += '["bicycle"!="no"]'
+
+    return base_filters
+
+
+def _build_railway_exclusions(
+    args: argparse.Namespace, base_filters: str
+) -> Tuple[str, str]:
+    """Build railway exclusion strings for bridges and tunnels."""
+    active_railway_types = "rail|light_rail|subway|tram|narrow_gauge|funicular|monorail|miniature|preserved"
+
+    if args.include_active_railways:
+        return "", ""
+
+    railway_exclusion = (
+        f'["railway"~"^({active_railway_types})$"]{base_filters}(if:!is_closed());'
+    )
+
+    bridge_railway_exclusion = f"\n  - way[bridge]{railway_exclusion}"
+    tunnel_railway_exclusion = f"\n  - way[tunnel]{railway_exclusion}"
+
+    return bridge_railway_exclusion, tunnel_railway_exclusion
+
+
+def _build_overpass_query(
+    bbox: Tuple[float, float, float, float],
+    base_filters: str,
+    bridge_railway_exclusion: str,
+    tunnel_railway_exclusion: str,
+) -> str:
+    """Build the complete Overpass QL query string."""
+    south, west, north, east = bbox
+
+    return (
+        f"[out:json][timeout:{DEFAULT_API_TIMEOUT}][bbox:{south},{west},{north},{east}];\n"
+        f"(\n"
+        f"  (\n"
+        f"    way[bridge]{base_filters}(if:!is_closed());{bridge_railway_exclusion}\n"
+        f"  );\n"
+        f"  way[bridge][cycleway](if:!is_closed());\n"
+        f");\n"
+        f"out count;\n"
+        f"out geom qt;\n"
+        f"(\n"
+        f"  (\n"
+        f"    way[tunnel]{base_filters}(if:!is_closed());{tunnel_railway_exclusion}\n"
+        f"  );\n"
+        f"  way[tunnel][cycleway](if:!is_closed());\n"
+        f");\n"
+        f"out count;\n"
+        f"out geom qt;\n"
+    )
+
+
+def _is_retryable_error(e: requests.exceptions.HTTPError) -> bool:
+    """Check if an HTTP error is retryable."""
+    if e.response and hasattr(e.response, "status_code"):
+        return e.response.status_code == 429 or e.response.status_code >= 500
+    else:
+        error_msg = str(e).lower()
+        return any(code in error_msg for code in ["429", "500", "502", "503", "504"])
+
+
 def query_overpass_brunnels(
     bbox: Tuple[float, float, float, float],
     args: argparse.Namespace,
@@ -26,63 +97,18 @@ def query_overpass_brunnels(
     Raises:
         requests.exceptions.RequestException: On network or HTTP errors after retries
     """
-    south, west, north, east = bbox
-
-    base_filters = ""
-
-    if not args.include_waterways:
-        base_filters += "[!waterway]"
-
-    if not args.include_bicycle_no:
-        base_filters += '["bicycle"!="no"]'
-
-    # Build railway exclusion using set difference with positive matching for active railways
-    active_railway_types = "rail|light_rail|subway|tram|narrow_gauge|funicular|monorail|miniature|preserved"
-
-    if args.include_active_railways:
-        railway_exclusion = ""
-    else:
-        railway_exclusion = (
-            f'["railway"~"^({active_railway_types})$"]{base_filters}(if:!is_closed());'
-        )
-
-    if railway_exclusion:
-        bridge_railway_exclusion = f"""
-  - way[bridge]{railway_exclusion}"""
-        tunnel_railway_exclusion = f"""
-  - way[tunnel]{railway_exclusion}"""
-    else:
-        bridge_railway_exclusion = ""
-        tunnel_railway_exclusion = ""
-
-    # Overpass QL query with count separators to distinguish bridges from tunnels
-    # Uses set difference for railway exclusion and unions for cycleway inclusion
-    query = f"""
-[out:json][timeout:{DEFAULT_API_TIMEOUT}][bbox:{south},{west},{north},{east}];
-(
-  (
-    way[bridge]{base_filters}(if:!is_closed());{bridge_railway_exclusion}
-  );
-  way[bridge][cycleway](if:!is_closed());
-);
-out count;
-out geom qt;
-(
-  (
-    way[tunnel]{base_filters}(if:!is_closed());{tunnel_railway_exclusion}
-  );
-  way[tunnel][cycleway](if:!is_closed());
-);
-out count;
-out geom qt;
-"""
+    base_filters = _build_base_filters(args)
+    bridge_railway_exclusion, tunnel_railway_exclusion = _build_railway_exclusions(
+        args, base_filters
+    )
+    query = _build_overpass_query(
+        bbox, base_filters, bridge_railway_exclusion, tunnel_railway_exclusion
+    )
 
     url = OVERPASS_API_URL
-
-    # Retry with exponential backoff for 429 errors
     attempt = 0
-    max_retries = 5  # Increased for CI environments
-    base_delay = 2.0  # Longer initial delay for CI
+    max_retries = 5
+    base_delay = 2.0
 
     while True:
         try:
@@ -90,7 +116,6 @@ out geom qt;
                 url, data=query.strip(), timeout=DEFAULT_API_TIMEOUT
             )
             response.raise_for_status()
-
             elements = response.json().get("elements", [])
             return _parse_separated_results(elements)
 
@@ -107,22 +132,7 @@ out geom qt;
                 )
                 logger.debug(f"Response type: {type(e.response)}")
 
-            # Check if this is a retryable error (429 rate limit or 5xx server errors)
-            is_retryable = False
-            if e.response and hasattr(e.response, "status_code"):
-                # 429 rate limit or 5xx server errors
-                is_retryable = (
-                    e.response.status_code == 429 or e.response.status_code >= 500
-                )
-            else:
-                # Fallback: check exception message for retryable errors
-                error_msg = str(e).lower()
-                is_retryable = any(
-                    code in error_msg for code in ["429", "500", "502", "503", "504"]
-                )
-
-            if is_retryable and attempt < max_retries:
-                # Calculate delay with exponential backoff
+            if _is_retryable_error(e) and attempt < max_retries:
                 delay = base_delay * (2**attempt)
                 error_type = (
                     "Server error"
@@ -136,7 +146,6 @@ out geom qt;
                 attempt += 1
                 continue
             else:
-                # Re-raise for non-retryable errors or final attempt
                 logger.debug(
                     f"Not retrying: status={status_code}, attempt={attempt}, max_retries={max_retries}"
                 )
