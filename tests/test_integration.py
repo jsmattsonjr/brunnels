@@ -815,24 +815,12 @@ class TestPaulRevereRoute(BaseRouteTest):
         result = run_brunnels_cli(gpx_file, route_buffer=5.0)
         assert result.exit_code == 0
 
-        # Should have overlap exclusion active
+        # Should have overlap exclusion active (now always enabled)
         assert "alternative" in result.exclusion_details
         overlap_excluded = result.exclusion_details["alternative"]
         assert (
             overlap_excluded >= 1
         ), f"Expected >=1 overlap excluded, got {overlap_excluded}"
-
-        # Test without overlap exclusion disabled
-        no_overlap_result = run_brunnels_cli(
-            gpx_file, route_buffer=5.0, no_overlap_exclusion=True
-        )
-        assert no_overlap_result.exit_code == 0
-
-        # Should have same or more included brunnels when overlap exclusion is disabled
-        assert (
-            no_overlap_result.metrics["final_included_total"]
-            >= result.metrics["final_included_total"]
-        ), "Disabling overlap exclusion should not reduce included brunnels"
 
     def test_known_bridges_present(self, gpx_file: Path, metadata: Dict[str, Any]):
         """Test that known bridges are detected correctly"""

@@ -91,11 +91,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Don't automatically open the HTML file in browser",
     )
     parser.add_argument(
-        "--no-overlap-exclusion",
-        action="store_true",
-        help="Disable exclusion of overlapping brunnels (keep all overlapping brunnels)",
-    )
-    parser.add_argument(
         "--metrics",
         action="store_true",
         help="Output structured metrics after processing",
@@ -388,8 +383,7 @@ def main():
     )
 
     find_compound_brunnels(brunnels)
-    if not args.no_overlap_exclusion:
-        route.exclude_overlapping_brunnels(brunnels)
+    route.exclude_overlapping_brunnels(brunnels)
 
     # Log all nearby brunnels (included and excluded with reasons)
     log_nearby_brunnels(brunnels)

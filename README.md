@@ -100,7 +100,6 @@ python3 -m brunnels.cli route.gpx \
 - `--bbox-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Vector alignment tolerance in degrees (default: 20.0°)
-- `--no-overlap-exclusion`: Disable exclusion of overlapping brunnels (keep all overlapping brunnels)
 - `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query
 - `--include-waterways`: Include ways tagged as `waterway` in the Overpass query
 - `--include-active-railways`: Include ways tagged as `railway` excluding inactive values (`abandoned`, `dismantled`, `disused`, `historic`, `razed`, `removed`)
@@ -170,12 +169,11 @@ A brunnel is kept if any of its segments align with any route segment in the cro
 
 ### Overlap Exclusion
 
-The tool automatically excludes overlapping brunnels to reduce visual clutter when multiple parallel bridges or tunnels span similar portions of your route. When brunnels have overlapping route spans:
+When multiple parallel bridges or tunnels span similar portions of your route, the tool handles overlapping brunnels by:
 
 - **Distance calculation**: The tool calculates the average distance from each brunnel to your route
-- **Nearest selection**: The closest brunnel in each overlapping group is highlighted
-
-This feature can be disabled with `--no-overlap-exclusion` if you want to include all detected infrastructure.
+- **Nearest selection**: The closest brunnel in each overlapping group is displayed in full color
+- **Alternative display**: Other brunnels in the overlap group are displayed on the map in a different color and marked as "alternative" in the output list
 
 ### Merging
 
