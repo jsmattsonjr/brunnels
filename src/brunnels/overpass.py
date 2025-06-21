@@ -63,7 +63,7 @@ def query_overpass_brunnels(
   (
     way[bridge]{base_filters}(if:!is_closed());{bridge_railway_exclusion}
   );
-  way[bridge][cycleway];
+  way[bridge][cycleway](if:!is_closed());
 );
 out count;
 out geom qt;
@@ -71,7 +71,7 @@ out geom qt;
   (
     way[tunnel]{base_filters}(if:!is_closed());{tunnel_railway_exclusion}
   );
-  way[tunnel][cycleway];
+  way[tunnel][cycleway](if:!is_closed());
 );
 out count;
 out geom qt;
