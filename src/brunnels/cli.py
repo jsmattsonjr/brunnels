@@ -15,7 +15,6 @@ import argparse
 import logging
 import sys
 import os
-import gpxpy
 from gpxpy import gpx
 from shapely.geometry.base import BaseGeometry
 
