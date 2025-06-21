@@ -118,7 +118,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-active-railways",
         action="store_true",
-        help="Include ways tagged railway (excluding railway=abandoned) in the Overpass query",
+        help="Include ways tagged railway (excluding inactive types: abandoned, dismantled, disused, historic, razed, removed)",
     )
     return parser
 
