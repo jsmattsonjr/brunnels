@@ -41,12 +41,19 @@ def query_overpass_brunnels(
         railway_filter = ' && (!t["railway"] || t["railway"] == "abandoned" || t["railway"] == "dismantled" || t["railway"] == "disused" || t["railway"] == "historic" || t["railway"] == "razed" || t["railway"] == "removed")'
 
     # Overpass QL query with count separators to distinguish bridges from tunnels
+    # Uses unions to include both filtered results and explicit cycleway matches
     query = f"""
 [out:json][timeout:{DEFAULT_API_TIMEOUT}][bbox:{south},{west},{north},{east}];
-way[bridge]{base_filters}(if:!is_closed(){railway_filter});
+(
+  way[bridge]{base_filters}(if:!is_closed(){railway_filter});
+  way[bridge][cycleway];
+);
 out count;
 out geom qt;
-way[tunnel]{base_filters}(if:!is_closed(){railway_filter});
+(
+  way[tunnel]{base_filters}(if:!is_closed(){railway_filter});
+  way[tunnel][cycleway];
+);
 out count;
 out geom qt;
 """
