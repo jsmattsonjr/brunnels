@@ -13,7 +13,7 @@ import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
 
-from .brunnel import Brunnel, BrunnelType, ExclusionReason, RouteSpan
+from .brunnel import Brunnel, BrunnelType, ExclusionReason
 from .overpass import query_overpass_brunnels
 from .geometry import (
     Position,
@@ -149,6 +149,81 @@ class Route:
 
         return (south, west, north, east)
 
+    @staticmethod
+    def _get_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> List[Brunnel]:
+        """Get brunnels that are nearby and eligible for overlap exclusion, sorted by route span."""
+        nearby = [
+            b
+            for b in brunnels.values()
+            if b.is_representative()
+            and b.get_route_span() is not None
+            and b.exclusion_reason == ExclusionReason.NONE
+        ]
+
+        # Sort by route span start distance for consistent processing
+        return sorted(nearby, key=lambda b: b.get_route_span().start_distance)  # type: ignore[union-attr]
+
+    @staticmethod
+    def _find_overlap_groups(nearby_brunnels: List[Brunnel]) -> List[List[Brunnel]]:
+        """Find groups of overlapping brunnels from pre-sorted list."""
+        overlap_groups = []
+        i = 0
+
+        while i < len(nearby_brunnels):
+            current_group = [nearby_brunnels[i]]
+            j = i + 1
+
+            # Find all contiguous overlapping brunnels
+            while j < len(nearby_brunnels):
+                if any(
+                    brunnel_in_group.overlaps_with(nearby_brunnels[j])
+                    for brunnel_in_group in current_group
+                ):
+                    current_group.append(nearby_brunnels[j])
+                    j += 1
+                else:
+                    break
+
+            # Only add groups with more than one brunnel
+            if len(current_group) > 1:
+                overlap_groups.append(current_group)
+
+            i = j if j > i + 1 else i + 1
+
+        return overlap_groups
+
+    def _process_overlap_group(self, group: List[Brunnel]) -> None:
+        """Process a single overlap group, keeping the nearest and excluding others."""
+        logger.debug(f"Processing overlap group with {len(group)} brunnels")
+
+        # Assign the same overlap_group list to all brunnels in this group
+        for brunnel in group:
+            brunnel.overlap_group = group
+
+        # Calculate average distance to route for each brunnel in the group
+        brunnel_distances = []
+        for brunnel in group:
+            avg_distance = self.average_distance_to_brunnel(brunnel)
+            brunnel_distances.append((brunnel, avg_distance))
+            logger.debug(
+                f"  {brunnel.get_short_description()}: avg distance = {avg_distance:.3f}km"
+            )
+
+        # Sort by distance (closest first)
+        brunnel_distances.sort(key=lambda x: x[1])
+
+        # Keep the closest, exclude the rest
+        closest_brunnel, closest_distance = brunnel_distances[0]
+        logger.debug(
+            f"  Keeping closest: {closest_brunnel.get_short_description()} (distance: {closest_distance:.3f}km)"
+        )
+
+        for brunnel, distance in brunnel_distances[1:]:
+            brunnel.exclusion_reason = ExclusionReason.ALTERNATIVE
+            logger.debug(
+                f"  Excluded: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.exclusion_reason})"
+            )
+
     def exclude_overlapping_brunnels(
         self,
         brunnels: Dict[str, Brunnel],
@@ -163,100 +238,24 @@ class Route:
         if not self.coords or not brunnels:
             return
 
-        # Only consider contained brunnels with route spans
-        contained_brunnels = [
-            b
-            for b in brunnels.values()
-            if b.is_representative()
-            and b.get_route_span() is not None
-            and b.exclusion_reason == ExclusionReason.NONE
-        ]
+        nearby_brunnels = self._get_nearby_brunnels(brunnels)
+        if len(nearby_brunnels) < 2:
+            return
 
-        if len(contained_brunnels) < 2:
-            return  # Nothing to exclude
-
-        # Find groups of overlapping brunnels
-        overlap_groups = []
-        processed = set()
-
-        for i, brunnel1 in enumerate(contained_brunnels):
-            if i in processed:
-                continue
-
-            # Start a new group with this brunnel
-            current_group = [brunnel1]
-            processed.add(i)
-
-            # Find all brunnels that overlap with any brunnel in the current group
-            changed = True
-            while changed:
-                changed = False
-                for j, brunnel2 in enumerate(contained_brunnels):
-                    if j in processed:
-                        continue
-
-                    # Check if brunnel2 overlaps with any brunnel in current group
-                    for brunnel_in_group in current_group:
-                        if brunnel_in_group.overlaps_with(brunnel2):
-                            current_group.append(brunnel2)
-                            processed.add(j)
-                            changed = True
-                            break
-
-            # Only add groups with more than one brunnel
-            if len(current_group) > 1:
-                overlap_groups.append(current_group)
-
+        overlap_groups = self._find_overlap_groups(nearby_brunnels)
         if not overlap_groups:
             logger.debug("No overlapping brunnels found")
             return
 
-        # Exclude each overlap group, keeping only the nearest
-        excluded_count = 0
+        # Process each overlap group
         for group in overlap_groups:
-            logger.debug(f"Processing overlap group with {len(group)} brunnels")
+            self._process_overlap_group(group)
 
-            # Sort by route span start distance for consistent ordering
-            sorted_group = sorted(
-                group,
-                key=lambda b: (b.get_route_span() or RouteSpan(0, 0)).start_distance,
-            )
-
-            # Assign the same overlap_group list to all brunnels in this group
-            for brunnel in sorted_group:
-                brunnel.overlap_group = sorted_group
-
-            # Calculate average distance to route for each brunnel in the group
-            brunnel_distances = []
-            for brunnel in group:
-                avg_distance = self.average_distance_to_brunnel(brunnel)
-                brunnel_distances.append((brunnel, avg_distance))
-                logger.debug(
-                    f"  {brunnel.get_short_description()}: avg distance = {avg_distance:.3f}km"
-                )
-
-            # Sort by distance (closest first)
-            brunnel_distances.sort(key=lambda x: x[1])
-
-            # Keep the closest, exclude the rest
-            closest_brunnel, closest_distance = brunnel_distances[0]
-
-            logger.debug(
-                f"  Keeping closest: {closest_brunnel.get_short_description()} (distance: {closest_distance:.3f}km)"
-            )
-
-            for brunnel, distance in brunnel_distances[1:]:
-                brunnel.exclusion_reason = ExclusionReason.ALTERNATIVE
-                excluded_count += 1
-
-                logger.debug(
-                    f"  Excluded: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.exclusion_reason})"
-                )
-
-        if excluded_count > 0:
-            logger.debug(
-                f"Excluded {excluded_count} overlapping brunnels, keeping nearest in each group"
-            )
+        # Calculate total excluded for debug logging
+        total_excluded = sum(len(group) - 1 for group in overlap_groups)
+        logger.debug(
+            f"Excluded {total_excluded} overlapping brunnels, keeping nearest in each group"
+        )
 
     def find_brunnels(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
         """
