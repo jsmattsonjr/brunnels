@@ -70,8 +70,8 @@ def generate_output_filename(input_filename: str) -> str:
 
     # If we get here, we've tried 180 files and none worked
     logger.error(
-        f"Could not find an available filename after 180 attempts. "
-        f"Like GPX routes that cross the antimeridian, this is not supported! "
-        f"Please clean up your output directory or specify --output explicitly."
+        "Could not find an available filename after 180 attempts. "
+        "Like GPX routes that cross the antimeridian, this is not supported! "
+        "Please clean up your output directory or specify --output explicitly."
     )
     raise RuntimeError("No available filename found after 180 attempts")
