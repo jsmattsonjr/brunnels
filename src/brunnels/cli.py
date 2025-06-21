@@ -306,10 +306,15 @@ def exclude_uncontained_brunnels(
             brunnel.exclusion_reason = ExclusionReason.OUTLIER
 
 
-def main():
+def _parse_and_validate_args() -> argparse.Namespace:
     """
-    Parses command-line arguments, processes the GPX file,
-    finds brunnels, and generates an interactive map.
+    Parse and validate command-line arguments.
+
+    Returns:
+        Parsed and validated arguments
+
+    Exits:
+        On argument validation failure
     """
     parser = create_argument_parser()
     args = parser.parse_args()
@@ -318,56 +323,73 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    # Setup logging
-    setup_logging(args)
+    return args
 
-    # Determine output filename
-    try:
-        output_filename = determine_output_filename(args.filename, args.output)
-        logger.debug(f"Output filename: {output_filename}")
-    except (RuntimeError, ValueError):
-        sys.exit(1)
 
-    # Load and parse the GPX file into a route
+def _load_route(filename: str) -> Route:
+    """
+    Load and parse the GPX file into a Route object.
+
+    Args:
+        filename: Path to the GPX file
+
+    Returns:
+        Route object created from GPX file
+
+    Exits:
+        On file loading or parsing errors
+    """
     try:
-        route = Route.from_file(args.filename)
+        route = Route.from_file(filename)
     except FileNotFoundError:
-        logger.error(f"GPX file not found: {args.filename}")
+        logger.error(f"GPX file not found: {filename}")
         sys.exit(1)
     except PermissionError:
-        logger.error(f"Cannot read GPX file (permission denied): {args.filename}")
+        logger.error(f"Cannot read GPX file (permission denied): {filename}")
         sys.exit(1)
     except gpx.GPXException as e:
         logger.error(f"Invalid GPX file: {e}")
         sys.exit(1)
-    logger.info(f"Loaded GPX route with {len(route)} points")
 
+    logger.info(f"Loaded GPX route with {len(route)} points")
     logger.info(f"Total route distance: {route.linestring.length / 1000:.2f} km")
 
+    return route
+
+
+def _discover_and_filter_brunnels(
+    route: Route, args: argparse.Namespace
+) -> Dict[str, Brunnel]:
+    """
+    Discover brunnels near the route and apply filtering.
+
+    Args:
+        route: Route object to search around
+        args: Command-line arguments containing filtering options
+
+    Returns:
+        Dictionary of discovered and filtered brunnels
+    """
     # Find bridges and tunnels near the route
     brunnels = route.find_brunnels(args)
-
     logger.info(f"Found {len(brunnels)} brunnels near route")
 
     excluded_count = len(
         [b for b in brunnels.values() if b.exclusion_reason != ExclusionReason.NONE]
     )
-
     if excluded_count > 0:
         logger.debug(f"{excluded_count} brunnels excluded (will show greyed out)")
 
+    # Apply geometric filtering
     route_geometry = route.calculate_buffered_route_geometry(args.route_buffer)
-
-    # Check for containment within the route buffer
     exclude_uncontained_brunnels(route_geometry, brunnels)
-
     route.calculate_route_spans(brunnels)
 
     # Exclude misaligned brunnels based on bearing tolerance
     if args.bearing_tolerance > 0:
         route.exclude_misaligned_brunnels(brunnels, args.bearing_tolerance)
 
-    # Count contained vs total brunnels
+    # Log filtering results
     bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
     tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
     contained_bridges = [
@@ -376,14 +398,35 @@ def main():
     contained_tunnels = [
         b for b in tunnels if b.exclusion_reason == ExclusionReason.NONE
     ]
-
     logger.debug(
         f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
     )
 
+    # Apply compound brunnel detection and overlap exclusion
     find_compound_brunnels(brunnels)
     route.exclude_overlapping_brunnels(brunnels)
 
+    return brunnels
+
+
+def _generate_output(
+    route: Route,
+    brunnels: Dict[str, Brunnel],
+    output_filename: str,
+    args: argparse.Namespace,
+) -> None:
+    """
+    Generate the visualization map and handle output.
+
+    Args:
+        route: Route object
+        brunnels: Dictionary of filtered brunnels
+        output_filename: Path for output HTML file
+        args: Command-line arguments
+
+    Exits:
+        On map creation failure
+    """
     # Log all nearby brunnels (included and excluded with reasons)
     log_nearby_brunnels(brunnels)
 
@@ -402,6 +445,34 @@ def main():
     # Automatically open the HTML file in the default browser
     if not args.no_open:
         open_file_in_browser(output_filename)
+
+
+def main():
+    """
+    Parses command-line arguments, processes the GPX file,
+    finds brunnels, and generates an interactive map.
+    """
+    # Parse and validate arguments
+    args = _parse_and_validate_args()
+
+    # Setup logging
+    setup_logging(args)
+
+    # Determine output filename
+    try:
+        output_filename = determine_output_filename(args.filename, args.output)
+        logger.debug(f"Output filename: {output_filename}")
+    except (RuntimeError, ValueError):
+        sys.exit(1)
+
+    # Load route from GPX file
+    route = _load_route(args.filename)
+
+    # Discover and filter brunnels
+    brunnels = _discover_and_filter_brunnels(route, args)
+
+    # Generate output
+    _generate_output(route, brunnels, output_filename, args)
 
 
 if __name__ == "__main__":
