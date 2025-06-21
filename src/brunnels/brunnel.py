@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Data structures for representing bridges and tunnels (brunnels)."""
 
-from typing import Optional, List, Dict, Any, Set, NamedTuple
+from typing import Optional, List, Dict, Any, Set, NamedTuple, Tuple
 from collections import defaultdict, deque
 from enum import Enum
 import logging
@@ -351,18 +351,10 @@ class Brunnel:
         )
 
 
-def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
-    """
-    Identify connected components of brunnels and mark compound groups.
-
-    This function analyzes the graph formed by brunnels sharing nodes and identifies
-    connected components. For components with more than one way, it constructs a compound group
-    to mark them as part of the same logical structure.
-
-    Args:
-        brunnels: Dictionary of Brunnel objects to analyze
-    """
-    # Step 1: Build edges dictionary mapping node IDs to collections of way IDs
+def _build_node_edges(
+    brunnels: Dict[str, Brunnel],
+) -> Tuple[Dict[str, Set[str]], List[str]]:
+    """Build edges dictionary mapping node IDs to way IDs and return eligible way IDs."""
     edges: Dict[str, Set[str]] = defaultdict(set)
     way_ids = []
 
@@ -381,7 +373,46 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         for node_id in nodes:
             edges[node_id].add(way_id)
 
-    # Step 2: Find connected components using breadth-first search
+    return edges, way_ids
+
+
+def _find_connected_component(
+    start_way: str,
+    edges: Dict[str, Set[str]],
+    brunnels: Dict[str, Brunnel],
+    visited_ways: Set[str],
+) -> Set[str]:
+    """Find all ways connected to start_way through shared nodes using BFS."""
+    component: Set[str] = set()
+    queue: deque[str] = deque([start_way])
+
+    while queue:
+        current_way = queue.popleft()
+
+        if current_way in visited_ways:
+            continue
+
+        visited_ways.add(current_way)
+        component.add(current_way)
+
+        # Find all ways connected to this way through shared nodes
+        brunnel = brunnels[current_way]
+        current_nodes = brunnel.metadata.get("nodes", [])
+
+        for node_id in current_nodes:
+            # Find all other ways that share this node
+            connected_ways = edges[node_id]
+            for connected_way in connected_ways:
+                if connected_way not in visited_ways:
+                    queue.append(connected_way)
+
+    return component
+
+
+def _find_all_connected_components(
+    way_ids: List[str], edges: Dict[str, Set[str]], brunnels: Dict[str, Brunnel]
+) -> List[Set[str]]:
+    """Find all connected components using breadth-first search."""
     visited_ways: Set[str] = set()
     connected_components: List[Set[str]] = []
 
@@ -390,33 +421,16 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         if way_id in visited_ways:
             continue
 
-        # Start BFS from this way to find its connected component
-        component: Set[str] = set()
-        queue: deque[str] = deque([way_id])
-
-        while queue:
-            current_way = queue.popleft()
-
-            if current_way in visited_ways:
-                continue
-
-            visited_ways.add(current_way)
-            component.add(current_way)
-
-            # Find all ways connected to this way through shared nodes
-            brunnel = brunnels[current_way]
-            current_nodes = brunnel.metadata.get("nodes", [])
-
-            for node_id in current_nodes:
-                # Find all other ways that share this node
-                connected_ways = edges[node_id]
-                for connected_way in connected_ways:
-                    if connected_way not in visited_ways:
-                        queue.append(connected_way)
-
+        component = _find_connected_component(way_id, edges, brunnels, visited_ways)
         connected_components.append(component)
 
-    # Step 3: Mark compound groups
+    return connected_components
+
+
+def _mark_compound_groups(
+    connected_components: List[Set[str]], brunnels: Dict[str, Brunnel]
+) -> None:
+    """Mark compound groups for components with more than one way."""
     for component in connected_components:
         # Only mark components with more than one way as compound groups
         if len(component) > 1:
@@ -432,3 +446,24 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
             for way_id in component:
                 brunnel = brunnels[way_id]
                 brunnel.compound_group = compound_group
+
+
+def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
+    """
+    Identify connected components of brunnels and mark compound groups.
+
+    This function analyzes the graph formed by brunnels sharing nodes and identifies
+    connected components. For components with more than one way, it constructs a compound group
+    to mark them as part of the same logical structure.
+
+    Args:
+        brunnels: Dictionary of Brunnel objects to analyze
+    """
+    # Build edges dictionary and get eligible way IDs
+    edges, way_ids = _build_node_edges(brunnels)
+
+    # Find connected components using breadth-first search
+    connected_components = _find_all_connected_components(way_ids, edges, brunnels)
+
+    # Mark compound groups
+    _mark_compound_groups(connected_components, brunnels)
