@@ -219,38 +219,17 @@ def brunnel_to_html(brunnel: Brunnel) -> str:
     return "".join(html_parts)
 
 
-def create_route_map(
-    route: Route,
-    output_filename: str,
-    brunnels: Dict[str, Brunnel],
-    metrics: BrunnelMetrics,
-    args: argparse.Namespace,
-) -> None:
+def _setup_map_with_layers(center_lat: float, center_lon: float) -> folium.Map:
     """
-    Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
+    Create and configure a folium map with tile layers.
 
     Args:
-        route: Route object representing the route
-        output_filename: Path where HTML map file should be saved
-        brunnels: Dictionary of Brunnel objects to display on map
-        metrics: BrunnelMetrics containing pre-collected metrics
-        args: argparse.Namespace object containing settings like buffer
+        center_lat: Center latitude for the map
+        center_lon: Center longitude for the map
 
-    Raises:
-        ValueError: If route is empty
+    Returns:
+        Configured folium Map instance
     """
-    if not route:
-        raise ValueError("Cannot create map for empty route")
-
-    # Calculate buffered bounding box using existing function
-    south, west, north, east = route.get_bbox(args.bbox_buffer)
-
-    center_lat = (south + north) / 2
-    center_lon = (west + east) / 2
-
-    logger.debug(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
-
-    # Initialize map (CartoDB positron will be the default base, but also explicitly added for control)
     route_map = folium.Map(
         location=[center_lat, center_lon],
         tiles=None,
@@ -283,6 +262,17 @@ def create_route_map(
     # Add LayerControl
     folium.LayerControl().add_to(route_map)
 
+    return route_map
+
+
+def _add_route_to_map(route_map: folium.Map, route: Route) -> None:
+    """
+    Add route polyline and start/end markers to the map.
+
+    Args:
+        route_map: Folium map instance
+        route: Route object to display
+    """
     # Convert route to coordinate pairs for folium
     coordinates = [[pos.latitude, pos.longitude] for pos in route.coords]
 
@@ -309,13 +299,62 @@ def create_route_map(
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(route_map)
 
-    # Process and add included brunnels to map (metrics already collected)
+
+def _get_brunnel_style(brunnel: Brunnel) -> Dict[str, Any]:
+    """
+    Determine color, weight, and opacity for a brunnel based on its type and exclusion reason.
+
+    Args:
+        brunnel: Brunnel object to style
+
+    Returns:
+        Dictionary with style properties (color, weight, opacity)
+    """
+    exclusion_reason = brunnel.exclusion_reason
+    brunnel_type = brunnel.brunnel_type
+
+    # Set color and style based on inclusion status
+    if exclusion_reason == ExclusionReason.NONE:
+        # Included brunnels with 80% saturation
+        opacity = 0.9
+        weight = 4
+        if brunnel_type == BrunnelType.BRIDGE:
+            color = "#D23C4C"  # Included Bridges (80% saturation)
+        else:  # TUNNEL
+            color = "#69498F"  # Included Tunnels (80% saturation)
+    elif exclusion_reason == ExclusionReason.ALTERNATIVE:
+        # Alternative brunnels with yellow tinge (fully saturated)
+        opacity = 0.9
+        weight = 3
+        if brunnel_type == BrunnelType.BRIDGE:
+            color = "#FF6B35"  # Alternative Bridges (red-orange, yellow tinge)
+        else:  # TUNNEL
+            color = "#9D4EDD"  # Alternative Tunnels (purple with yellow tinge)
+    else:  # MISALIGNED
+        # Misaligned brunnels with more yellow tinge than alternatives
+        opacity = 0.9
+        weight = 3
+        if brunnel_type == BrunnelType.BRIDGE:
+            color = "#FF8C00"  # Misaligned Bridges (dark orange, more yellow)
+        else:  # TUNNEL
+            color = "#DAA520"  # Misaligned Tunnels (goldenrod, more yellow)
+
+    return {"color": color, "weight": weight, "opacity": opacity}
+
+
+def _add_brunnels_to_map(route_map: folium.Map, brunnels: Dict[str, Brunnel]) -> None:
+    """
+    Add brunnels to the map with appropriate styling and popups.
+
+    Args:
+        route_map: Folium map instance
+        brunnels: Dictionary of Brunnel objects to display
+    """
     for brunnel in brunnels.values():
         brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
         if not brunnel_coords:
             continue
 
-        brunnel_type = brunnel.brunnel_type
         exclusion_reason = brunnel.exclusion_reason
         route_span = brunnel.get_route_span()
 
@@ -327,31 +366,8 @@ def create_route_map(
         ]:
             continue
 
-        # Set color and style based on inclusion status
-        if exclusion_reason == ExclusionReason.NONE:
-            # Included brunnels with 80% saturation
-            opacity = 0.9
-            weight = 4
-            if brunnel_type == BrunnelType.BRIDGE:
-                color = "#D23C4C"  # Included Bridges (80% saturation)
-            else:  # TUNNEL
-                color = "#69498F"  # Included Tunnels (80% saturation)
-        elif exclusion_reason == ExclusionReason.ALTERNATIVE:
-            # Alternative brunnels with yellow tinge (fully saturated)
-            opacity = 0.9
-            weight = 3
-            if brunnel_type == BrunnelType.BRIDGE:
-                color = "#FF6B35"  # Alternative Bridges (red-orange, yellow tinge)
-            else:  # TUNNEL
-                color = "#9D4EDD"  # Alternative Tunnels (purple with yellow tinge)
-        else:  # MISALIGNED
-            # Misaligned brunnels with more yellow tinge than alternatives
-            opacity = 0.9
-            weight = 3
-            if brunnel_type == BrunnelType.BRIDGE:
-                color = "#FF8C00"  # Misaligned Bridges (dark orange, more yellow)
-            else:  # TUNNEL
-                color = "#DAA520"  # Misaligned Tunnels (goldenrod, more yellow)
+        # Get styling for this brunnel
+        style = _get_brunnel_style(brunnel)
 
         # Create popup text with full metadata
         if exclusion_reason == ExclusionReason.NONE:
@@ -367,34 +383,62 @@ def create_route_map(
         else:  # MISALIGNED
             status = "not aligned with route"
 
-        popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
-
+        popup_header = (
+            f"<b>{brunnel.brunnel_type.value.capitalize()}</b> ({status})<br>"
+        )
         metadata_html = brunnel_to_html(brunnel)
         popup_text = popup_header + metadata_html
 
-        # Style and add brunnel based on type
-        if brunnel_type == BrunnelType.TUNNEL:
-            folium.PolyLine(
-                brunnel_coords,
-                color=color,
-                weight=weight,
-                opacity=opacity,
-                popup=folium.Popup(
-                    popup_text, max_width=400
-                ),  # Wider for compound brunnels
-                z_index=2,  # Ensure tunnels are above route
-            ).add_to(route_map)
-        else:
-            folium.PolyLine(
-                brunnel_coords,
-                color=color,
-                weight=weight,
-                opacity=opacity,
-                popup=folium.Popup(
-                    popup_text, max_width=400
-                ),  # Wider for compound brunnels
-                z_index=2,  # Ensure bridges are above route
-            ).add_to(route_map)
+        # Add brunnel to map
+        folium.PolyLine(
+            brunnel_coords,
+            color=style["color"],
+            weight=style["weight"],
+            opacity=style["opacity"],
+            popup=folium.Popup(popup_text, max_width=400),
+            z_index=2,  # Ensure brunnels are above route
+        ).add_to(route_map)
+
+
+def create_route_map(
+    route: Route,
+    output_filename: str,
+    brunnels: Dict[str, Brunnel],
+    metrics: BrunnelMetrics,
+    args: argparse.Namespace,
+) -> None:
+    """
+    Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
+
+    Args:
+        route: Route object representing the route
+        output_filename: Path where HTML map file should be saved
+        brunnels: Dictionary of Brunnel objects to display on map
+        metrics: BrunnelMetrics containing pre-collected metrics
+        args: argparse.Namespace object containing settings like buffer
+
+    Raises:
+        ValueError: If route is empty
+    """
+    if not route:
+        raise ValueError("Cannot create map for empty route")
+
+    # Calculate buffered bounding box using existing function
+    south, west, north, east = route.get_bbox(args.bbox_buffer)
+
+    center_lat = (south + north) / 2
+    center_lon = (west + east) / 2
+
+    logger.debug(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
+
+    # Create and configure map with layers
+    route_map = _setup_map_with_layers(center_lat, center_lon)
+
+    # Add route to map
+    _add_route_to_map(route_map, route)
+
+    # Add brunnels to map
+    _add_brunnels_to_map(route_map, brunnels)
 
     # Add legend with dynamic counts from metrics
     legend = BrunnelLegend(metrics)
