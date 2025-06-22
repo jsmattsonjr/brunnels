@@ -102,7 +102,7 @@ python3 -m brunnels.cli route.gpx \
 - `--bearing-tolerance DEGREES`: Vector alignment tolerance in degrees (default: 20.0°)
 - `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query
 - `--include-waterways`: Include ways tagged as `waterway` in the Overpass query
-- `--include-active-railways`: Include ways tagged as `railway` excluding inactive values (`abandoned`, `dismantled`, `disused`, `historic`, `razed`, `removed`)
+- `--include-active-railways`: Include ways tagged as active `railway` types (`rail`, `light_rail`, `subway`, `tram`, `narrow_gauge`, `funicular`, `monorail`, `miniature`, `preserved`)
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) (default: WARNING)
 - `--metrics`: Output detailed structured metrics about the processing of brunnels to stderr
 - `--no-open`: Don't automatically open the HTML file in browser
@@ -153,7 +153,7 @@ When multiple brunnels span the same portion of your route, they're grouped toge
 
 The tool applies smart exclusion criteria for cycling routes:
 
-- **Excludes**: Infrastructure marked `bicycle=no`, waterways, active railways
+- **Excludes**: Infrastructure marked `bicycle=no`, waterways, active railways (`rail`, `light_rail`, `subway`, `tram`, `narrow_gauge`, `funicular`, `monorail`, `miniature`, `preserved`)
 - **Vector alignment**: Excludes brunnels where no segment pairs are aligned with your route direction (±20° tolerance by default)
 
 ### Vector Alignment

@@ -8,6 +8,19 @@ import time
 DEFAULT_API_TIMEOUT = 30
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 
+# Active railway types that are filtered out by default (unless --include-active-railways is used)
+ACTIVE_RAILWAY_TYPES = [
+    "rail",
+    "light_rail",
+    "subway",
+    "tram",
+    "narrow_gauge",
+    "funicular",
+    "monorail",
+    "miniature",
+    "preserved",
+]
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -29,13 +42,12 @@ def _build_railway_exclusions(
     args: argparse.Namespace, base_filters: str
 ) -> Tuple[str, str]:
     """Build railway exclusion strings for bridges and tunnels."""
-    active_railway_types = "rail|light_rail|subway|tram|narrow_gauge|funicular|monorail|miniature|preserved"
-
     if args.include_active_railways:
         return "", ""
 
+    active_railway_pattern = "|".join(ACTIVE_RAILWAY_TYPES)
     railway_exclusion = (
-        f'["railway"~"^({active_railway_types})$"]{base_filters}(if:!is_closed());'
+        f'["railway"~"^({active_railway_pattern})$"]{base_filters}(if:!is_closed());'
     )
 
     bridge_railway_exclusion = f"\n  - way[bridge]{railway_exclusion}"

@@ -12,6 +12,7 @@ from folium.template import Template
 from .brunnel import Brunnel, BrunnelType, ExclusionReason
 from .route import Route
 from .metrics import BrunnelMetrics
+from .overpass import ACTIVE_RAILWAY_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +185,7 @@ def _format_osm_tags(tags: Dict[str, str]) -> str:
             and value == "no"
             or key == "waterway"
             or key == "railway"
-            and value != "abandoned"
+            and value in ACTIVE_RAILWAY_TYPES
         )
         prefix = "<span style='color: red;'>" if highlight else ""
         suffix = "</span>" if highlight else ""
