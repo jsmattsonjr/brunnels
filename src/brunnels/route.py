@@ -258,13 +258,12 @@ class Route:
         )
 
     def _chunk_route_for_queries(
-        self, max_area_sq_km: float = 50000.0, buffer_meters: float = 10.0
+        self, buffer_meters: float = 10.0
     ) -> List[Tuple[int, int, Tuple[float, float, float, float]]]:
         """
-        Break route into chunks for separate Overpass queries based on bounding box area.
+        Break route into chunks for separate Overpass queries based on bounding box size.
 
         Args:
-            max_area_sq_km: Maximum bounding box area for each chunk in square kilometers
             buffer_meters: Buffer around each chunk in meters
 
         Returns:
@@ -272,6 +271,10 @@ class Route:
         """
         if not self.coords or len(self.coords) < 2:
             return []
+
+        # Maximum bounding box size in square degrees
+        # Roughly equivalent to 50,000 km² at equator (50000 / 111² ≈ 4.06)
+        MAX_DEGREES_SQUARED = 4.0
 
         chunks = []
         start_idx = 0
@@ -306,17 +309,15 @@ class Route:
             min_lat, max_lat = min(lats), max(lats)
             min_lon, max_lon = min(lons), max(lons)
 
-            # Calculate bounding box area without buffer for threshold check
+            # Fast bounding box size check using degrees
             lat_diff = max_lat - min_lat
             lon_diff = max_lon - min_lon
-            avg_lat = (min_lat + max_lat) / 2
-            lat_km = lat_diff * 111.0
-            lon_km = lon_diff * 111.0 * abs(math.cos(math.radians(avg_lat)))
-            area_sq_km = lat_km * lon_km
+            degrees_squared = lat_diff * lon_diff
 
-            # Create chunk when we exceed area threshold or reach the end
-            if area_sq_km >= max_area_sq_km or i == len(self.coords) - 1:
+            # Create chunk when we exceed size threshold or reach the end
+            if degrees_squared >= MAX_DEGREES_SQUARED or i == len(self.coords) - 1:
                 # Add buffer in degrees (approximate)
+                avg_lat = (min_lat + max_lat) / 2
                 lat_buffer = buffer_meters / 111000.0
                 lon_buffer = buffer_meters / (
                     111000.0 * abs(math.cos(math.radians(avg_lat)))
@@ -331,10 +332,12 @@ class Route:
 
                 chunks.append((start_idx, i, bbox))
 
+                # Calculate approximate area for logging
+                approx_area_sq_km = degrees_squared * 111.0 * 111.0
                 logger.debug(
                     f"Chunk {len(chunks)}: points {start_idx}-{i} "
                     f"({cumulative_distance/1000:.1f}km), "
-                    f"area: {area_sq_km:.1f} sq km, "
+                    f"area: {approx_area_sq_km:.1f} sq km, "
                     f"bbox: {bbox[0]:.3f},{bbox[1]:.3f},"
                     f"{bbox[2]:.3f},{bbox[3]:.3f}"
                 )
@@ -401,7 +404,7 @@ class Route:
         self, args: argparse.Namespace, max_area_sq_km: float
     ) -> Dict[str, Brunnel]:
         """Find brunnels using multiple chunked Overpass queries for long routes."""
-        chunks = self._chunk_route_for_queries(max_area_sq_km, args.query_buffer)
+        chunks = self._chunk_route_for_queries(args.query_buffer)
 
         logger.info(
             f"Long route ({self.linestring.length/1000:.1f}km) - "

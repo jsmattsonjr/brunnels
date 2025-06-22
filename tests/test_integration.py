@@ -4,8 +4,33 @@ import json
 import subprocess
 import tempfile
 import re
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+
+# Global cache for CLI results to avoid re-running expensive operations
+_CLI_RESULT_CACHE: Dict[tuple, "BrunnelsTestResult"] = {}
+
+
+def run_brunnels_cli(gpx_file: Path, **kwargs) -> "BrunnelsTestResult":
+    """Run brunnels CLI with caching based on gpx_file and kwargs"""
+    # Create cache key from gpx_file and sorted kwargs
+    cache_key = (str(gpx_file), tuple(sorted(kwargs.items())))
+
+    if cache_key in _CLI_RESULT_CACHE:
+        return _CLI_RESULT_CACHE[cache_key]
+
+    # Run CLI and cache result
+    start_time = time.time()
+    result = _run_brunnels_cli(gpx_file, **kwargs)
+    end_time = time.time()
+
+    # Store processing time for performance tests
+    result.processing_time = end_time - start_time
+
+    _CLI_RESULT_CACHE[cache_key] = result
+    return result
 
 
 class BrunnelsTestResult:
@@ -27,6 +52,7 @@ class BrunnelsTestResult:
         self.metrics: Dict[str, float] = {}
         self.exclusion_details: Dict[str, int] = {}
         self.included_brunnels: List[Dict[str, Any]] = []
+        self.processing_time: float = 0.0
 
         self._parse_output()
 
@@ -241,7 +267,7 @@ class BrunnelsTestResult:
             assert tunnel_found, error_msg
 
 
-def run_brunnels_cli(gpx_file: Path, **kwargs) -> BrunnelsTestResult:
+def _run_brunnels_cli(gpx_file: Path, **kwargs) -> BrunnelsTestResult:
     """Run brunnels CLI and return parsed results"""
     import time
 
@@ -338,6 +364,11 @@ class BaseRouteTest:
     # self.gpx_file and self.metadata are expected to be provided by subclasses
     # through pytest fixtures.
 
+    @pytest.fixture
+    def default_result(self, gpx_file: Path) -> BrunnelsTestResult:
+        """Run CLI with default settings using cache"""
+        return run_brunnels_cli(gpx_file)
+
     def assert_known_bridges_present(
         self, result: BrunnelsTestResult, metadata: Dict[str, Any], context=""
     ):
@@ -379,9 +410,11 @@ class BaseRouteTest:
         self.assert_known_bridges_present(result, metadata, context)
         self.assert_known_tunnels_present(result, metadata, context)
 
-    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
+    def test_default_settings(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
         """Test route with default settings"""
-        result = run_brunnels_cli(gpx_file)
+        result = default_result
 
         # Basic execution
         assert result.exit_code == 0, f"CLI failed: {result.stderr}"
@@ -438,9 +471,9 @@ class BaseRouteTest:
                     f"excluded_{reason}",
                 )
 
-    def test_html_output_validity(self, gpx_file: Path):
+    def test_html_output_validity(self, default_result: BrunnelsTestResult):
         """Test that generated HTML is valid and contains expected elements"""
-        result = run_brunnels_cli(gpx_file)
+        result = default_result
         assert result.exit_code == 0
         assert result.html_content is not None, "No HTML content generated"
 
@@ -972,6 +1005,169 @@ class TestPaulRevereRoute(BaseRouteTest):
             assert (
                 default_result.exclusion_details["misaligned"] >= 3
             ), "Expected some bearing misalignment exclusion"
+
+
+class TestAcrossAmericaRoute(BaseRouteTest):
+    """Integration tests for AcrossAmerica transcontinental route"""
+
+    @pytest.fixture
+    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
+        """Load metadata JSON file matching the GPX basename"""
+        metadata_file = gpx_file.with_suffix(".json")
+        with open(metadata_file) as f:
+            return json.load(f)
+
+    @pytest.fixture
+    def gpx_file(self) -> Path:
+        """Path to AcrossAmerica GPX file"""
+        return Path(__file__).parent / "fixtures" / "AcrossAmerica.gpx"
+
+    def test_known_bridges_present(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
+        """Test that known bridges are detected correctly"""
+        result = default_result
+        assert result.exit_code == 0
+
+        self.assert_known_bridges_present(result, metadata)
+
+    def test_transcontinental_chunking(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
+        """Test that long transcontinental route is processed in chunks"""
+        result = default_result
+        assert result.exit_code == 0
+
+        # Should have processed route in chunks (indicated by chunked query messages)
+        assert "chunks for Overpass queries" in result.stderr
+        assert "Chunk 1/8" in result.stderr
+        assert "Chunk 8/8" in result.stderr
+
+        # Should have significant route distance
+        assert result.metrics["total_distance_km"] > 4500
+        assert result.metrics["track_points"] > 40000
+
+    def test_compound_bridge_detection(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
+        """Test that compound bridges are detected correctly"""
+        result = default_result
+        assert result.exit_code == 0
+
+        # Should have 4 compound bridges
+        compound_brunnels = [
+            b for b in result.included_brunnels if b["type"] == "compound"
+        ]
+        assert (
+            len(compound_brunnels) == 4
+        ), f"Expected 4 compound bridges, found {len(compound_brunnels)}"
+
+        # Verify each compound bridge has 2 segments
+        for compound in compound_brunnels:
+            assert (
+                compound["segments"] == 2
+            ), f"Expected 2 segments for compound bridge {compound['name']}"
+
+    def test_overlap_exclusion(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
+        """Test that overlap exclusion works correctly"""
+        result = default_result
+        assert result.exit_code == 0
+
+        # Should have 1 overlap exclusion
+        assert "alternative" in result.exclusion_details
+        assert result.exclusion_details["alternative"] == 1
+
+    def test_no_tunnels_detected(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
+        """Test that no tunnels are detected along this route"""
+        result = default_result
+        assert result.exit_code == 0
+
+        # Should have 0 tunnels
+        assert result.metrics["contained_tunnels"] == 0
+        tunnel_brunnels = [
+            b for b in result.included_brunnels if b["brunnel_type"] == "tunnel"
+        ]
+        assert len(tunnel_brunnels) == 0
+
+    def test_transcontinental_performance(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
+        """Test performance with transcontinental route"""
+        result = default_result
+        assert result.exit_code == 0
+
+        # Use the processing time captured during fixture creation
+        processing_time = result.processing_time
+        benchmarks = metadata["performance_benchmarks"]
+
+        # Parse expected time range
+        time_range = benchmarks["processing_time_seconds"]
+        min_time, max_time = map(int, time_range.split("-"))
+
+        # Note: Don't fail in CI, just report the timing
+        if os.getenv("CI") == "true":
+            print(
+                f"CI processing time: {processing_time:.1f}s (benchmark: {time_range}s)"
+            )
+        else:
+            assert (
+                processing_time <= max_time
+            ), f"Processing took {processing_time:.1f}s, expected <{max_time}s"
+
+    def test_major_highway_bridges(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
+        """Test that major highway bridges are detected"""
+        result = default_result
+        assert result.exit_code == 0
+
+        # Check for major highway bridges by name
+        highway_names = [
+            "United States Highway 160",
+            "Highway Of Legends",
+            "James A. Rhodes Appalachian Highway",
+            "National Pike",
+        ]
+
+        included_names = {b["name"] for b in result.included_brunnels}
+
+        for highway_name in highway_names:
+            found = any(highway_name in name for name in included_names)
+            assert found, f"Major highway bridge '{highway_name}' not found"
+
+    def test_bearing_alignment_exclusion(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test bearing alignment exclusion on transcontinental route"""
+        # Test with default tolerance (cached)
+        default_result = run_brunnels_cli(gpx_file)
+        assert default_result.exit_code == 0
+
+        # Test with strict tolerance (cached)
+        strict_result = run_brunnels_cli(gpx_file, bearing_tolerance=2.0)
+        assert strict_result.exit_code == 0
+
+        # Stricter tolerance should result in same or fewer included brunnels
+        assert (
+            strict_result.metrics["final_included_total"]
+            <= default_result.metrics["final_included_total"]
+        ), "Stricter bearing tolerance should not increase included brunnels"
+
+        # Should have some misalignment exclusion with default tolerance (but much less than with strict)
+        default_misaligned = default_result.exclusion_details.get("misaligned", 0)
+        strict_misaligned = strict_result.exclusion_details.get("misaligned", 0)
+
+        # Strict tolerance should exclude more bridges for misalignment
+        assert (
+            strict_misaligned >= default_misaligned
+        ), "Stricter bearing tolerance should increase misaligned exclusions"
+        assert (
+            strict_misaligned >= 5
+        ), f"Expected >=5 misaligned bridges with strict tolerance, got {strict_misaligned}"
 
 
 class TestChehalisRoute(BaseRouteTest):
