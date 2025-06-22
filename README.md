@@ -123,14 +123,20 @@ The generated HTML map includes:
 - **Blue line**: Your GPX route
 - **Red lines**: Bridges that your route crosses
 - **Purple lines**: Tunnels that your route passes through
+- **Orange lines**: Alternative bridges (overlapping with included bridges)
+- **Light purple lines**: Alternative tunnels (overlapping with included tunnels)
+- **Dark orange lines**: Misaligned bridges (not aligned with route direction)
+- **Goldenrod lines**: Misaligned tunnels (not aligned with route direction)  
 - **Green marker**: Route start
 - **Red marker**: Route end
 
-### Legend
+Click on any brunnel for detailed OpenStreetMap metadata. Nearby brunnels show route span information (start/end distances, length).
 
-- Numbers in parentheses show counts
-- Click on any brunnel for detailed OpenStreetMap metadata
-- Contained brunnels show route span information (start/end distances, length)
+#### Legend
+
+The map includes a dynamic legend showing:
+- Numbers in parentheses show counts for each category
+- Only categories with brunnels present are displayed
 
 ### Brunnel List Output
 
@@ -143,7 +149,7 @@ start-end km (length km) [annotation] Name/ID [exclusion reason]
 ```
 
 - **Distance Information:** `1.45-1.47 km` shows the route span where the brunnel intersects your path, `(0.01 km)` shows the length of the brunnel crossing
-- **Annotations:** `*` = included brunnel (full color on map), `-` = excluded brunnel (grayed out or alternate colors)
+- **Annotations:** `*` = included brunnel; `-` = excluded brunnel
 - **Names/IDs:** Named infrastructure like `Bridge: Main Street`, unnamed ways like `Bridge: <OSM 852560833>`, or compound brunnels like `Bridge: <OSM 169505851;591294837> [2 segments]`
 - **Exclusion Reasons:** `(alternative)` = excluded because a closer overlapping brunnel was kept, `(misaligned)` = excluded because no segment pairs align with your route direction
 

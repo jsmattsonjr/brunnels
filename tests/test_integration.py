@@ -433,14 +433,14 @@ class BaseRouteTest:
             "total_brunnels_found",
         )
         assert_in_range(
-            result.metrics["contained_bridges"],
-            expected["contained_bridges"],
-            "contained_bridges",
+            result.metrics["nearby_bridges"],
+            expected["nearby_bridges"],
+            "nearby_bridges",
         )
         assert_in_range(
-            result.metrics["contained_tunnels"],
-            expected["contained_tunnels"],
-            "contained_tunnels",
+            result.metrics["nearby_tunnels"],
+            expected["nearby_tunnels"],
+            "nearby_tunnels",
         )
         assert_in_range(
             result.metrics["final_included_total"],
@@ -667,8 +667,8 @@ class TestTransfagarasanRoute(BaseRouteTest):
             "total_brunnels_found": 55,
             "total_bridges_found": 35,
             "total_tunnels_found": 20,
-            "contained_bridges": 20,  # Updated: one more bridge included
-            "contained_tunnels": 13,  # Updated: more tunnels included with larger buffer
+            "nearby_bridges": 20,  # Updated: one more bridge included
+            "nearby_tunnels": 13,  # Updated: more tunnels included with larger buffer
             "final_included_individual": 33,  # Updated: total included individual brunnels
             "final_included_compound": 0,
             "final_included_total": 33,  # Updated: total included brunnels
@@ -1087,7 +1087,7 @@ class TestAcrossAmericaRoute(BaseRouteTest):
         assert result.exit_code == 0
 
         # Should have 0 tunnels
-        assert result.metrics["contained_tunnels"] == 0
+        assert result.metrics["nearby_tunnels"] == 0
         tunnel_brunnels = [
             b for b in result.included_brunnels if b["brunnel_type"] == "tunnel"
         ]
@@ -1342,8 +1342,8 @@ class TestCoronadoRoute(BaseRouteTest):
         assert result.metrics["final_included_total"] == 9
         assert result.metrics["final_included_individual"] == 8
         assert result.metrics["final_included_compound"] == 1
-        assert result.metrics["contained_bridges"] == 8
-        assert result.metrics["contained_tunnels"] == 1
+        assert result.metrics["nearby_bridges"] == 8
+        assert result.metrics["nearby_tunnels"] == 1
 
         # Check default bridges are still found using helper method
         result.assert_bridges_found(
@@ -1420,7 +1420,7 @@ def debug_route(gpx_filename: str):
         f"Total brunnels: {result.metrics.get('total_brunnels_found', 'N/A')} (expected: {expected['total_brunnels_found']})"
     )
     print(
-        f"Contained bridges: {result.metrics.get('contained_bridges', 'N/A')} (expected: {expected['contained_bridges']})"
+        f"Nearby bridges: {result.metrics.get('nearby_bridges', 'N/A')} (expected: {expected['nearby_bridges']})"
     )
     print(
         f"Final included total: {result.metrics.get('final_included_total', 'N/A')} (expected: {expected['final_included_total']})"

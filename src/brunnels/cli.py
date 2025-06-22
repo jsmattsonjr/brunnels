@@ -69,7 +69,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--route-buffer",
         type=float,
         default=3.0,
-        help="Route buffer for containment detection in meters (default: 3.0)",
+        help="Route buffer for nearby detection in meters (default: 3.0)",
     )
     parser.add_argument(
         "--bearing-tolerance",
@@ -405,7 +405,7 @@ def _discover_and_filter_brunnels(
         b for b in tunnels if b.exclusion_reason == ExclusionReason.NONE
     ]
     logger.debug(
-        f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
+        f"Found {len(contained_bridges)}/{len(bridges)} nearby bridges and {len(contained_tunnels)}/{len(tunnels)} nearby tunnels"
     )
 
     # Apply compound brunnel detection and overlap exclusion
