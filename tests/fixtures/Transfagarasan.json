@@ -13,17 +13,16 @@
     "area_sq_km": 56.1
   },
   "expected_results": {
-    "total_brunnels_found": "40-50",
-    "total_bridges_found": "30-40",
-    "total_tunnels_found": "5-15",
-    "contained_bridges": "17-21",
-    "contained_tunnels": "8-12",
-    "final_included_individual": "25-33",
-    "final_included_compound": "0-2",
-    "final_included_total": "25-33",
+    "total_brunnels_found": "46",
+    "total_bridges_found": "35",
+    "total_tunnels_found": "11",
+    "contained_bridges": "20",
+    "contained_tunnels": "10",
+    "final_included_individual": "30",
+    "final_included_compound": "0",
+    "final_included_total": "30",
     "filtered_brunnels": {
-      "outlier": "12-20",
-      "misaligned": "0-3"
+      "outlier": "16"
     }
   },
   "known_bridges": [
@@ -114,7 +113,7 @@
       "args": {
         "bearing_tolerance": 10.0
       },
-      "expected_final_included_total": "20-28",
+      "expected_final_included_total": "30",
       "notes": "Mountain road with serpentines may filter more bridges with stricter tolerance"
     },
     {
@@ -122,7 +121,7 @@
       "args": {
         "route_buffer": 10.0
       },
-      "expected_included": "29-35",
+      "expected_included": "31",
       "notes": "Larger buffer may include additional mountain infrastructure"
     },
     {

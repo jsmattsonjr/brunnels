@@ -93,7 +93,7 @@
       "args": {
         "bearing_tolerance": 10.0
       },
-      "expected_final_included_total": "5-7",
+      "expected_final_included_total": "7",
       "notes": "Some bridges may be filtered due to tighter alignment"
     },
     {
@@ -101,7 +101,7 @@
       "args": {
         "route_buffer": 10.0
       },
-      "expected_included": "7-9",
+      "expected_included": "8",
       "notes": "Larger buffer may include additional borderline bridges"
     }
   ],

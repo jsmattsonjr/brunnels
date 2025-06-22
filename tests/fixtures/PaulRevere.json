@@ -13,16 +13,16 @@
     "area_sq_km": 179.6
   },
   "expected_results": {
-    "total_brunnels_found": "940-980",
-    "total_bridges_found": "730-760",
-    "total_tunnels_found": "205-240",
-    "contained_bridges": "12-14",
-    "contained_tunnels": "0-1",
-    "final_included_individual": "11-13",
-    "final_included_compound": "1-2",
-    "final_included_total": "12-14",
+    "total_brunnels_found": "969",
+    "total_bridges_found": "747",
+    "total_tunnels_found": "221",
+    "contained_bridges": "14",
+    "contained_tunnels": "0",
+    "final_included_individual": "13",
+    "final_included_compound": "1",
+    "final_included_total": "14",
     "filtered_brunnels": {
-      "outlier": "945-955"
+      "outlier": "954"
     }
   },
   "known_bridges": [
@@ -117,8 +117,8 @@
       "args": {
         "route_buffer": 5.0
       },
-      "expected_final_included_total": "13-15",
-      "expected_overlap_filtered": "1-2",
+      "expected_final_included_total": "14",
+      "expected_overlap_filtered": "2",
       "notes": "Increased buffer detects overlapping brunnels for filtering test"
     },
     {
@@ -127,7 +127,7 @@
         "bearing_tolerance": 10.0,
         "route_buffer": 5.0
       },
-      "expected_final_included_total": "10-14",
+      "expected_final_included_total": "14",
       "notes": "Urban trail with various bridge orientations"
     },
     {
@@ -136,8 +136,8 @@
         "no_overlap_filtering": true,
         "route_buffer": 5.0
       },
-      "expected_final_included_total": "14-16",
-      "notes": "Should include overlapping brunnels that would normally be filtered"
+      "expected_final_included_total": "16",
+      "notes": "Should include overlapping brunnels that would normally be filtered (placeholder - no such option currently exists)"
     }
   ],
   "performance_benchmarks": {
