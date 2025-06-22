@@ -46,7 +46,7 @@ def generate_output_filename(input_filename: str) -> str:
     # Try the base filename first
     candidate = os.path.join(input_dir, base_output + ".html")
     try:
-        with open(candidate, "x") as f:
+        with open(candidate, "x") as _:
             pass  # File created successfully and is kept
         return candidate  # Found and reserved a good filename
     except FileExistsError:
@@ -59,7 +59,7 @@ def generate_output_filename(input_filename: str) -> str:
     for i in range(1, 181):  # 1 to 180 (antimeridian reference)
         candidate = os.path.join(input_dir, f"{base_output} ({i}).html")
         try:
-            with open(candidate, "x") as f:
+            with open(candidate, "x") as _:
                 pass  # File created successfully and is kept
             return candidate  # Found and reserved a good filename
         except FileExistsError:
