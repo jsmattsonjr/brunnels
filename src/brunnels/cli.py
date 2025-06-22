@@ -114,6 +114,12 @@ def create_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Include ways tagged railway (excluding inactive types: abandoned, dismantled, disused, historic, razed, removed)",
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="Overpass API timeout in seconds (default: 30)",
+    )
     return parser
 
 

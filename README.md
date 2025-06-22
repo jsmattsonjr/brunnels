@@ -94,12 +94,18 @@ python3 -m brunnels.cli route.gpx \
   --log-level DEBUG
 ```
 
+**For large routes (cross-country, international) that may timeout:**
+```bash
+brunnels large_route.gpx --timeout 300
+```
+
 ### Options
 
 - `--output FILE`: Specify output HTML filename (default: auto-generated based on input filename)
 - `--query-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Vector alignment tolerance in degrees (default: 20.0°)
+- `--timeout SECONDS`: Overpass API timeout in seconds (default: 30)
 - `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query
 - `--include-waterways`: Include ways tagged as `waterway` in the Overpass query
 - `--include-active-railways`: Include ways tagged as active `railway` types (`rail`, `light_rail`, `subway`, `tram`, `narrow_gauge`, `funicular`, `monorail`, `miniature`, `preserved`)
