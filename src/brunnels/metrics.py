@@ -104,8 +104,8 @@ def log_metrics(
         if key not in ["total", "contained", "individual", "compound"] and count > 0:
             eprint(f"excluded_reason[{key}][tunnel]={count}")
 
-    eprint(f"contained_bridges={metrics.bridge_counts.get('contained', 0)}")
-    eprint(f"contained_tunnels={metrics.tunnel_counts.get('contained', 0)}")
+    eprint(f"nearby_bridges={metrics.bridge_counts.get('contained', 0)}")
+    eprint(f"nearby_tunnels={metrics.tunnel_counts.get('contained', 0)}")
     eprint(
         f"final_included_individual={metrics.bridge_counts.get('individual', 0) + metrics.tunnel_counts.get('individual', 0)}"
     )

@@ -511,5 +511,5 @@ def create_route_map(
     route_map.save(output_filename)
 
     logger.debug(
-        f"Map saved to {output_filename} with {metrics.bridge_counts.get('contained', 0)}/{metrics.bridge_counts.get('total', 0)} bridges and {metrics.tunnel_counts.get('contained', 0)}/{metrics.tunnel_counts.get('total', 0)} tunnels contained in route buffer"
+        f"Map saved to {output_filename} with {metrics.bridge_counts.get('contained', 0)}/{metrics.bridge_counts.get('total', 0)} bridges and {metrics.tunnel_counts.get('contained', 0)}/{metrics.tunnel_counts.get('total', 0)} tunnels nearby route"
     )
