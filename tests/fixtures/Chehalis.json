@@ -1,0 +1,46 @@
+{
+  "route_name": "Chehalis Western Trail",
+  "track_points": 469,
+  "distance_km": 33.47,
+  "description": "Rails-to-trails route in Washington State featuring highway=cycleway bridges with railway=razed tags",
+  "expected_results": {
+    "total_brunnels_found": "64",
+    "total_bridges_found": "39",
+    "total_tunnels_found": "25",
+    "contained_bridges": "5",
+    "contained_tunnels": "1",
+    "final_included_total": "6",
+    "final_included_individual": "6",
+    "final_included_compound": "0",
+    "filtered_brunnels": {
+      "outlier": "58",
+      "total": "58"
+    }
+  },
+  "known_bridges": [
+    {
+      "name": "Chehalis Western Trail",
+      "osm_way_id": 226011762,
+      "distance_km": 8.71,
+      "description": "Bridge with highway=cycleway and railway=razed tags"
+    },
+    {
+      "name": "Chehalis Western Trail", 
+      "osm_way_id": 129601971,
+      "distance_km": 8.97,
+      "description": "Bridge with highway=cycleway and railway=razed tags"
+    }
+  ],
+  "known_tunnels": [
+    {
+      "name": "Chehalis Western Trail",
+      "osm_way_id": 800533008,
+      "distance_km": 16.70,
+      "description": "Tunnel with highway=cycleway tag"
+    }
+  ],
+  "performance_benchmarks": {
+    "processing_time_seconds": "1-5",
+    "memory_usage_mb": "<50"
+  }
+}

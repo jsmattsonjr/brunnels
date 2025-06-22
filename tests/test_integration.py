@@ -974,6 +974,119 @@ class TestPaulRevereRoute(BaseRouteTest):
             ), "Expected some bearing misalignment exclusion"
 
 
+class TestChehalisRoute(BaseRouteTest):
+    """Integration tests for Chehalis Western Trail (railway=razed tags)"""
+
+    @pytest.fixture
+    def metadata(self, gpx_file: Path) -> Dict[str, Any]:
+        """Load metadata JSON file matching the GPX basename"""
+        metadata_file = gpx_file.with_suffix(".json")
+        with open(metadata_file) as f:
+            return json.load(f)
+
+    @pytest.fixture
+    def gpx_file(self) -> Path:
+        """Path to Chehalis GPX file"""
+        return Path(__file__).parent / "fixtures" / "Chehalis.gpx"
+
+    def test_known_bridges_and_tunnels_present(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test that known bridges and tunnels are detected correctly"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        self.assert_known_infrastructure_present(result, metadata)
+
+    def test_railway_razed_tags_in_html(self, gpx_file: Path):
+        """Test that railway=razed tags appear in HTML popups (not highlighted in red)"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+        assert result.html_content is not None
+
+        html_content = result.html_content
+
+        # Should contain railway=razed tags (not highlighted in red)
+        railway_razed_count = html_content.count("<i>railway:</i> razed")
+        assert (
+            railway_razed_count >= 2
+        ), f"Expected >=2 railway=razed tags, found {railway_razed_count}"
+
+        # railway=razed should NOT be highlighted in red (verify it's not in red spans)
+        railway_razed_highlighted = html_content.count(
+            "<span style='color: red;'><i>railway:</i> razed"
+        )
+        assert (
+            railway_razed_highlighted == 0
+        ), f"railway=razed should not be highlighted in red, found {railway_razed_highlighted}"
+
+        # Verify railway=abandoned is not highlighted either (should be in some bridges)
+        railway_abandoned_highlighted = html_content.count(
+            "<span style='color: red;'><i>railway:</i> abandoned"
+        )
+        assert (
+            railway_abandoned_highlighted == 0
+        ), f"railway=abandoned should not be highlighted in red, found {railway_abandoned_highlighted}"
+
+    def test_highway_cycleway_tags_in_html(self, gpx_file: Path):
+        """Test that highway=cycleway tags appear in HTML popups"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+        assert result.html_content is not None
+
+        html_content = result.html_content
+
+        # Should contain highway=cycleway tags (all bridges and the tunnel have this)
+        highway_cycleway_count = html_content.count("<i>highway:</i> cycleway")
+        assert (
+            highway_cycleway_count >= 6
+        ), f"Expected >=6 highway=cycleway tags, found {highway_cycleway_count}"
+
+        # highway=cycleway should NOT be highlighted in red
+        highway_cycleway_highlighted = html_content.count(
+            "<span style='color: red;'><i>highway:</i> cycleway"
+        )
+        assert (
+            highway_cycleway_highlighted == 0
+        ), f"highway=cycleway should not be highlighted in red, found {highway_cycleway_highlighted}"
+
+    def test_rails_to_trails_characteristics(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
+        """Test characteristics specific to rails-to-trails conversion"""
+        result = run_brunnels_cli(gpx_file)
+        assert result.exit_code == 0
+
+        # All included brunnels should have the same name (Chehalis Western Trail)
+        trail_name_count = sum(
+            1
+            for b in result.included_brunnels
+            if "Chehalis Western Trail" in b.get("name", "")
+        )
+        assert trail_name_count == len(
+            result.included_brunnels
+        ), "All brunnels should be part of Chehalis Western Trail"
+
+        # Should have good mix of bridges and tunnels
+        bridge_count = sum(
+            1 for b in result.included_brunnels if b.get("brunnel_type") == "bridge"
+        )
+        tunnel_count = sum(
+            1 for b in result.included_brunnels if b.get("brunnel_type") == "tunnel"
+        )
+
+        assert bridge_count == 5, f"Expected 5 bridges, found {bridge_count}"
+        assert tunnel_count == 1, f"Expected 1 tunnel, found {tunnel_count}"
+
+        # All brunnels should be individual (no compound brunnels expected)
+        individual_count = sum(
+            1 for b in result.included_brunnels if b.get("type") == "individual"
+        )
+        assert individual_count == len(
+            result.included_brunnels
+        ), "All brunnels should be individual"
+
+
 class TestCoronadoRoute(BaseRouteTest):
     """Integration tests for Coronado Bay Trail"""
 
