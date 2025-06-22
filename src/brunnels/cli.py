@@ -60,7 +60,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Output HTML map file (default: auto-generated based on input filename)",
     )
     parser.add_argument(
-        "--bbox-buffer",
+        "--query-buffer",
         type=float,
         default=10,
         help="Search buffer around route in meters (default: 10)",

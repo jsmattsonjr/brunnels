@@ -78,7 +78,7 @@ If the output file already exists, the tool will automatically try numbered vari
 ```bash
 brunnels route.gpx \
   --output my_map.html \
-  --bbox-buffer 0.5 \
+  --query-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
   --log-level DEBUG
@@ -88,7 +88,7 @@ brunnels route.gpx \
 ```bash
 python3 -m brunnels.cli route.gpx \
   --output my_map.html \
-  --bbox-buffer 0.5 \
+  --query-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
   --log-level DEBUG
@@ -97,7 +97,7 @@ python3 -m brunnels.cli route.gpx \
 ### Options
 
 - `--output FILE`: Specify output HTML filename (default: auto-generated based on input filename)
-- `--bbox-buffer DISTANCE`: Search radius around route in meters (default: 10m)
+- `--query-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Vector alignment tolerance in degrees (default: 20.0°)
 - `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query

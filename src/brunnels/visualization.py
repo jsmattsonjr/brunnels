@@ -484,7 +484,7 @@ def create_route_map(
         raise ValueError("Cannot create map for empty route")
 
     # Calculate buffered bounding box using existing function
-    south, west, north, east = route.get_bbox(args.bbox_buffer)
+    south, west, north, east = route.get_bbox(args.query_buffer)
 
     center_lat = (south + north) / 2
     center_lon = (west + east) / 2

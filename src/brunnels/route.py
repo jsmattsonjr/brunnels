@@ -270,7 +270,7 @@ class Route:
         if not self.coords:
             raise ValueError("Cannot find brunnels for empty route")
 
-        bbox = self.get_bbox(args.bbox_buffer)
+        bbox = self.get_bbox(args.query_buffer)
 
         # Calculate and log query area before API call
         south, west, north, east = bbox
