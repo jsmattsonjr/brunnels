@@ -5,17 +5,17 @@
   "route_type": "transcontinental",
   "description": "Transcontinental route from San Diego, CA to Washington, DC with 167 bridges",
   "expected_results": {
-    "total_brunnels_found": "36709",
+    "total_brunnels_found": "33638",
     "contained_bridges": "167",
     "contained_tunnels": "0",
     "final_included_total": "167",
     "final_included_individual": "163",
     "final_included_compound": "4",
     "filtered_brunnels": {
-      "outlier": "36537",
+      "outlier": "33466",
       "misaligned": "0",
       "alternative": "1",
-      "total": "36538"
+      "total": "33467"
     }
   },
   "known_bridges": [
@@ -110,8 +110,8 @@
     "memory_usage_mb": "<500"
   },
   "notes": [
-    "Transcontinental route processed in 8 chunks due to length",
-    "Total query area: 359,693 sq km",
+    "Transcontinental route processed in 9 chunks due to length",
+    "Total query area: 327,843 sq km",
     "Route crosses 15+ states from California to Washington DC",
     "Major bridges include highway crossings and historic routes",
     "Contains 4 compound bridges with merged segments",

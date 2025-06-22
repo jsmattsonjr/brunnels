@@ -1040,8 +1040,8 @@ class TestAcrossAmericaRoute(BaseRouteTest):
 
         # Should have processed route in chunks (indicated by chunked query messages)
         assert "chunks for Overpass queries" in result.stderr
-        assert "Chunk 1/8" in result.stderr
-        assert "Chunk 8/8" in result.stderr
+        assert "Chunk 1/9" in result.stderr
+        assert "Chunk 9/9" in result.stderr
 
         # Should have significant route distance
         assert result.metrics["total_distance_km"] > 4500

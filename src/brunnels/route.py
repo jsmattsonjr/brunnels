@@ -257,6 +257,38 @@ class Route:
             f"Excluded {total_excluded} overlapping brunnels, keeping nearest in each group"
         )
 
+    def _update_incremental_bbox(
+        self, min_lat: float, max_lat: float, min_lon: float, max_lon: float, coord
+    ) -> Tuple[float, float, float, float]:
+        """
+        Update bounding box incrementally by adding a new coordinate.
+
+        Leverages the fact that when adding a coordinate, at least one corner
+        of the bounding box remains unchanged, avoiding expensive recalculation.
+
+        Args:
+            min_lat, max_lat, min_lon, max_lon: Current bounding box
+            coord: New coordinate to include
+
+        Returns:
+            Updated (min_lat, max_lat, min_lon, max_lon) tuple
+        """
+        new_lat = coord.latitude
+        new_lon = coord.longitude
+
+        # Update only the bounds that need to change
+        if new_lat < min_lat:
+            min_lat = new_lat
+        elif new_lat > max_lat:
+            max_lat = new_lat
+
+        if new_lon < min_lon:
+            min_lon = new_lon
+        elif new_lon > max_lon:
+            max_lon = new_lon
+
+        return min_lat, max_lat, min_lon, max_lon
+
     def _chunk_route_for_queries(
         self, buffer_meters: float = 10.0
     ) -> List[Tuple[int, int, Tuple[float, float, float, float]]]:
@@ -280,6 +312,11 @@ class Route:
         start_idx = 0
         cumulative_distance = 0.0
 
+        # Initialize bounding box with first coordinate
+        first_coord = self.coords[0]
+        min_lat = max_lat = first_coord.latitude
+        min_lon = max_lon = first_coord.longitude
+
         for i in range(1, len(self.coords)):
             prev_coord = self.coords[i - 1]
             curr_coord = self.coords[i]
@@ -301,13 +338,10 @@ class Route:
             distance = 2 * 6371000 * math.asin(math.sqrt(a))  # Earth radius in meters
             cumulative_distance += distance
 
-            # Calculate current bounding box for this potential chunk
-            chunk_coords = self.coords[start_idx : i + 1]
-            lats = [c.latitude for c in chunk_coords]
-            lons = [c.longitude for c in chunk_coords]
-
-            min_lat, max_lat = min(lats), max(lats)
-            min_lon, max_lon = min(lons), max(lons)
+            # Update bounding box incrementally (much faster than recalculating)
+            min_lat, max_lat, min_lon, max_lon = self._update_incremental_bbox(
+                min_lat, max_lat, min_lon, max_lon, curr_coord
+            )
 
             # Fast bounding box size check using degrees
             lat_diff = max_lat - min_lat
@@ -342,9 +376,11 @@ class Route:
                     f"{bbox[2]:.3f},{bbox[3]:.3f}"
                 )
 
-                # Start next chunk
+                # Start next chunk and reset bounding box to current coordinate
                 start_idx = i
                 cumulative_distance = 0.0
+                min_lat = max_lat = curr_coord.latitude
+                min_lon = max_lon = curr_coord.longitude
 
         return chunks
 
