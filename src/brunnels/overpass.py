@@ -115,7 +115,11 @@ def query_overpass_brunnels(
         args, base_filters
     )
     query = _build_overpass_query(
-        bbox, base_filters, bridge_railway_exclusion, tunnel_railway_exclusion, args.timeout
+        bbox,
+        base_filters,
+        bridge_railway_exclusion,
+        tunnel_railway_exclusion,
+        args.timeout,
     )
 
     url = OVERPASS_API_URL
@@ -125,9 +129,7 @@ def query_overpass_brunnels(
 
     while True:
         try:
-            response = requests.post(
-                url, data=query.strip(), timeout=args.timeout
-            )
+            response = requests.post(url, data=query.strip(), timeout=args.timeout)
             response.raise_for_status()
             elements = response.json().get("elements", [])
             return _parse_separated_results(elements)

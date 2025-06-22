@@ -257,19 +257,125 @@ class Route:
             f"Excluded {total_excluded} overlapping brunnels, keeping nearest in each group"
         )
 
+    def _chunk_route_for_queries(
+        self, max_area_sq_km: float = 50000.0, buffer_meters: float = 10.0
+    ) -> List[Tuple[int, int, Tuple[float, float, float, float]]]:
+        """
+        Break route into chunks for separate Overpass queries based on bounding box area.
+
+        Args:
+            max_area_sq_km: Maximum bounding box area for each chunk in square kilometers
+            buffer_meters: Buffer around each chunk in meters
+
+        Returns:
+            List of (start_idx, end_idx, bbox) tuples for each chunk
+        """
+        if not self.coords or len(self.coords) < 2:
+            return []
+
+        chunks = []
+        start_idx = 0
+        cumulative_distance = 0.0
+
+        for i in range(1, len(self.coords)):
+            prev_coord = self.coords[i - 1]
+            curr_coord = self.coords[i]
+
+            # Calculate distance for logging
+            lat1, lon1 = math.radians(prev_coord.latitude), math.radians(
+                prev_coord.longitude
+            )
+            lat2, lon2 = math.radians(curr_coord.latitude), math.radians(
+                curr_coord.longitude
+            )
+
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = (
+                math.sin(dlat / 2) ** 2
+                + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+            )
+            distance = 2 * 6371000 * math.asin(math.sqrt(a))  # Earth radius in meters
+            cumulative_distance += distance
+
+            # Calculate current bounding box for this potential chunk
+            chunk_coords = self.coords[start_idx : i + 1]
+            lats = [c.latitude for c in chunk_coords]
+            lons = [c.longitude for c in chunk_coords]
+
+            min_lat, max_lat = min(lats), max(lats)
+            min_lon, max_lon = min(lons), max(lons)
+
+            # Calculate bounding box area without buffer for threshold check
+            lat_diff = max_lat - min_lat
+            lon_diff = max_lon - min_lon
+            avg_lat = (min_lat + max_lat) / 2
+            lat_km = lat_diff * 111.0
+            lon_km = lon_diff * 111.0 * abs(math.cos(math.radians(avg_lat)))
+            area_sq_km = lat_km * lon_km
+
+            # Create chunk when we exceed area threshold or reach the end
+            if area_sq_km >= max_area_sq_km or i == len(self.coords) - 1:
+                # Add buffer in degrees (approximate)
+                lat_buffer = buffer_meters / 111000.0
+                lon_buffer = buffer_meters / (
+                    111000.0 * abs(math.cos(math.radians(avg_lat)))
+                )
+
+                bbox = (
+                    max(-90.0, min_lat - lat_buffer),  # south
+                    max(-180.0, min_lon - lon_buffer),  # west
+                    min(90.0, max_lat + lat_buffer),  # north
+                    min(180.0, max_lon + lon_buffer),  # east
+                )
+
+                chunks.append((start_idx, i, bbox))
+
+                logger.debug(
+                    f"Chunk {len(chunks)}: points {start_idx}-{i} "
+                    f"({cumulative_distance/1000:.1f}km), "
+                    f"area: {area_sq_km:.1f} sq km, "
+                    f"bbox: {bbox[0]:.3f},{bbox[1]:.3f},"
+                    f"{bbox[2]:.3f},{bbox[3]:.3f}"
+                )
+
+                # Start next chunk
+                start_idx = i
+                cumulative_distance = 0.0
+
+        return chunks
+
     def find_brunnels(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
         """
-        Find all bridges and tunnels near this route and check for containment within route buffer.
+        Find all bridges and tunnels near this route and check for containment
+        within route buffer. For long routes, breaks into chunks to avoid large
+        bounding box queries.
 
         Args:
             args: argparse.Namespace object containing all settings
 
         Returns:
-            List of Brunnel objects found near the route, with containment status set
+            Dictionary of Brunnel objects found near the route, with containment
+            status set
         """
         if not self.coords:
             raise ValueError("Cannot find brunnels for empty route")
 
+        # Check if route is long enough to need chunking
+        route_length_km = self.linestring.length / 1000.0
+        max_chunk_area_sq_km = 50000.0
+
+        if route_length_km <= 500.0:  # Still use distance for very short routes
+            # Short route - use single query
+            return self._find_brunnels_single_query(args)
+        else:
+            # Long route - use area-based chunked queries
+            return self._find_brunnels_chunked_queries(args, max_chunk_area_sq_km)
+
+    def _find_brunnels_single_query(
+        self, args: argparse.Namespace
+    ) -> Dict[str, Brunnel]:
+        """Find brunnels using a single Overpass query for short routes."""
         bbox = self.get_bbox(args.query_buffer)
 
         # Calculate and log query area before API call
@@ -282,12 +388,75 @@ class Route:
         area_sq_km = lat_km * lon_km
 
         logger.debug(
-            f"Querying Overpass API for bridges and tunnels in {area_sq_km:.1f} sq km area..."
+            f"Querying Overpass API for bridges and tunnels in "
+            f"{area_sq_km:.1f} sq km area..."
         )
 
         # Get separated bridge and tunnel data
         raw_bridges, raw_tunnels = query_overpass_brunnels(bbox, args)
 
+        return self._process_raw_brunnel_data(raw_bridges, raw_tunnels)
+
+    def _find_brunnels_chunked_queries(
+        self, args: argparse.Namespace, max_area_sq_km: float
+    ) -> Dict[str, Brunnel]:
+        """Find brunnels using multiple chunked Overpass queries for long routes."""
+        chunks = self._chunk_route_for_queries(max_area_sq_km, args.query_buffer)
+
+        logger.info(
+            f"Long route ({self.linestring.length/1000:.1f}km) - "
+            f"breaking into {len(chunks)} chunks for Overpass queries"
+        )
+
+        all_raw_bridges = []
+        all_raw_tunnels = []
+        total_area_sq_km = 0.0
+
+        for i, (start_idx, end_idx, bbox) in enumerate(chunks):
+            # Calculate chunk area for logging
+            south, west, north, east = bbox
+            lat_diff = north - south
+            lon_diff = east - west
+            avg_lat = (north + south) / 2
+            lat_km = lat_diff * 111.0
+            lon_km = lon_diff * 111.0 * abs(math.cos(math.radians(avg_lat)))
+            area_sq_km = lat_km * lon_km
+            total_area_sq_km += area_sq_km
+
+            logger.debug(
+                f"Chunk {i+1}/{len(chunks)}: querying {area_sq_km:.1f} sq km area "
+                f"(points {start_idx}-{end_idx})"
+            )
+
+            # Query this chunk
+            raw_bridges, raw_tunnels = query_overpass_brunnels(bbox, args)
+            all_raw_bridges.extend(raw_bridges)
+            all_raw_tunnels.extend(raw_tunnels)
+
+        logger.debug(
+            f"Completed {len(chunks)} chunked queries covering {total_area_sq_km:.1f} sq km total"
+        )
+
+        # Merge results by OSM ID to remove duplicates
+        bridges_by_id = {way["id"]: way for way in all_raw_bridges}
+        tunnels_by_id = {way["id"]: way for way in all_raw_tunnels}
+
+        merged_bridges = list(bridges_by_id.values())
+        merged_tunnels = list(tunnels_by_id.values())
+
+        logger.debug(
+            f"Merged results: {len(merged_bridges)} unique bridges, "
+            f"{len(merged_tunnels)} unique tunnels "
+            f"(removed {len(all_raw_bridges) - len(merged_bridges)} duplicate bridges, "
+            f"{len(all_raw_tunnels) - len(merged_tunnels)} duplicate tunnels)"
+        )
+
+        return self._process_raw_brunnel_data(merged_bridges, merged_tunnels)
+
+    def _process_raw_brunnel_data(
+        self, raw_bridges: List[Dict], raw_tunnels: List[Dict]
+    ) -> Dict[str, Brunnel]:
+        """Process raw bridge and tunnel data into Brunnel objects."""
         brunnels = {}
 
         # Process bridges
