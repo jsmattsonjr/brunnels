@@ -237,18 +237,58 @@ class Brunnel:
         Args:
             route: Route object representing the route
         """
-        min_distance = float("inf")
-        max_distance = -float("inf")
+        if len(self.linestring.coords) < 2:
+            # Cannot calculate span for a point or empty brunnel
+            # Or if brunnel has less than 2 coordinates
+            logger.warning(
+                f"Brunnel {self.get_id()} has less than 2 coordinates. Skipping route span calculation."
+            )
+            return
 
-        points = [Point(coord) for coord in self.linestring.coords]
-        # Find the closest route point for each brunnel coordinate
-        for point in points:
-            distance = route.linestring.project(point)  # Keep in meters
+        # Project brunnel endpoint A onto full route
+        endpoint_a = Point(self.linestring.coords[0])
+        d1 = route.linestring.project(endpoint_a)
 
-            min_distance = min(min_distance, distance)
-            max_distance = max(max_distance, distance)
+        brunnel_length = self.linestring.length
 
-        self.route_span = RouteSpan(min_distance, max_distance)
+        # Create substring from (D1 - brunnel_length) to (D1 + brunnel_length)
+        substring_start = max(0, d1 - brunnel_length)
+        substring_end = min(route.linestring.length, d1 + brunnel_length)
+
+        # Ensure substring_start is not greater than substring_end
+        if substring_start > substring_end:
+            # This can happen if d1 - brunnel_length is already past the end of the route,
+            # and route.linestring.length is small.
+            # Or if d1 + brunnel_length is before the start of the route (less likely with max(0,...))
+            # In such cases, the valid substring is effectively of zero length or invalid.
+            # We can project onto the closest point on the main route as a fallback.
+            logger.warning(
+                f"Substring start {substring_start} is greater than substring end {substring_end} for brunnel {self.get_id()}. Projecting endpoint B onto the full route."
+            )
+            endpoint_b = Point(self.linestring.coords[-1])
+            d2 = route.linestring.project(endpoint_b)
+        elif substring_start == substring_end:
+            # If the substring is a single point (zero length)
+            d2 = substring_start # d2_substring will be 0
+        else:
+            route_substring_geom = substring(
+                route.linestring, substring_start, substring_end
+            )
+            if route_substring_geom.is_empty or route_substring_geom.length == 0:
+                # If the substring is empty or a point, project onto the full route as fallback
+                logger.warning(
+                    f"Route substring for brunnel {self.get_id()} is empty or a point. Projecting endpoint B onto the full route."
+                )
+                endpoint_b = Point(self.linestring.coords[-1])
+                d2 = route.linestring.project(endpoint_b)
+            else:
+                # Project brunnel endpoint B onto substring
+                endpoint_b = Point(self.linestring.coords[-1])
+                d2_substring = route_substring_geom.project(endpoint_b)
+                # Convert to full route distance
+                d2 = substring_start + d2_substring
+
+        self.route_span = RouteSpan(min(d1, d2), max(d1, d2))
 
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """
