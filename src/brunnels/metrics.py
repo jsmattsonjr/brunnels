@@ -4,23 +4,24 @@ Module for collecting and logging metrics related to brunnels.
 
 import argparse
 import collections
-import logging
+import sys
 from typing import Dict, NamedTuple
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, BrunnelType, ExclusionReason
 
-logger = logging.getLogger(__name__)
+
+def eprint(*args, **kwargs):
+    """
+    Prints the given arguments to standard error (stderr).
+    Accepts the same arguments as the built-in print() function.
+    """
+    print(*args, file=sys.stderr, **kwargs)
 
 
 class BrunnelMetrics(NamedTuple):
     """Container for brunnel metrics data."""
 
-    bridge_count: int
-    tunnel_count: int
-    contained_bridge_count: int
-    contained_tunnel_count: int
-    individual_count: int
-    compound_count: int
-    filter_reason_counts: Dict[FilterReason, int]
+    bridge_counts: Dict[str, int]
+    tunnel_counts: Dict[str, int]
 
 
 def collect_metrics(brunnels: Dict[str, Brunnel]) -> BrunnelMetrics:
@@ -33,46 +34,43 @@ def collect_metrics(brunnels: Dict[str, Brunnel]) -> BrunnelMetrics:
     Returns:
         BrunnelMetrics containing all collected metrics
     """
-    bridge_count = 0
-    tunnel_count = 0
-    contained_bridge_count = 0
-    contained_tunnel_count = 0
-    compound_count = 0
-    individual_count = 0
-    filter_reason_counts: Dict[FilterReason, int] = collections.Counter()
+    # Initialize count dictionaries
+    bridge_counts: Dict[str, int] = collections.defaultdict(int)
+    tunnel_counts: Dict[str, int] = collections.defaultdict(int)
+    total_individual = 0
+    total_compound = 0
 
     for brunnel in brunnels.values():
         brunnel_type = brunnel.brunnel_type
-        filter_reason = brunnel.filter_reason
-
-        if filter_reason != FilterReason.NONE:
-            filter_reason_counts[filter_reason] += 1
+        exclusion_reason = brunnel.exclusion_reason
 
         # Count all representative brunnels
         if brunnel.is_representative():
-            if brunnel_type == BrunnelType.BRIDGE:
-                bridge_count += 1
-                if filter_reason == FilterReason.NONE:
-                    contained_bridge_count += 1
-            else:  # TUNNEL
-                tunnel_count += 1
-                if filter_reason == FilterReason.NONE:
-                    contained_tunnel_count += 1
+            counts_dict = (
+                bridge_counts if brunnel_type == BrunnelType.BRIDGE else tunnel_counts
+            )
 
-            if filter_reason == FilterReason.NONE:
+            # Total count
+            counts_dict["total"] += 1
+
+            # Contained/included count
+            if exclusion_reason == ExclusionReason.NONE:
+                counts_dict["contained"] += 1
+
+                # Individual vs compound count
                 if brunnel.compound_group is not None:
-                    compound_count += 1
+                    counts_dict["compound"] += 1
+                    total_compound += 1
                 else:
-                    individual_count += 1
+                    counts_dict["individual"] += 1
+                    total_individual += 1
+            else:
+                # Exclusion reason counts
+                counts_dict[exclusion_reason.value] += 1
 
     return BrunnelMetrics(
-        bridge_count=bridge_count,
-        tunnel_count=tunnel_count,
-        contained_bridge_count=contained_bridge_count,
-        contained_tunnel_count=contained_tunnel_count,
-        individual_count=individual_count,
-        compound_count=compound_count,
-        filter_reason_counts=filter_reason_counts,
+        bridge_counts=dict(bridge_counts),
+        tunnel_counts=dict(tunnel_counts),
     )
 
 
@@ -80,7 +78,7 @@ def log_metrics(
     brunnels: Dict[str, Brunnel], metrics: BrunnelMetrics, args: argparse.Namespace
 ) -> None:
     """
-    Log detailed metrics after creating the route map.
+    Output detailed metrics after creating the route map directly to stderr.
 
     Args:
         brunnels: Dictionary of Brunnel objects (for total count)
@@ -90,20 +88,31 @@ def log_metrics(
     if not args.metrics:
         return
 
-    # Log detailed filtering metrics
-    logger.debug("=== BRUNNELS_METRICS ===")
-    logger.debug(f"total_brunnels_found={len(brunnels)}")
-    logger.debug(f"total_bridges_found={metrics.bridge_count}")
-    logger.debug(f"total_tunnels_found={metrics.tunnel_count}")
+    # Output detailed metrics directly to stderr
+    eprint("=== BRUNNELS_METRICS ===")
+    eprint(f"total_brunnels_found={len(brunnels)}")
+    eprint(f"total_bridges_found={metrics.bridge_counts.get('total', 0)}")
+    eprint(f"total_tunnels_found={metrics.tunnel_counts.get('total', 0)}")
 
-    for reason, count in metrics.filter_reason_counts.items():
-        logger.debug(f"filtered_reason[{reason.value}]={count}")
+    # Output exclusion reasons for bridges
+    for key, count in metrics.bridge_counts.items():
+        if key not in ["total", "contained", "individual", "compound"] and count > 0:
+            eprint(f"excluded_reason[{key}][bridge]={count}")
 
-    logger.debug(f"contained_bridges={metrics.contained_bridge_count}")
-    logger.debug(f"contained_tunnels={metrics.contained_tunnel_count}")
-    logger.debug(f"final_included_individual={metrics.individual_count}")
-    logger.debug(f"final_included_compound={metrics.compound_count}")
-    logger.debug(
-        f"final_included_total={metrics.individual_count + metrics.compound_count}"
+    # Output exclusion reasons for tunnels
+    for key, count in metrics.tunnel_counts.items():
+        if key not in ["total", "contained", "individual", "compound"] and count > 0:
+            eprint(f"excluded_reason[{key}][tunnel]={count}")
+
+    eprint(f"nearby_bridges={metrics.bridge_counts.get('contained', 0)}")
+    eprint(f"nearby_tunnels={metrics.tunnel_counts.get('contained', 0)}")
+    eprint(
+        f"final_included_individual={metrics.bridge_counts.get('individual', 0) + metrics.tunnel_counts.get('individual', 0)}"
     )
-    logger.debug("=== END_BRUNNELS_METRICS ===")
+    eprint(
+        f"final_included_compound={metrics.bridge_counts.get('compound', 0) + metrics.tunnel_counts.get('compound', 0)}"
+    )
+    eprint(
+        f"final_included_total={metrics.bridge_counts.get('contained', 0) + metrics.tunnel_counts.get('contained', 0)}"
+    )
+    eprint("=== END_BRUNNELS_METRICS ===")

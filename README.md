@@ -10,9 +10,9 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 
 - **GPX Route Processing**: Parse GPX files containing GPS tracks from cycling computers, fitness apps, or route planning tools
 - **OpenStreetMap Integration**: Query real bridge and tunnel data from OpenStreetMap via the Overpass API
-- **Smart Filtering**: Filter bridges/tunnels based on cycling relevance (bicycle access, infrastructure type)
+- **Smart Exclusion**: Exclude bridges/tunnels based on cycling relevance (bicycle access, infrastructure type)
 - **Containment Analysis**: Identify which bridges/tunnels your route actually crosses vs. those merely nearby
-- **Bearing Alignment**: Filter out bridges/tunnels that aren't aligned with your route direction (configurable tolerance)
+- **Vector Alignment**: Exclude bridges/tunnels that aren't aligned with your route direction (configurable tolerance)
 - **Interactive Visualization**: Generate beautiful HTML maps with route and brunnel overlay
 - **Detailed Metadata**: View comprehensive OpenStreetMap tags and properties for each brunnel
 - **Adjacent Way Merging**: Automatically combines adjacent bridge/tunnel ways that share OSM nodes into single continuous brunnels
@@ -35,22 +35,19 @@ pip install git+https://github.com/jsmattsonjr/brunnels.git
 ```bash
 git clone https://github.com/jsmattsonjr/brunnels.git
 cd brunnels
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ### Run from Source (No Installation)
-
-If you prefer not to install the package, you can run it directly from the cloned repository:
 
 ```bash
 git clone https://github.com/jsmattsonjr/brunnels.git
 cd brunnels
 # Install dependencies only
-pip install gpxpy>=1.4.2,<2.0 shapely>=1.8.0,<3.0 pyproj>=3.2.0,<4.0 folium>=0.12.0,<1.0 requests>=2.25.0,<3.0
+pip install gpxpy>=1.4.2 shapely>=1.8.0 pyproj>=3.2.0 folium>=0.12.0 requests>=2.25.0
 # Run directly from source
 python3 -m brunnels.cli your_route.gpx
 ```
-
 
 ## Usage
 
@@ -69,7 +66,7 @@ python3 -m brunnels.cli your_route.gpx
 This will:
 1. Parse your GPX file
 2. Find all bridges and tunnels in an area extending 10m beyond your route's bounding box
-3. Filter brunnels based on cycling relevance and bearing alignment with your route
+3. Exclude brunnels based on cycling relevance and vector alignment with your route
 4. Generate an interactive map with a filename based on your input file (e.g., `route.gpx` → `route map.html`)
 5. Automatically open the map in your default browser
 
@@ -81,7 +78,7 @@ If the output file already exists, the tool will automatically try numbered vari
 ```bash
 brunnels route.gpx \
   --output my_map.html \
-  --bbox-buffer 0.5 \
+  --query-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
   --log-level DEBUG
@@ -91,41 +88,31 @@ brunnels route.gpx \
 ```bash
 python3 -m brunnels.cli route.gpx \
   --output my_map.html \
-  --bbox-buffer 0.5 \
+  --query-buffer 0.5 \
   --route-buffer 5.0 \
   --bearing-tolerance 15.0 \
   --log-level DEBUG
 ```
 
+**For large routes (cross-country, international) that may timeout:**
+```bash
+brunnels large_route.gpx --timeout 300
+```
+
 ### Options
 
 - `--output FILE`: Specify output HTML filename (default: auto-generated based on input filename)
-- `--bbox-buffer DISTANCE`: Search radius around route in meters (default: 10m)
+- `--query-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
-- `--bearing-tolerance DEGREES`: Bearing alignment tolerance in degrees (default: 20.0°)
-- `--no-overlap-filtering`: Disable filtering of overlapping brunnels (keep all overlapping brunnels)
-- `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query.
-- `--include-waterways`: Include ways tagged as `waterway` in the Overpass query.
-- `--include-active-railways`: Include ways tagged as `railway` with values other than `abandoned` in the Overpass query.
-- `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- `--metrics`: Output detailed structured metrics about the processing of brunnels. Examples include: total brunnels found, total bridges and tunnels found, counts of brunnels filtered by different reasons, and counts of finally included brunnels (individual, compound, total). Note that this option also sets the log level to `DEBUG`.
-- `--version`: Show program's version number and exit.
-- `--no-open`: Don't automatically open the map in browser
-
-## Output Files
-
-### Automatic Filename Generation
-
-By default, the tool generates output filenames based on your input file:
-
-- `my_route.gpx` → `my_route map.html`
-- `Sunday Ride.GPX` → `Sunday Ride map.html`
-- `track.tcx` → `track.tcx map.html` (if you somehow use non-GPX files)
-
-If the output file already exists, numbered versions are automatically tried:
-- `my_route map.html` (if this exists, try...)
-- `my_route map (1).html` (if this exists, try...)
-- `my_route map (2).html` (and so on...)
+- `--bearing-tolerance DEGREES`: Vector alignment tolerance in degrees (default: 20.0°)
+- `--timeout SECONDS`: Overpass API timeout in seconds (default: 30)
+- `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query
+- `--include-waterways`: Include ways tagged as `waterway` in the Overpass query
+- `--include-active-railways`: Include ways tagged as active `railway` types (`rail`, `light_rail`, `subway`, `tram`, `narrow_gauge`, `funicular`, `monorail`, `miniature`, `preserved`)
+- `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) (default: WARNING)
+- `--metrics`: Output detailed structured metrics about the processing of brunnels to stderr
+- `--no-open`: Don't automatically open the HTML file in browser
+- `--version`: Show program's version number and exit
 
 ## Understanding the Output
 
@@ -133,58 +120,79 @@ If the output file already exists, numbered versions are automatically tried:
 
 The generated HTML map includes:
 
-- **Red line**: Your GPX route
-- **Blue solid lines**: Bridges that your route crosses
-- **Brown dashed lines**: Tunnels that your route passes through
-- **Light colored lines**: Nearby bridges/tunnels that you don't cross
+- **Blue line**: Your GPX route
+- **Red lines**: Bridges that your route crosses
+- **Purple lines**: Tunnels that your route passes through
+- **Orange lines**: Alternative bridges (overlapping with included bridges)
+- **Light purple lines**: Alternative tunnels (overlapping with included tunnels)
+- **Dark orange lines**: Misaligned bridges (not aligned with route direction)
+- **Goldenrod lines**: Misaligned tunnels (not aligned with route direction)  
 - **Green marker**: Route start
 - **Red marker**: Route end
 
-### Legend
+Click on any brunnel for detailed OpenStreetMap metadata. Nearby brunnels show route span information (start/end distances, length).
 
-- Numbers in parentheses show counts
-- Click on any brunnel for detailed OpenStreetMap metadata
-- Contained brunnels show route span information (start/end distances, length)
+#### Legend
 
-### Filtering
+The map includes a dynamic legend showing:
+- Numbers in parentheses show counts for each category
+- Only categories with brunnels present are displayed
 
-The tool applies smart filtering for cycling routes:
+### Brunnel List Output
 
-- **Keeps**: Bridges/tunnels with bicycle access allowed or `highway=cycleway`
-- **Filters out**: Infrastructure marked `bicycle=no`, pure waterways, active railways
-- **Bearing alignment**: Filters out brunnels whose direction doesn't align with your route (±20° tolerance by default)
-- **Greys out**: Non-contained or filtered brunnels for context
+The tool outputs a detailed list of all brunnels found near your route:
 
-### Bearing Alignment
+**Individual Brunnel Lines:**
+Each line follows this format:
+```
+start-end km (length km) [annotation] Name/ID [exclusion reason]
+```
+
+- **Distance Information:** `1.45-1.47 km` shows the route span where the brunnel intersects your path, `(0.01 km)` shows the length of the brunnel crossing
+- **Annotations:** `*` = included brunnel; `-` = excluded brunnel
+- **Names/IDs:** Named infrastructure like `Bridge: Main Street`, unnamed ways like `Bridge: <OSM 852560833>`, or compound brunnels like `Bridge: <OSM 169505851;591294837> [2 segments]`
+- **Exclusion Reasons:** `(alternative)` = excluded because a closer overlapping brunnel was kept, `(misaligned)` = excluded because no segment pairs align with your route direction
+
+**Overlap Groups:**
+```
+--- Overlapping -------
+ 3.89- 3.91 km (0.02 km) *   Bridge: <OSM 1338748628> 
+ 3.89- 3.91 km (0.02 km) -   Bridge: <OSM 778940105>  (alternative)
+```
+When multiple brunnels span the same portion of your route, they're grouped together. The closest one to your actual path is kept (`*`), while others are marked as alternatives (`-`). The dashed lines separate different overlap groups and standalone brunnels for easier reading.
+
+### Exclusion Criteria
+
+The tool applies smart exclusion criteria for cycling routes:
+
+- **Excludes**: Infrastructure marked `bicycle=no`, waterways, active railways (`rail`, `light_rail`, `subway`, `tram`, `narrow_gauge`, `funicular`, `monorail`, `miniature`, `preserved`)
+- **Vector alignment**: Excludes brunnels where no segment pairs are aligned with your route direction (±20° tolerance by default)
+
+### Vector Alignment
 
 The tool checks if bridges and tunnels are aligned with your route direction by:
 
-1. Finding the closest segments between the brunnel and your route
-2. Calculating bearing (compass direction) for both segments
-3. Checking if they're aligned within tolerance (same or opposite direction)
-4. Filtering out perpendicular or oddly-angled infrastructure that you don't actually cross
+1. Examining all pairs of brunnel segments and route segments within the route span
+2. Calculating direction vectors for each segment pair  
+3. Using dot product to measure alignment between vectors (handles both parallel and anti-parallel cases)
+4. Excludes brunnels only if no segment pairs are aligned within tolerance
 
-This prevents including nearby infrastructure that intersects your route buffer but runs perpendicular to your actual path.
+A brunnel is kept if any of its segments align with any route segment in the crossing area. This prevents excluding infrastructure that genuinely crosses your route, even if some segments run at different angles.
 
-### Overlap Filtering
+### Overlap Exclusion
 
-The tool automatically filters overlapping brunnels to reduce visual clutter when multiple parallel bridges or tunnels span similar portions of your route. When brunnels have overlapping route spans:
+When multiple parallel bridges or tunnels span similar portions of your route, the tool handles overlapping brunnels by:
 
-Distance calculation: The tool calculates the average distance from each brunnel to your route
-Nearest selection: Only the closest brunnel in each overlapping group is kept
-Filtered display: Non-nearest brunnels are shown in muted colors with "filtered: not nearest among overlapping brunnels" status
-
-This feature can be disabled with `--no-overlap-filtering` if you want to see all detected infrastructure.
+- **Distance calculation**: The tool calculates the average distance from each brunnel to your route
+- **Nearest selection**: The closest brunnel in each overlapping group is displayed in full color
+- **Alternative display**: Other brunnels in the overlap group are displayed on the map in a different color and marked as "alternative" in the output list
 
 ### Merging
 
 The tool automatically merges adjacent brunnels of the same type (bridge or tunnel) that share OpenStreetMap nodes. This combines fragmented infrastructure into continuous segments for cleaner visualization. The merging process:
 
 - Detects shared nodes between adjacent segments along your route
-- Handles directional concatenation of coordinates and metadata
-- Resolves tag conflicts by keeping the first brunnel's values
 - Updates route spans to cover the full merged length
-- Removes duplicate segments from the final output
 
 ## Technical Details
 
@@ -201,51 +209,14 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 - Uses Shapely for precise geometric containment checking
 - Route buffering accounts for GPS accuracy and path width
 - Projects coordinates for local distance calculations
-- Bearing calculations use great circle geometry for accuracy
+- Vector alignment analysis uses dot product calculations for accuracy
 
-### Bearing Alignment Analysis
-- Calculates true bearing (compass direction) for route and brunnel segments
-- Finds closest segments between polylines using point-to-line projections
-- Checks alignment within configurable tolerance (default 20°)
+### Alignment Analysis
+- Calculates direction vectors for route and brunnel segments
+- Examines all segment pairs between brunnel and route within the route span
+- Uses dot product to measure vector alignment within configurable tolerance (default 20°)
 - Handles both same-direction and opposite-direction alignment
-- Filters out perpendicular crossings that don't represent actual route usage
-
-### Brunnel Merging
-- Detects adjacent brunnels of the same type sharing OSM nodes
-- Performs directional concatenation based on node connectivity patterns
-- Merges OSM tags, coordinates, geometry, and bounding boxes
-- Handles four connection patterns: forward-forward, forward-reverse, reverse-forward, reverse-reverse
-- Updates route spans to reflect the full merged segment length
-- Logs conflicts when tags differ between merged segments
-
-## Limitations
-
-- Requires internet connection for OpenStreetMap data
-- Route validation excludes polar regions (±85° latitude)
-- Cannot process routes crossing the antimeridian (±180° longitude)
-- Dependent on OpenStreetMap data quality and completeness
-- Limited to ways tagged as bridges/tunnels in OSM
-- Bearing alignment works best for linear infrastructure; complex intersections may be filtered unexpectedly
-
-## Example Output
-
-```
-06:53:46 - brunnels - INFO - Loaded GPX route with 4183 points
-06:53:47 - overpass - INFO - Found 1556 brunnels near route
-06:53:47 - geometry - INFO - Total route distance: 22.39 km
-06:53:47 - geometry - DEBUG - Filtered 3 brunnels due to bearing misalignment
-06:53:47 - overpass - INFO - Found 11/680 contained bridges and 0/876 contained tunnels
-06:53:47 - merge - WARNING - Tag conflict during merge: surface='asphalt' vs 'metal_grid'; keeping first value
-06:53:47 - merge - INFO - Included brunnels (post-merge):
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (222183028) 5.38-5.41 km (length: 0.03 km)
-06:53:47 - merge - INFO - Bridge: Cherry Street (24382063;1330056252;1330056251) 7.73-7.85 km (length: 0.12 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (1101486832;1352972087;1352972086) 8.14-8.25 km (length: 0.11 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (1352972070) 8.61-8.67 km (length: 0.06 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (146154648) 11.82-11.84 km (length: 0.02 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (33398082) 19.30-19.43 km (length: 0.13 km)
-06:53:47 - merge - INFO - Bridge: Waterfront Recreational Trail (33539707) 20.87-20.91 km (length: 0.05 km)
-
-```
+- Excludes brunnels only when no segment pairs are aligned within tolerance
 
 ## Contributing
 
@@ -268,7 +239,7 @@ pytest
 ### Code Formatting
 
 ```bash
-black brunnels/
+black src/brunnels/
 ```
 
 ## License

@@ -73,7 +73,7 @@ jobs:
     - name: Test with different CLI options
       run: |
         # Test with different buffer sizes
-        brunnels tests/fixtures/Area51.gpx --bbox-buffer 20 --route-buffer 5.0 --no-open --output test_buffer.html
+        brunnels tests/fixtures/Area51.gpx --query-buffer 20 --route-buffer 5.0 --no-open --output test_buffer.html
         
         # Test with different bearing tolerance
         brunnels tests/fixtures/Area51.gpx --bearing-tolerance 30.0 --no-open --output test_bearing.html

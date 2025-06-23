@@ -13,10 +13,13 @@ import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
 
-from .geometry_utils import Position
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, BrunnelType, ExclusionReason
 from .overpass import query_overpass_brunnels
-from .shapely_utils import coords_to_polyline, create_transverse_mercator_projection
+from .geometry import (
+    Position,
+    coords_to_polyline,
+    create_transverse_mercator_projection,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,11 +78,7 @@ class Route:
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
 
-        Raises:
-            ValueError: If route is empty
         """
-        if not self.coords:
-            raise ValueError("Cannot calculate bounding box for empty route")
 
         # Ensure the base bounding box (0 buffer) is calculated and memoized
         if self.bbox is None:
@@ -146,119 +145,270 @@ class Route:
 
         return (south, west, north, east)
 
-    def filter_overlapping_brunnels(
-        self,
-        brunnels: Dict[str, Brunnel],
-    ) -> None:
-        """
-        Filter overlapping brunnels, keeping only the nearest one for each overlapping group.
-        Supports both regular and compound brunnels.
-
-        Args:
-            brunnels: Dictionary of Brunnel objects to filter (modified in-place)
-        """
-        if not self.coords or not brunnels:
-            return
-
-        # Only consider contained brunnels with route spans
-        contained_brunnels = [
+    @staticmethod
+    def _get_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> List[Brunnel]:
+        """Get brunnels that are nearby and eligible for overlap exclusion, sorted by route span."""
+        nearby = [
             b
             for b in brunnels.values()
             if b.is_representative()
             and b.get_route_span() is not None
-            and b.filter_reason == FilterReason.NONE
+            and b.exclusion_reason == ExclusionReason.NONE
         ]
 
-        if len(contained_brunnels) < 2:
-            return  # Nothing to filter
+        # Sort by route span start distance for consistent processing
+        return sorted(nearby, key=lambda b: b.get_route_span().start_distance)  # type: ignore[union-attr]
 
-        # Find groups of overlapping brunnels
+    @staticmethod
+    def _find_overlap_groups(nearby_brunnels: List[Brunnel]) -> List[List[Brunnel]]:
+        """Find groups of overlapping brunnels from pre-sorted list."""
         overlap_groups = []
-        processed = set()
+        i = 0
 
-        for i, brunnel1 in enumerate(contained_brunnels):
-            if i in processed:
-                continue
+        while i < len(nearby_brunnels):
+            current_group = [nearby_brunnels[i]]
+            j = i + 1
 
-            # Start a new group with this brunnel
-            current_group = [brunnel1]
-            processed.add(i)
-
-            # Find all brunnels that overlap with any brunnel in the current group
-            changed = True
-            while changed:
-                changed = False
-                for j, brunnel2 in enumerate(contained_brunnels):
-                    if j in processed:
-                        continue
-
-                    # Check if brunnel2 overlaps with any brunnel in current group
-                    for brunnel_in_group in current_group:
-                        if brunnel_in_group.overlaps_with(brunnel2):
-                            current_group.append(brunnel2)
-                            processed.add(j)
-                            changed = True
-                            break
+            # Find all contiguous overlapping brunnels
+            while j < len(nearby_brunnels):
+                if any(
+                    brunnel_in_group.overlaps_with(nearby_brunnels[j])
+                    for brunnel_in_group in current_group
+                ):
+                    current_group.append(nearby_brunnels[j])
+                    j += 1
+                else:
+                    break
 
             # Only add groups with more than one brunnel
             if len(current_group) > 1:
                 overlap_groups.append(current_group)
 
+            i = j if j > i + 1 else i + 1
+
+        return overlap_groups
+
+    def _process_overlap_group(self, group: List[Brunnel]) -> None:
+        """Process a single overlap group, keeping the nearest and excluding others."""
+        logger.debug(f"Processing overlap group with {len(group)} brunnels")
+
+        # Assign the same overlap_group list to all brunnels in this group
+        for brunnel in group:
+            brunnel.overlap_group = group
+
+        # Calculate average distance to route for each brunnel in the group
+        brunnel_distances = []
+        for brunnel in group:
+            avg_distance = self.average_distance_to_brunnel(brunnel)
+            brunnel_distances.append((brunnel, avg_distance))
+            logger.debug(
+                f"  {brunnel.get_short_description()}: avg distance = {avg_distance:.3f}km"
+            )
+
+        # Sort by distance (closest first)
+        brunnel_distances.sort(key=lambda x: x[1])
+
+        # Keep the closest, exclude the rest
+        closest_brunnel, closest_distance = brunnel_distances[0]
+        logger.debug(
+            f"  Keeping closest: {closest_brunnel.get_short_description()} (distance: {closest_distance:.3f}km)"
+        )
+
+        for brunnel, distance in brunnel_distances[1:]:
+            brunnel.exclusion_reason = ExclusionReason.ALTERNATIVE
+            logger.debug(
+                f"  Excluded: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.exclusion_reason})"
+            )
+
+    def exclude_overlapping_brunnels(
+        self,
+        brunnels: Dict[str, Brunnel],
+    ) -> None:
+        """
+        Exclude overlapping brunnels, keeping only the nearest one for each overlapping group.
+        Supports both regular and compound brunnels.
+
+        Args:
+            brunnels: Dictionary of Brunnel objects to exclude (modified in-place)
+        """
+        if not self.coords or not brunnels:
+            return
+
+        nearby_brunnels = self._get_nearby_brunnels(brunnels)
+        if len(nearby_brunnels) < 2:
+            return
+
+        overlap_groups = self._find_overlap_groups(nearby_brunnels)
         if not overlap_groups:
             logger.debug("No overlapping brunnels found")
             return
 
-        # Filter each overlap group, keeping only the nearest
-        filtered = 0
+        # Process each overlap group
         for group in overlap_groups:
-            logger.debug(f"Processing overlap group with {len(group)} brunnels")
+            self._process_overlap_group(group)
 
-            # Calculate average distance to route for each brunnel in the group
-            brunnel_distances = []
-            for brunnel in group:
-                avg_distance = self.average_distance_to_brunnel(brunnel)
-                brunnel_distances.append((brunnel, avg_distance))
-                logger.debug(
-                    f"  {brunnel.get_short_description()}: avg distance = {avg_distance:.3f}km"
-                )
+        # Calculate total excluded for debug logging
+        total_excluded = sum(len(group) - 1 for group in overlap_groups)
+        logger.debug(
+            f"Excluded {total_excluded} overlapping brunnels, keeping nearest in each group"
+        )
 
-            # Sort by distance (closest first)
-            brunnel_distances.sort(key=lambda x: x[1])
+    def _update_incremental_bbox(
+        self, min_lat: float, max_lat: float, min_lon: float, max_lon: float, coord
+    ) -> Tuple[float, float, float, float]:
+        """
+        Update bounding box incrementally by adding a new coordinate.
 
-            # Keep the closest, filter the rest
-            closest_brunnel, closest_distance = brunnel_distances[0]
+        Leverages the fact that when adding a coordinate, at least one corner
+        of the bounding box remains unchanged, avoiding expensive recalculation.
 
-            logger.debug(
-                f"  Keeping closest: {closest_brunnel.get_short_description()} (distance: {closest_distance:.3f}km)"
+        Args:
+            min_lat, max_lat, min_lon, max_lon: Current bounding box
+            coord: New coordinate to include
+
+        Returns:
+            Updated (min_lat, max_lat, min_lon, max_lon) tuple
+        """
+        new_lat = coord.latitude
+        new_lon = coord.longitude
+
+        # Update only the bounds that need to change
+        if new_lat < min_lat:
+            min_lat = new_lat
+        elif new_lat > max_lat:
+            max_lat = new_lat
+
+        if new_lon < min_lon:
+            min_lon = new_lon
+        elif new_lon > max_lon:
+            max_lon = new_lon
+
+        return min_lat, max_lat, min_lon, max_lon
+
+    def _chunk_route_for_queries(
+        self, buffer_meters: float = 10.0
+    ) -> List[Tuple[int, int, Tuple[float, float, float, float]]]:
+        """
+        Break route into chunks for separate Overpass queries based on bounding box size.
+
+        Args:
+            buffer_meters: Buffer around each chunk in meters
+
+        Returns:
+            List of (start_idx, end_idx, bbox) tuples for each chunk
+        """
+        # Route constructor guarantees coords exist and len >= 2
+
+        # Maximum bounding box size in square degrees
+        # Roughly equivalent to 50,000 km² at equator (50000 / 111² ≈ 4.06)
+        MAX_DEGREES_SQUARED = 4.0
+
+        chunks = []
+        start_idx = 0
+        cumulative_distance = 0.0
+
+        # Initialize bounding box with first coordinate
+        first_coord = self.coords[0]
+        min_lat = max_lat = first_coord.latitude
+        min_lon = max_lon = first_coord.longitude
+
+        for i in range(1, len(self.coords)):
+            prev_coord = self.coords[i - 1]
+            curr_coord = self.coords[i]
+
+            # Calculate distance for logging
+            lat1, lon1 = math.radians(prev_coord.latitude), math.radians(
+                prev_coord.longitude
+            )
+            lat2, lon2 = math.radians(curr_coord.latitude), math.radians(
+                curr_coord.longitude
             )
 
-            for brunnel, distance in brunnel_distances[1:]:
-                brunnel.filter_reason = FilterReason.NOT_NEAREST
-                filtered += 1
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = (
+                math.sin(dlat / 2) ** 2
+                + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+            )
+            distance = 2 * 6371000 * math.asin(math.sqrt(a))  # Earth radius in meters
+            cumulative_distance += distance
 
-                logger.debug(
-                    f"  Filtered: {brunnel.get_short_description()} (distance: {distance:.3f}km, reason: {brunnel.filter_reason})"
+            # Update bounding box incrementally (much faster than recalculating)
+            min_lat, max_lat, min_lon, max_lon = self._update_incremental_bbox(
+                min_lat, max_lat, min_lon, max_lon, curr_coord
+            )
+
+            # Fast bounding box size check using degrees
+            lat_diff = max_lat - min_lat
+            lon_diff = max_lon - min_lon
+            degrees_squared = lat_diff * lon_diff
+
+            # Create chunk when we exceed size threshold or reach the end
+            if degrees_squared >= MAX_DEGREES_SQUARED or i == len(self.coords) - 1:
+                # Add buffer in degrees (approximate)
+                avg_lat = (min_lat + max_lat) / 2
+                lat_buffer = buffer_meters / 111000.0
+                lon_buffer = buffer_meters / (
+                    111000.0 * abs(math.cos(math.radians(avg_lat)))
                 )
 
-        if filtered > 0:
-            logger.debug(
-                f"Filtered {filtered} overlapping brunnels, keeping nearest in each group"
-            )
+                bbox = (
+                    max(-90.0, min_lat - lat_buffer),  # south
+                    max(-180.0, min_lon - lon_buffer),  # west
+                    min(90.0, max_lat + lat_buffer),  # north
+                    min(180.0, max_lon + lon_buffer),  # east
+                )
+
+                chunks.append((start_idx, i, bbox))
+
+                # Calculate approximate area for logging
+                approx_area_sq_km = degrees_squared * 111.0 * 111.0
+                logger.debug(
+                    f"Chunk {len(chunks)}: points {start_idx}-{i} "
+                    f"({cumulative_distance/1000:.1f}km), "
+                    f"area: {approx_area_sq_km:.1f} sq km, "
+                    f"bbox: {bbox[0]:.3f},{bbox[1]:.3f},"
+                    f"{bbox[2]:.3f},{bbox[3]:.3f}"
+                )
+
+                # Start next chunk and reset bounding box to current coordinate
+                start_idx = i
+                cumulative_distance = 0.0
+                min_lat = max_lat = curr_coord.latitude
+                min_lon = max_lon = curr_coord.longitude
+
+        return chunks
 
     def find_brunnels(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
         """
-        Find all bridges and tunnels near this route and check for containment within route buffer.
+        Find all bridges and tunnels near this route and check for containment
+        within route buffer. For long routes, breaks into chunks to avoid large
+        bounding box queries.
 
         Args:
             args: argparse.Namespace object containing all settings
 
         Returns:
-            List of Brunnel objects found near the route, with containment status set
+            Dictionary of Brunnel objects found near the route, with containment
+            status set
         """
-        if not self.coords:
-            raise ValueError("Cannot find brunnels for empty route")
 
-        bbox = self.get_bbox(args.bbox_buffer)
+        # Check if route is long enough to need chunking
+        route_length_km = self.linestring.length / 1000.0
+        max_chunk_area_sq_km = 50000.0
+
+        if route_length_km <= 500.0:  # Still use distance for very short routes
+            # Short route - use single query
+            return self._find_brunnels_single_query(args)
+        else:
+            # Long route - use area-based chunked queries
+            return self._find_brunnels_chunked_queries(args, max_chunk_area_sq_km)
+
+    def _find_brunnels_single_query(
+        self, args: argparse.Namespace
+    ) -> Dict[str, Brunnel]:
+        """Find brunnels using a single Overpass query for short routes."""
+        bbox = self.get_bbox(args.query_buffer)
 
         # Calculate and log query area before API call
         south, west, north, east = bbox
@@ -270,12 +420,75 @@ class Route:
         area_sq_km = lat_km * lon_km
 
         logger.debug(
-            f"Querying Overpass API for bridges and tunnels in {area_sq_km:.1f} sq km area..."
+            f"Querying Overpass API for bridges and tunnels in "
+            f"{area_sq_km:.1f} sq km area..."
         )
 
         # Get separated bridge and tunnel data
         raw_bridges, raw_tunnels = query_overpass_brunnels(bbox, args)
 
+        return self._process_raw_brunnel_data(raw_bridges, raw_tunnels)
+
+    def _find_brunnels_chunked_queries(
+        self, args: argparse.Namespace, max_area_sq_km: float
+    ) -> Dict[str, Brunnel]:
+        """Find brunnels using multiple chunked Overpass queries for long routes."""
+        chunks = self._chunk_route_for_queries(args.query_buffer)
+
+        logger.info(
+            f"Long route ({self.linestring.length/1000:.1f}km) - "
+            f"breaking into {len(chunks)} chunks for Overpass queries"
+        )
+
+        all_raw_bridges = []
+        all_raw_tunnels = []
+        total_area_sq_km = 0.0
+
+        for i, (start_idx, end_idx, bbox) in enumerate(chunks):
+            # Calculate chunk area for logging
+            south, west, north, east = bbox
+            lat_diff = north - south
+            lon_diff = east - west
+            avg_lat = (north + south) / 2
+            lat_km = lat_diff * 111.0
+            lon_km = lon_diff * 111.0 * abs(math.cos(math.radians(avg_lat)))
+            area_sq_km = lat_km * lon_km
+            total_area_sq_km += area_sq_km
+
+            logger.debug(
+                f"Chunk {i+1}/{len(chunks)}: querying {area_sq_km:.1f} sq km area "
+                f"(points {start_idx}-{end_idx})"
+            )
+
+            # Query this chunk
+            raw_bridges, raw_tunnels = query_overpass_brunnels(bbox, args)
+            all_raw_bridges.extend(raw_bridges)
+            all_raw_tunnels.extend(raw_tunnels)
+
+        logger.debug(
+            f"Completed {len(chunks)} chunked queries covering {total_area_sq_km:.1f} sq km total"
+        )
+
+        # Merge results by OSM ID to remove duplicates
+        bridges_by_id = {way["id"]: way for way in all_raw_bridges}
+        tunnels_by_id = {way["id"]: way for way in all_raw_tunnels}
+
+        merged_bridges = list(bridges_by_id.values())
+        merged_tunnels = list(tunnels_by_id.values())
+
+        logger.debug(
+            f"Merged results: {len(merged_bridges)} unique bridges, "
+            f"{len(merged_tunnels)} unique tunnels "
+            f"(removed {len(all_raw_bridges) - len(merged_bridges)} duplicate bridges, "
+            f"{len(all_raw_tunnels) - len(merged_tunnels)} duplicate tunnels)"
+        )
+
+        return self._process_raw_brunnel_data(merged_bridges, merged_tunnels)
+
+    def _process_raw_brunnel_data(
+        self, raw_bridges: List[Dict], raw_tunnels: List[Dict]
+    ) -> Dict[str, Brunnel]:
+        """Process raw bridge and tunnel data into Brunnel objects."""
         brunnels = {}
 
         # Process bridges
@@ -405,10 +618,6 @@ class Route:
         Returns:
             Shapely geometry object or None if it could not be created.
         """
-        if not self.coords:
-            raise ValueError(
-                "Cannot calculate buffered geometry for empty route, coords are empty"
-            )
 
         route_line = self.linestring
         if route_line is None:
@@ -440,13 +649,13 @@ class Route:
                 )
         return route_geometry
 
-    def filter_misaligned_brunnels(
+    def exclude_misaligned_brunnels(
         self,
         brunnels: Dict[str, Brunnel],
         bearing_tolerance_degrees: float,
     ) -> None:
         """
-        Filters a list of brunnels by their alignment with the route.
+        Excludes a list of brunnels by their alignment with the route.
 
         Args:
 
@@ -454,20 +663,20 @@ class Route:
             self: The Route instance.
 
         """
-        unaligned_count = 0
+        misaligned_count = 0
 
         for brunnel in brunnels.values():
 
             if (
-                brunnel.filter_reason == FilterReason.NONE
+                brunnel.exclusion_reason == ExclusionReason.NONE
                 and not brunnel.is_aligned_with_route(self, bearing_tolerance_degrees)
             ):
-                brunnel.filter_reason = FilterReason.UNALIGNED
-                unaligned_count += 1
+                brunnel.exclusion_reason = ExclusionReason.MISALIGNED
+                misaligned_count += 1
 
-        if unaligned_count > 0:
+        if misaligned_count > 0:
             logger.debug(
-                f"Filtered {unaligned_count} brunnels out of {len(brunnels)} "
+                f"Excluded {misaligned_count} brunnels out of {len(brunnels)} "
                 f"contained brunnels due to bearing misalignment (tolerance: {bearing_tolerance_degrees}°)"
             )
 
@@ -476,5 +685,5 @@ class Route:
         Calculate the route span for each included brunnel.
         """
         for brunnel in brunnels.values():
-            if brunnel.filter_reason == FilterReason.NONE:
+            if brunnel.exclusion_reason == ExclusionReason.NONE:
                 brunnel.calculate_route_span(self)

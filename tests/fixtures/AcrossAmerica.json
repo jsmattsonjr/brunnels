@@ -1,0 +1,121 @@
+{
+  "route_name": "AcrossAmerica",
+  "track_points": 45794,
+  "distance_km": 4965.2,
+  "route_type": "transcontinental",
+  "description": "Transcontinental route from San Diego, CA to Washington, DC with 167 bridges",
+  "expected_results": {
+    "total_brunnels_found": "33637-33638",
+    "nearby_bridges": "167",
+    "nearby_tunnels": "0",
+    "final_included_total": "167",
+    "final_included_individual": "163",
+    "final_included_compound": "4",
+    "filtered_brunnels": {
+      "outlier": "33465-33466",
+      "misaligned": "0",
+      "alternative": "1",
+      "total": "33466-33467"
+    }
+  },
+  "known_bridges": [
+    {
+      "name": "San Luis Rey Bike Path",
+      "osm_way_id": "unknown",
+      "start_km": 10.23,
+      "end_km": 10.24,
+      "description": "Early bridge on California coast"
+    },
+    {
+      "name": "Intake Boulevard",
+      "osm_way_id": "unknown",
+      "start_km": 404.63,
+      "end_km": 404.66,
+      "description": "Bridge in Arizona"
+    },
+    {
+      "name": "Camp Verde-Bridgeport Highway",
+      "osm_way_id": "unknown",
+      "start_km": 824.92,
+      "end_km": 825.03,
+      "description": "Major highway bridge in Arizona"
+    },
+    {
+      "name": "United States Highway 160",
+      "osm_way_id": "unknown",
+      "start_km": 1753.39,
+      "end_km": 1753.42,
+      "description": "Highway bridge in Colorado"
+    },
+    {
+      "name": "Highway Of Legends",
+      "osm_way_id": "unknown",
+      "start_km": 1924.01,
+      "end_km": 1924.03,
+      "description": "Scenic highway bridge in Colorado"
+    },
+    {
+      "name": "Clark Bridge",
+      "osm_way_id": "unknown",
+      "start_km": 3426.59,
+      "end_km": 3427.17,
+      "description": "Major bridge crossing in Illinois/Missouri"
+    },
+    {
+      "name": "James A. Rhodes Appalachian Highway",
+      "osm_way_id": "unknown",
+      "start_km": 4247.96,
+      "end_km": 4248.01,
+      "description": "Appalachian highway bridge in Ohio"
+    },
+    {
+      "name": "Garrett Highway",
+      "osm_way_id": "unknown",
+      "start_km": 4559.36,
+      "end_km": 4559.43,
+      "description": "Highway bridge in Maryland"
+    },
+    {
+      "name": "National Pike",
+      "osm_way_id": "unknown",
+      "start_km": 4612.01,
+      "end_km": 4612.02,
+      "description": "Historic National Pike bridge"
+    },
+    {
+      "name": "Millersville Road",
+      "osm_way_id": "unknown",
+      "start_km": 4946.42,
+      "end_km": 4946.50,
+      "description": "Final bridge near Washington DC"
+    }
+  ],
+  "known_tunnels": [],
+  "test_scenarios": [
+    {
+      "name": "default_settings",
+      "args": {},
+      "expected_final_included_total": "167"
+    },
+    {
+      "name": "strict_bearing_tolerance",
+      "args": {
+        "bearing_tolerance": 10.0
+      },
+      "expected_final_included_total": "140-180"
+    }
+  ],
+  "performance_benchmarks": {
+    "processing_time_seconds": "60-180",
+    "memory_usage_mb": "<500"
+  },
+  "notes": [
+    "Transcontinental route processed in 9 chunks due to length",
+    "Total query area: 327,843 sq km",
+    "Route crosses 15+ states from California to Washington DC",
+    "Major bridges include highway crossings and historic routes",
+    "Contains 4 compound bridges with merged segments",
+    "1 overlap exclusion (alternative) detected",
+    "No tunnels detected along route"
+  ]
+}

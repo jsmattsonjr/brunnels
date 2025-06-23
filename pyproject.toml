@@ -13,7 +13,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -44,6 +44,7 @@ dev = [
     "mypy",
     "psutil",
     "types-requests",
+    "types-shapely",
 ]
 
 [project.urls]
@@ -66,7 +67,6 @@ target-version = ['py39']
 python_version = "3.9"
 warn_return_any = false  # Allow Any returns for third-party libraries
 warn_unused_configs = true
-ignore_missing_imports = true  # Ignore missing stubs for third-party libraries
 
 [tool.setuptools_scm]
 write_to = "src/brunnels/_version.py"

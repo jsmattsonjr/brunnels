@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
 """Data structures for representing bridges and tunnels (brunnels)."""
 
-from typing import Optional, List, Dict, Any, Set, NamedTuple
+from typing import Optional, List, Dict, Any, Set, NamedTuple, Tuple
 from collections import defaultdict, deque
 from enum import Enum
 import logging
 from shapely import Point
 from shapely.geometry import LineString
+from shapely.ops import substring
 import pyproj
+import math
 
-from .geometry_utils import Position
-from .geometry_utils import (
-    bearing,
-    bearings_aligned,
-)
-from .shapely_utils import (
+from .geometry import (
+    Position,
     coords_to_polyline,
-    find_closest_segments,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,13 +29,13 @@ class BrunnelType(Enum):
         return self.value.capitalize()
 
 
-class FilterReason(Enum):
-    """Enumeration for brunnel filtering reasons."""
+class ExclusionReason(Enum):
+    """Enumeration for brunnel exclusion reasons."""
 
     NONE = "none"
-    NOT_CONTAINED = "outwith_route_buffer"
-    UNALIGNED = "not_aligned_with_route"
-    NOT_NEAREST = "not_nearest_among_overlapping_brunnels"
+    OUTLIER = "outlier"
+    MISALIGNED = "misaligned"
+    ALTERNATIVE = "alternative"
 
     def __str__(self) -> str:
         return self.value
@@ -47,8 +44,8 @@ class FilterReason(Enum):
 class RouteSpan(NamedTuple):
     """Information about where a brunnel spans along a route."""
 
-    start_distance: float  # Distance from route start where brunnel begins
-    end_distance: float  # Distance from route start where brunnel ends
+    start_distance: float  # Distance from route start where brunnel begins (in meters)
+    end_distance: float  # Distance from route start where brunnel ends (in meters)
 
 
 class Brunnel:
@@ -59,9 +56,10 @@ class Brunnel:
         coords: List[Position],
         metadata: Dict[str, Any],
         brunnel_type: BrunnelType,
-        filter_reason: FilterReason = FilterReason.NONE,
+        exclusion_reason: ExclusionReason = ExclusionReason.NONE,
         route_span: Optional[RouteSpan] = None,
         compound_group: Optional[List["Brunnel"]] = None,
+        overlap_group: Optional[List["Brunnel"]] = None,
         projection: Optional[pyproj.Proj] = None,
     ):
         """Initializes a Brunnel object.
@@ -70,9 +68,10 @@ class Brunnel:
             coords: A list of Position objects representing the brunnel's geometry.
             metadata: A dictionary containing metadata from OpenStreetMap.
             brunnel_type: The type of the brunnel (BRIDGE or TUNNEL).
-            filter_reason: The reason why this brunnel might be filtered out.
+            exclusion_reason: The reason why this brunnel might be excluded.
             route_span: A RouteSpan object indicating where the brunnel intersects with a route.
             compound_group: A list of other Brunnel objects if this is part of a compound structure.
+            overlap_group: A list of other Brunnel objects if this overlaps with other brunnels.
             projection: A pyproj.Proj object for coordinate transformations.
 
         Raises:
@@ -81,9 +80,10 @@ class Brunnel:
         self.coords = coords
         self.metadata = metadata
         self.brunnel_type = brunnel_type
-        self.filter_reason = filter_reason
+        self.exclusion_reason = exclusion_reason
         self.route_span = route_span
         self.compound_group = compound_group
+        self.overlap_group = overlap_group
         self.projection = projection
         if not coords:
             raise ValueError(f"{self.get_short_description()} has no coordinates")
@@ -129,43 +129,48 @@ class Brunnel:
     def get_display_name(self) -> str:
         """Get the display name for this brunnel.
 
-        Retrieves the 'name' tag from OSM metadata. If no 'name' tag exists,
-        returns "unnamed".
+        For compound brunnels, collects names from all components (using "<OSM id>" for unnamed
+        components). If all names match, returns the common name; otherwise joins names with ';'.
+        For simple brunnels, retrieves the 'name' tag from OSM metadata, or returns a formatted
+        OSM ID if no name exists.
 
         Returns:
-            str: The display name or "unnamed".
+            str: The OSM name, joined names, or "<OSM {id}>" for unnamed brunnels.
         """
-        return self.metadata.get("tags", {}).get("name", "unnamed")
+        if self.compound_group is not None:
+            names = []
+            for component in self.compound_group:
+                if "name" in component.metadata["tags"]:
+                    names.append(component.metadata["tags"]["name"])
+                else:
+                    # Use <OSM id> format for unnamed components
+                    component_id = component.metadata.get("id", "unknown")
+                    names.append(f"<OSM {component_id}>")
+
+            # If all names are the same, return the common name
+            if len(set(names)) == 1:
+                return names[0]
+            # Otherwise, join all names with ';'
+            return "; ".join(names)
+
+        return self.metadata["tags"].get("name", f"<OSM {self.get_id()}>")
 
     def get_short_description(self) -> str:
         """Get a short, human-readable description for logging.
 
-        Includes the brunnel type, display name, ID, and segment count for compound brunnels.
+        Includes the brunnel type, display name, and segment count for compound brunnels.
+        Format: "{Type}: {name}" or "{Type}: {name} [{count} segments]" for compound brunnels.
 
         Returns:
             str: A short descriptive string.
         """
         brunnel_type = self.brunnel_type.value.capitalize()
         name = self.get_display_name()
+        count = ""
         if self.compound_group is not None:
-            component_count = len(self.compound_group)
-            return f"Compound {brunnel_type}: {name} ({self.get_id()}) [{component_count} segments]"
-        return f"{brunnel_type}: {name} ({self.get_id()})"
+            count = f" [{len(self.compound_group)} segments]"
 
-    def get_log_description(self) -> str:
-        """Get a standardized description for logging, including route span information.
-
-        Combines the short description with formatted route span distances if available.
-
-        Returns:
-            str: A descriptive string for logging purposes.
-        """
-        route_span = self.get_route_span()
-        if route_span is not None:
-            span_info = f"{route_span.start_distance:.2f}-{route_span.end_distance:.2f} km (length: {route_span.end_distance - route_span.start_distance:.2f} km)"
-            return f"{self.get_short_description()} {span_info}"
-        else:
-            return f"{self.get_short_description()} (no route span)"
+        return f"{brunnel_type}: {name}{count}"
 
     def get_route_span(self) -> Optional[RouteSpan]:
         """
@@ -238,7 +243,7 @@ class Brunnel:
         points = [Point(coord) for coord in self.linestring.coords]
         # Find the closest route point for each brunnel coordinate
         for point in points:
-            distance = route.linestring.project(point) / 1000.0  # Convert to kilometers
+            distance = route.linestring.project(point)  # Keep in meters
 
             min_distance = min(min_distance, distance)
             max_distance = max(max_distance, distance)
@@ -247,39 +252,72 @@ class Brunnel:
 
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """
-        Check if this brunnel's bearing is aligned with the route at their closest point.
+        Check if this brunnel's bearing is aligned with the route within tolerance.
+
+        For each brunnel segment, projects endpoints onto the route to find the
+        corresponding route substring, then checks alignment between each brunnel
+        segment and each route segment in that substring. Returns True if any
+        segment pair is within tolerance.
 
         Args:
             route: Route object representing the route
             tolerance_degrees: Allowed bearing deviation in degrees
 
         Returns:
-            True if brunnel is aligned with route within tolerance, False otherwise
+            True if any brunnel segment is aligned with any route segment within tolerance
         """
+        cos_max_angle = math.cos(math.radians(tolerance_degrees))
+        brunnel_coords = list(self.linestring.coords)
 
-        # Find closest segments between brunnel and route
-        brunnel_index, route_index = find_closest_segments(
-            self.linestring, route.linestring
-        )
+        # Check each brunnel segment
+        for b_idx in range(len(brunnel_coords) - 1):
+            # Get brunnel segment endpoints
+            b_start_point = Point(brunnel_coords[b_idx])
+            b_end_point = Point(brunnel_coords[b_idx + 1])
 
-        # Extract segment coordinates
-        brunnel_start = self.coords[brunnel_index]
-        brunnel_end = self.coords[brunnel_index + 1]
-        route_start = route.coords[route_index]
-        route_end = route.coords[route_index + 1]
+            # Project brunnel endpoints onto route to get distances
+            d1 = route.linestring.project(b_start_point)
+            d2 = route.linestring.project(b_end_point)
 
-        # Calculate bearings for both segments
-        brunnel_bearing = bearing(brunnel_start, brunnel_end)
-        route_bearing = bearing(route_start, route_end)
+            route_substring = substring(route.linestring, d1, d2)
+            if route_substring.is_empty:
+                continue
+            route_coords = list(route_substring.coords)
 
-        # Check if bearings are aligned
-        aligned = bearings_aligned(brunnel_bearing, route_bearing, tolerance_degrees)
+            # Get brunnel segment vector
+            b_vec_x = brunnel_coords[b_idx + 1][0] - brunnel_coords[b_idx][0]
+            b_vec_y = brunnel_coords[b_idx + 1][1] - brunnel_coords[b_idx][1]
+            b_mag = math.sqrt(b_vec_x**2 + b_vec_y**2)
 
-        logger.debug(
-            f"{self.get_short_description()}: brunnel_bearing={brunnel_bearing:.1f}°, route_bearing={route_bearing:.1f}°, aligned={aligned} (tolerance={tolerance_degrees}°)"
-        )
+            if b_mag == 0:
+                continue  # Skip zero-length brunnel segment
 
-        return aligned
+            # Check alignment with each route segment in the substring
+            for r_idx in range(len(route_coords) - 1):
+                # Get route segment vector
+                r_vec_x = route_coords[r_idx + 1][0] - route_coords[r_idx][0]
+                r_vec_y = route_coords[r_idx + 1][1] - route_coords[r_idx][1]
+                r_mag = math.sqrt(r_vec_x**2 + r_vec_y**2)
+
+                if r_mag == 0:
+                    continue  # Skip zero-length route segment
+
+                # Calculate alignment using dot product
+                # abs() handles both parallel and anti-parallel cases
+                dot_product = abs(
+                    (b_vec_x * r_vec_x + b_vec_y * r_vec_y) / (b_mag * r_mag)
+                )
+
+                # Ensure dot_product is not slightly > 1.0 due to precision errors
+                dot_product = min(dot_product, 1.0)
+
+                # If this segment pair is aligned within tolerance, return True
+                if dot_product >= cos_max_angle:
+                    return True
+
+        # No segment pairs were aligned within tolerance
+        logger.debug(f"{self.get_short_description()} is not aligned with the route")
+        return False
 
     @classmethod
     def from_overpass_data(
@@ -313,24 +351,16 @@ class Brunnel:
         )
 
 
-def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
-    """
-    Identify connected components of brunnels and mark compound groups.
-
-    This function analyzes the graph formed by brunnels sharing nodes and identifies
-    connected components. For components with more than one way, it constructs a compound group
-    to mark them as part of the same logical structure.
-
-    Args:
-        brunnels: Dictionary of Brunnel objects to analyze
-    """
-    # Step 1: Build edges dictionary mapping node IDs to collections of way IDs
+def _build_node_edges(
+    brunnels: Dict[str, Brunnel],
+) -> Tuple[Dict[str, Set[str]], List[str]]:
+    """Build edges dictionary mapping node IDs to way IDs and return eligible way IDs."""
     edges: Dict[str, Set[str]] = defaultdict(set)
     way_ids = []
 
     for brunnel in brunnels.values():
         # Only process brunnels that are not filtered
-        if brunnel.filter_reason != FilterReason.NONE:
+        if brunnel.exclusion_reason != ExclusionReason.NONE:
             continue
 
         way_id = brunnel.get_id()
@@ -343,7 +373,46 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         for node_id in nodes:
             edges[node_id].add(way_id)
 
-    # Step 2: Find connected components using breadth-first search
+    return edges, way_ids
+
+
+def _find_connected_component(
+    start_way: str,
+    edges: Dict[str, Set[str]],
+    brunnels: Dict[str, Brunnel],
+    visited_ways: Set[str],
+) -> Set[str]:
+    """Find all ways connected to start_way through shared nodes using BFS."""
+    component: Set[str] = set()
+    queue: deque[str] = deque([start_way])
+
+    while queue:
+        current_way = queue.popleft()
+
+        if current_way in visited_ways:
+            continue
+
+        visited_ways.add(current_way)
+        component.add(current_way)
+
+        # Find all ways connected to this way through shared nodes
+        brunnel = brunnels[current_way]
+        current_nodes = brunnel.metadata.get("nodes", [])
+
+        for node_id in current_nodes:
+            # Find all other ways that share this node
+            connected_ways = edges[node_id]
+            for connected_way in connected_ways:
+                if connected_way not in visited_ways:
+                    queue.append(connected_way)
+
+    return component
+
+
+def _find_all_connected_components(
+    way_ids: List[str], edges: Dict[str, Set[str]], brunnels: Dict[str, Brunnel]
+) -> List[Set[str]]:
+    """Find all connected components using breadth-first search."""
     visited_ways: Set[str] = set()
     connected_components: List[Set[str]] = []
 
@@ -352,33 +421,16 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         if way_id in visited_ways:
             continue
 
-        # Start BFS from this way to find its connected component
-        component: Set[str] = set()
-        queue: deque[str] = deque([way_id])
-
-        while queue:
-            current_way = queue.popleft()
-
-            if current_way in visited_ways:
-                continue
-
-            visited_ways.add(current_way)
-            component.add(current_way)
-
-            # Find all ways connected to this way through shared nodes
-            brunnel = brunnels[current_way]
-            current_nodes = brunnel.metadata.get("nodes", [])
-
-            for node_id in current_nodes:
-                # Find all other ways that share this node
-                connected_ways = edges[node_id]
-                for connected_way in connected_ways:
-                    if connected_way not in visited_ways:
-                        queue.append(connected_way)
-
+        component = _find_connected_component(way_id, edges, brunnels, visited_ways)
         connected_components.append(component)
 
-    # Step 3: Mark compound groups
+    return connected_components
+
+
+def _mark_compound_groups(
+    connected_components: List[Set[str]], brunnels: Dict[str, Brunnel]
+) -> None:
+    """Mark compound groups for components with more than one way."""
     for component in connected_components:
         # Only mark components with more than one way as compound groups
         if len(component) > 1:
@@ -394,3 +446,24 @@ def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
             for way_id in component:
                 brunnel = brunnels[way_id]
                 brunnel.compound_group = compound_group
+
+
+def find_compound_brunnels(brunnels: Dict[str, Brunnel]) -> None:
+    """
+    Identify connected components of brunnels and mark compound groups.
+
+    This function analyzes the graph formed by brunnels sharing nodes and identifies
+    connected components. For components with more than one way, it constructs a compound group
+    to mark them as part of the same logical structure.
+
+    Args:
+        brunnels: Dictionary of Brunnel objects to analyze
+    """
+    # Build edges dictionary and get eligible way IDs
+    edges, way_ids = _build_node_edges(brunnels)
+
+    # Find connected components using breadth-first search
+    connected_components = _find_all_connected_components(way_ids, edges, brunnels)
+
+    # Mark compound groups
+    _mark_compound_groups(connected_components, brunnels)

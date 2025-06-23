@@ -9,9 +9,10 @@ import argparse
 import folium
 from folium.template import Template
 
-from .brunnel import Brunnel, BrunnelType, FilterReason
+from .brunnel import Brunnel, BrunnelType, ExclusionReason
 from .route import Route
 from .metrics import BrunnelMetrics
+from .overpass import ACTIVE_RAILWAY_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +20,16 @@ logger = logging.getLogger(__name__)
 class BrunnelLegend(folium.MacroElement):
     """Custom legend for brunnel visualization with dynamic counts."""
 
-    def __init__(
-        self, bridge_count, tunnel_count, contained_bridge_count, contained_tunnel_count
-    ):
+    def __init__(self, metrics: BrunnelMetrics):
         super().__init__()
-        self.bridge_count = bridge_count
-        self.tunnel_count = tunnel_count
-        self.contained_bridge_count = contained_bridge_count
-        self.contained_tunnel_count = contained_tunnel_count
+        self.bridge_count = metrics.bridge_counts.get("total", 0)
+        self.tunnel_count = metrics.tunnel_counts.get("total", 0)
+        self.contained_bridge_count = metrics.bridge_counts.get("contained", 0)
+        self.contained_tunnel_count = metrics.tunnel_counts.get("contained", 0)
+        self.alternative_bridge_count = metrics.bridge_counts.get("alternative", 0)
+        self.alternative_tunnel_count = metrics.tunnel_counts.get("alternative", 0)
+        self.misaligned_bridge_count = metrics.bridge_counts.get("misaligned", 0)
+        self.misaligned_tunnel_count = metrics.tunnel_counts.get("misaligned", 0)
 
         # Use folium's template string approach
         self._template = Template(
@@ -37,8 +40,8 @@ class BrunnelLegend(folium.MacroElement):
             bottom: 50px;
             left: 50px;
             width: 230px;
-            min-height: 140px;
-            max-height: 250px;
+            min-height: 90px;
+            max-height: 200px;
             background-color: white;
             border: 2px solid grey;
             z-index: 9999;
@@ -52,25 +55,41 @@ class BrunnelLegend(folium.MacroElement):
         ">
             <b>Legend</b><br>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #2E86AB; font-weight: bold; font-size: 16px;">—</span>
+                <span style="color: #2E86AB; font-weight: normal; font-size: 18px;">—</span>
                 GPX Route
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #E63946; font-weight: bold; font-size: 16px;">—</span>
-                Included Bridges ({{ this.contained_bridge_count }})
+                <span style="color: #D23C4C; font-weight: bold; font-size: 18px;">—</span>
+                Bridges ({{ this.contained_bridge_count }})
             </div>
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #6A4C93; font-weight: bold; font-size: 16px;">—</span>
-                Included Tunnels ({{ this.contained_tunnel_count }})
+                <span style="color: #69498F; font-weight: bold; font-size: 18px;">—</span>
+                Tunnels ({{ this.contained_tunnel_count }})
             </div>
+            {% if this.alternative_bridge_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #A8A8A8; font-weight: bold; font-size: 16px;">—</span>
-                Excluded Bridges ({{ this.bridge_count - this.contained_bridge_count }})
+                <span style="color: #FF6B35; font-weight: bold; font-size: 18px;">—</span>
+                Alternative Bridges ({{ this.alternative_bridge_count }})
             </div>
+            {% endif %}
+            {% if this.alternative_tunnel_count > 0 %}
             <div style="margin: 4px 0; line-height: 1.3;">
-                <span style="color: #9B9B9B; font-weight: bold; font-size: 16px;">—</span>
-                Excluded Tunnels ({{ this.tunnel_count - this.contained_tunnel_count }})
+                <span style="color: #9D4EDD; font-weight: bold; font-size: 18px;">—</span>
+                Alternative Tunnels ({{ this.alternative_tunnel_count }})
             </div>
+            {% endif %}
+            {% if this.misaligned_bridge_count > 0 %}
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: #FF8C00; font-weight: bold; font-size: 18px;">—</span>
+                Misaligned Bridges ({{ this.misaligned_bridge_count }})
+            </div>
+            {% endif %}
+            {% if this.misaligned_tunnel_count > 0 %}
+            <div style="margin: 4px 0; line-height: 1.3;">
+                <span style="color: #DAA520; font-weight: bold; font-size: 18px;">—</span>
+                Misaligned Tunnels ({{ this.misaligned_tunnel_count }})
+            </div>
+            {% endif %}
         </div>
         {% endmacro %}
         """
@@ -121,6 +140,104 @@ def format_complex_value(key: str, value: Any, indent_level: int = 0) -> str:
         return f"{indent}<i>{key}:</i> {value}"
 
 
+def _format_brunnel_names(tags: Dict[str, str]) -> str:
+    """
+    Format brunnel name and alt_name into HTML.
+
+    Args:
+        tags: OSM tags dictionary
+
+    Returns:
+        HTML string with formatted names
+    """
+    html_parts = []
+
+    # Add name most prominently if present
+    if "name" in tags:
+        html_parts.append(f"<b>{tags['name']}</b>")
+
+    # Add alt_name next if present
+    if "alt_name" in tags:
+        html_parts.append(f"<br><b>AKA:</b> {tags['alt_name']}")
+
+    return "".join(html_parts)
+
+
+def _format_osm_tags(tags: Dict[str, str]) -> str:
+    """
+    Format OSM tags (excluding name and alt_name) into HTML.
+
+    Args:
+        tags: OSM tags dictionary
+
+    Returns:
+        HTML string with formatted tags
+    """
+    # Add remaining OSM tags (excluding name and alt_name which we already showed)
+    remaining_tags = {k: v for k, v in tags.items() if k not in ["name", "alt_name"]}
+    if not remaining_tags:
+        return ""
+
+    html_parts = ["<br><b>Tags:</b>"]
+    for key, value in sorted(remaining_tags.items()):
+        highlight = (
+            key == "bicycle"
+            and value == "no"
+            or key == "waterway"
+            or key == "railway"
+            and value in ACTIVE_RAILWAY_TYPES
+        )
+        prefix = "<span style='color: red;'>" if highlight else ""
+        suffix = "</span>" if highlight else ""
+        html_parts.append(f"<br>&nbsp;&nbsp;{prefix}<i>{key}:</i> {value}{suffix}")
+
+    return "".join(html_parts)
+
+
+def _format_other_metadata(metadata: Dict[str, Any]) -> str:
+    """
+    Format other metadata (non-tag, non-ID fields) into HTML.
+
+    Args:
+        metadata: Brunnel metadata dictionary
+
+    Returns:
+        HTML string with formatted metadata
+    """
+    # Add other metadata (excluding tags and id which we already handled,
+    # geometry which is very long, and type which is always "way")
+    other_data = {
+        k: v for k, v in metadata.items() if k not in ["tags", "id", "geometry", "type"]
+    }
+    if not other_data:
+        return ""
+
+    html_parts = ["<br><b>Other:</b>"]
+    for key, value in sorted(other_data.items()):
+        # Handle nested dictionaries or lists
+        if isinstance(value, (dict, list)):
+            # Use structured formatting for nodes and bounds
+            if key in ["nodes", "bounds"]:
+                formatted_value = format_complex_value(key, value, 0)
+                # Add proper indentation for the "Other:" section
+                indented_lines = []
+                for line in formatted_value.split("<br>"):
+                    if line.strip():  # Skip empty lines
+                        indented_lines.append(f"&nbsp;&nbsp;{line}")
+                html_parts.append("<br>" + "<br>".join(indented_lines))
+            else:
+                # Keep truncation for other long nested data
+                value_str = str(value)
+                if len(value_str) > 50:
+                    value_str = value_str[:47] + "..."
+                html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
+        else:
+            value_str = str(value)
+            html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
+
+    return "".join(html_parts)
+
+
 def brunnel_to_html(brunnel: Brunnel) -> str:
     """
     Format a brunnel's metadata into HTML for popup display.
@@ -138,101 +255,41 @@ def brunnel_to_html(brunnel: Brunnel) -> str:
         html_parts.append(
             f"Segment {compound_group.index(brunnel)+1} of {len(compound_group)} in compound group<br>"
         )
+
     tags = brunnel.metadata.get("tags", {})
 
-    # Add name most prominently if present
-    if "name" in tags:
-        html_parts.append(f"<b>{tags['name']}</b>")
-
-    # Add alt_name next if present
-    if "alt_name" in tags:
-        html_parts.append(f"<br><b>AKA:</b> {tags['alt_name']}")
+    # Add formatted names
+    names_html = _format_brunnel_names(tags)
+    if names_html:
+        html_parts.append(names_html)
 
     # Add OSM ID
     html_parts.append(f"<br><b>OSM ID:</b> {brunnel.get_id()}")
 
-    # Add remaining OSM tags (excluding name and alt_name which we already showed)
-    remaining_tags = {k: v for k, v in tags.items() if k not in ["name", "alt_name"]}
-    if remaining_tags:
-        html_parts.append("<br><b>Tags:</b>")
-        for key, value in sorted(remaining_tags.items()):
-            highlight = (
-                key == "bicycle"
-                and value == "no"
-                or key == "waterway"
-                or key == "railway"
-                and value != "abandoned"
-            )
-            prefix = "<span style='color: red;'>" if highlight else ""
-            suffix = "</span>" if highlight else ""
-            html_parts.append(f"<br>&nbsp;&nbsp;{prefix}<i>{key}:</i> {value}{suffix}")
+    # Add formatted OSM tags
+    tags_html = _format_osm_tags(tags)
+    if tags_html:
+        html_parts.append(tags_html)
 
-    # Add other metadata (excluding tags and id which we already handled,
-    # geometry which is very long, and type which is always "way")
-    other_data = {
-        k: v
-        for k, v in brunnel.metadata.items()
-        if k not in ["tags", "id", "geometry", "type"]
-    }
-    if other_data:
-        html_parts.append("<br><b>Other:</b>")
-        for key, value in sorted(other_data.items()):
-            # Handle nested dictionaries or lists
-            if isinstance(value, (dict, list)):
-                # Use structured formatting for nodes and bounds
-                if key in ["nodes", "bounds"]:
-                    formatted_value = format_complex_value(key, value, 0)
-                    # Add proper indentation for the "Other:" section
-                    indented_lines = []
-                    for line in formatted_value.split("<br>"):
-                        if line.strip():  # Skip empty lines
-                            indented_lines.append(f"&nbsp;&nbsp;{line}")
-                    html_parts.append("<br>" + "<br>".join(indented_lines))
-                else:
-                    # Keep truncation for other long nested data
-                    value_str = str(value)
-                    if len(value_str) > 50:
-                        value_str = value_str[:47] + "..."
-                    html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
-            else:
-                value_str = str(value)
-                html_parts.append(f"<br>&nbsp;&nbsp;<i>{key}:</i> {value_str}")
+    # Add formatted other metadata
+    other_html = _format_other_metadata(brunnel.metadata)
+    if other_html:
+        html_parts.append(other_html)
 
     return "".join(html_parts)
 
 
-def create_route_map(
-    route: Route,
-    output_filename: str,
-    brunnels: Dict[str, Brunnel],
-    metrics: BrunnelMetrics,
-    args: argparse.Namespace,
-) -> None:
+def _setup_map_with_layers(center_lat: float, center_lon: float) -> folium.Map:
     """
-    Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
+    Create and configure a folium map with tile layers.
 
     Args:
-        route: Route object representing the route
-        output_filename: Path where HTML map file should be saved
-        brunnels: Dictionary of Brunnel objects to display on map
-        metrics: BrunnelMetrics containing pre-collected metrics
-        args: argparse.Namespace object containing settings like buffer
+        center_lat: Center latitude for the map
+        center_lon: Center longitude for the map
 
-    Raises:
-        ValueError: If route is empty
+    Returns:
+        Configured folium Map instance
     """
-    if not route:
-        raise ValueError("Cannot create map for empty route")
-
-    # Calculate buffered bounding box using existing function
-    south, west, north, east = route.get_bbox(args.bbox_buffer)
-
-    center_lat = (south + north) / 2
-    center_lon = (west + east) / 2
-
-    logger.debug(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
-
-    # Initialize map (CartoDB positron will be the default base, but also explicitly added for control)
     route_map = folium.Map(
         location=[center_lat, center_lon],
         tiles=None,
@@ -265,6 +322,17 @@ def create_route_map(
     # Add LayerControl
     folium.LayerControl().add_to(route_map)
 
+    return route_map
+
+
+def _add_route_to_map(route_map: folium.Map, route: Route) -> None:
+    """
+    Add route polyline and start/end markers to the map.
+
+    Args:
+        route_map: Folium map instance
+        route: Route object to display
+    """
     # Convert route to coordinate pairs for folium
     coordinates = [[pos.latitude, pos.longitude] for pos in route.coords]
 
@@ -291,85 +359,149 @@ def create_route_map(
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(route_map)
 
-    # Process and add brunnels to map (metrics already collected)
+
+def _get_brunnel_style(brunnel: Brunnel) -> Dict[str, Any]:
+    """
+    Determine color, weight, and opacity for a brunnel based on its type and exclusion reason.
+
+    Args:
+        brunnel: Brunnel object to style
+
+    Returns:
+        Dictionary with style properties (color, weight, opacity)
+    """
+    exclusion_reason = brunnel.exclusion_reason
+    brunnel_type = brunnel.brunnel_type
+
+    # Set color and style based on inclusion status
+    if exclusion_reason == ExclusionReason.NONE:
+        # Included brunnels with 80% saturation
+        opacity = 0.9
+        weight = 4
+        if brunnel_type == BrunnelType.BRIDGE:
+            color = "#D23C4C"  # Included Bridges (80% saturation)
+        else:  # TUNNEL
+            color = "#69498F"  # Included Tunnels (80% saturation)
+    elif exclusion_reason == ExclusionReason.ALTERNATIVE:
+        # Alternative brunnels with yellow tinge (fully saturated)
+        opacity = 0.9
+        weight = 3
+        if brunnel_type == BrunnelType.BRIDGE:
+            color = "#FF6B35"  # Alternative Bridges (red-orange, yellow tinge)
+        else:  # TUNNEL
+            color = "#9D4EDD"  # Alternative Tunnels (purple with yellow tinge)
+    else:  # MISALIGNED
+        # Misaligned brunnels with more yellow tinge than alternatives
+        opacity = 0.9
+        weight = 3
+        if brunnel_type == BrunnelType.BRIDGE:
+            color = "#FF8C00"  # Misaligned Bridges (dark orange, more yellow)
+        else:  # TUNNEL
+            color = "#DAA520"  # Misaligned Tunnels (goldenrod, more yellow)
+
+    return {"color": color, "weight": weight, "opacity": opacity}
+
+
+def _add_brunnels_to_map(route_map: folium.Map, brunnels: Dict[str, Brunnel]) -> None:
+    """
+    Add brunnels to the map with appropriate styling and popups.
+
+    Args:
+        route_map: Folium map instance
+        brunnels: Dictionary of Brunnel objects to display
+    """
     for brunnel in brunnels.values():
         brunnel_coords = [[pos.latitude, pos.longitude] for pos in brunnel.coords]
         if not brunnel_coords:
             continue
 
-        brunnel_type = brunnel.brunnel_type
-        filter_reason = brunnel.filter_reason
+        exclusion_reason = brunnel.exclusion_reason
         route_span = brunnel.get_route_span()
 
-        # Determine color and opacity based on containment status and filtering
-        if filter_reason == FilterReason.NONE:
-            opacity = 0.9
-            weight = 4
-            if brunnel_type == BrunnelType.BRIDGE:
-                color = "#E63946"  # Included Bridges
-            else:  # TUNNEL
-                color = "#6A4C93"  # Included Tunnels
-        else:
-            # Use muted colors for filtered or non-contained brunnels
-            opacity = 0.3
-            weight = 2
-            if brunnel_type == BrunnelType.BRIDGE:
-                color = "#A8A8A8"  # Excluded Bridges
-            else:  # TUNNEL
-                color = "#9B9B9B"  # Excluded Tunnels
+        # Display included brunnels, "alternative", and "misaligned" excluded brunnels
+        if exclusion_reason not in [
+            ExclusionReason.NONE,
+            ExclusionReason.ALTERNATIVE,
+            ExclusionReason.MISALIGNED,
+        ]:
+            continue
+
+        # Get styling for this brunnel
+        style = _get_brunnel_style(brunnel)
 
         # Create popup text with full metadata
-        if filter_reason == FilterReason.NONE:
+        if exclusion_reason == ExclusionReason.NONE:
             if route_span:
                 status = (
-                    f"{route_span.start_distance:.2f} - {route_span.end_distance:.2f} km; "
-                    f"length: {route_span.end_distance - route_span.start_distance:.2f} km"
+                    f"{route_span.start_distance/1000:.2f} - {route_span.end_distance/1000:.2f} km; "
+                    f"length: {(route_span.end_distance - route_span.start_distance)/1000:.2f} km"
                 )
             else:
-                status = "contained in route buffer"
-        elif filter_reason == FilterReason.NOT_CONTAINED:
-            status = "not contained in route buffer"
-        else:
-            status = f"filtered: {filter_reason}"
+                status = "included"
+        elif exclusion_reason == ExclusionReason.ALTERNATIVE:
+            status = "alternative overlapping brunnel"
+        else:  # MISALIGNED
+            status = "not aligned with route"
 
-        popup_header = f"<b>{brunnel_type.value.capitalize()}</b> ({status})<br>"
-
+        popup_header = (
+            f"<b>{brunnel.brunnel_type.value.capitalize()}</b> ({status})<br>"
+        )
         metadata_html = brunnel_to_html(brunnel)
         popup_text = popup_header + metadata_html
 
-        # Style and add brunnel based on type
-        if brunnel_type == BrunnelType.TUNNEL:
-            # Use dashed line for ALL tunnels (both contained and non-contained)
-            folium.PolyLine(
-                brunnel_coords,
-                color=color,
-                weight=weight,
-                opacity=opacity,
-                popup=folium.Popup(
-                    popup_text, max_width=400
-                ),  # Wider for compound brunnels
-                z_index=2,  # Ensure tunnels are above route
-            ).add_to(route_map)
-        else:
-            # Solid line for all bridges
-            folium.PolyLine(
-                brunnel_coords,
-                color=color,
-                weight=weight,
-                opacity=opacity,
-                popup=folium.Popup(
-                    popup_text, max_width=400
-                ),  # Wider for compound brunnels
-                z_index=2,  # Ensure bridges are above route
-            ).add_to(route_map)
+        # Add brunnel to map
+        folium.PolyLine(
+            brunnel_coords,
+            color=style["color"],
+            weight=style["weight"],
+            opacity=style["opacity"],
+            popup=folium.Popup(popup_text, max_width=400),
+            z_index=2,  # Ensure brunnels are above route
+        ).add_to(route_map)
+
+
+def create_route_map(
+    route: Route,
+    output_filename: str,
+    brunnels: Dict[str, Brunnel],
+    metrics: BrunnelMetrics,
+    args: argparse.Namespace,
+) -> None:
+    """
+    Create an interactive map showing the route and nearby bridges/tunnels, save as HTML.
+
+    Args:
+        route: Route object representing the route
+        output_filename: Path where HTML map file should be saved
+        brunnels: Dictionary of Brunnel objects to display on map
+        metrics: BrunnelMetrics containing pre-collected metrics
+        args: argparse.Namespace object containing settings like buffer
+
+    Raises:
+        ValueError: If route is empty
+    """
+    if not route:
+        raise ValueError("Cannot create map for empty route")
+
+    # Calculate buffered bounding box using existing function
+    south, west, north, east = route.get_bbox(args.query_buffer)
+
+    center_lat = (south + north) / 2
+    center_lon = (west + east) / 2
+
+    logger.debug(f"Creating map centered at ({center_lat:.4f}, {center_lon:.4f})")
+
+    # Create and configure map with layers
+    route_map = _setup_map_with_layers(center_lat, center_lon)
+
+    # Add route to map
+    _add_route_to_map(route_map, route)
+
+    # Add brunnels to map
+    _add_brunnels_to_map(route_map, brunnels)
 
     # Add legend with dynamic counts from metrics
-    legend = BrunnelLegend(
-        metrics.bridge_count,
-        metrics.tunnel_count,
-        metrics.contained_bridge_count,
-        metrics.contained_tunnel_count,
-    )
+    legend = BrunnelLegend(metrics)
     route_map.add_child(legend)
 
     # Fit map bounds to buffered route area
@@ -379,5 +511,5 @@ def create_route_map(
     route_map.save(output_filename)
 
     logger.debug(
-        f"Map saved to {output_filename} with {metrics.contained_bridge_count}/{metrics.bridge_count} bridges and {metrics.contained_tunnel_count}/{metrics.tunnel_count} tunnels contained in route buffer"
+        f"Map saved to {output_filename} with {metrics.bridge_counts.get('contained', 0)}/{metrics.bridge_counts.get('total', 0)} bridges and {metrics.tunnel_counts.get('contained', 0)}/{metrics.tunnel_counts.get('total', 0)} tunnels nearby route"
     )

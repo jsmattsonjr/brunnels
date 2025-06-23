@@ -15,7 +15,6 @@ import argparse
 import logging
 import sys
 import os
-import gpxpy
 from gpxpy import gpx
 from shapely.geometry.base import BaseGeometry
 
@@ -24,7 +23,13 @@ from . import __version__
 from . import visualization
 from .metrics import collect_metrics, log_metrics
 from .route import Route
-from .brunnel import Brunnel, BrunnelType, FilterReason, find_compound_brunnels
+from .brunnel import (
+    Brunnel,
+    BrunnelType,
+    ExclusionReason,
+    RouteSpan,
+    find_compound_brunnels,
+)
 from .file_utils import generate_output_filename
 
 # Configure logging
@@ -55,7 +60,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Output HTML map file (default: auto-generated based on input filename)",
     )
     parser.add_argument(
-        "--bbox-buffer",
+        "--query-buffer",
         type=float,
         default=10,
         help="Search buffer around route in meters (default: 10)",
@@ -64,7 +69,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--route-buffer",
         type=float,
         default=3.0,
-        help="Route buffer for containment detection in meters (default: 3.0)",
+        help="Route buffer for nearby detection in meters (default: 3.0)",
     )
     parser.add_argument(
         "--bearing-tolerance",
@@ -75,19 +80,14 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--log-level",
         type=str,
-        default="INFO",
+        default="WARNING",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set logging level (default: INFO)",
+        help="Set logging level (default: WARNING)",
     )
     parser.add_argument(
         "--no-open",
         action="store_true",
         help="Don't automatically open the HTML file in browser",
-    )
-    parser.add_argument(
-        "--no-overlap-filtering",
-        action="store_true",
-        help="Disable filtering of overlapping brunnels (keep all overlapping brunnels)",
     )
     parser.add_argument(
         "--metrics",
@@ -112,7 +112,13 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-active-railways",
         action="store_true",
-        help="Include ways tagged railway (excluding railway=abandoned) in the Overpass query",
+        help="Include ways tagged railway (excluding inactive types: abandoned, dismantled, disused, historic, razed, removed)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="Overpass API timeout in seconds (default: 30)",
     )
     return parser
 
@@ -162,6 +168,14 @@ def open_file_in_browser(filename: str) -> None:
 
 def setup_logging(args: argparse.Namespace) -> None:
     """Setup logging configuration."""
+    try:
+        if hasattr(sys.stdout, "reconfigure") and sys.stdout.encoding != "utf-8":
+            sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
+        if hasattr(sys.stderr, "reconfigure") and sys.stderr.encoding != "utf-8":
+            sys.stderr.reconfigure(encoding="utf-8")  # type: ignore
+        logger.debug("Reconfigured stdout and stderr to UTF-8 encoding.")
+    except Exception as e:
+        logger.debug(f"Could not reconfigure stdout/stderr to UTF-8: {e}")
     level = getattr(logging, args.log_level)
 
     # Create formatter
@@ -184,40 +198,105 @@ def setup_logging(args: argparse.Namespace) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def log_final_included_brunnels(brunnels: Dict[str, Brunnel]) -> None:
+def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     """
-    Log the final list of brunnels that are included in the route (after all processing).
-    This shows the actual brunnels that will appear on the map.
+    Print all nearby brunnels (included, misaligned, and alternatives from overlap groups).
+    Shows detailed analysis of what was found and why some were excluded.
 
     Args:
-        brunnels: Sequence of all brunnels to check (including compound brunnels)
+        brunnels: Dictionary of all brunnels to analyze
     """
-    # Find final included brunnels (those that are contained and not filtered)
-    included_brunnels = [
+    # Find all nearby brunnels (those with route spans, regardless of other exclusion reasons)
+    nearby_brunnels = [
         b
         for b in brunnels.values()
-        if b.filter_reason == FilterReason.NONE and b.is_representative()
+        if b.is_representative()
+        and b.route_span is not None
+        and b.exclusion_reason != ExclusionReason.OUTLIER
     ]
 
-    if not included_brunnels:
-        logger.info("No brunnels included in final map")
+    if not nearby_brunnels:
+        print("No nearby brunnels found")
         return
 
-    # Sort by start distance along route
-    included_brunnels.sort(
-        key=lambda b: (b.route_span.start_distance if b.route_span else 0.0)
+    # Sort by start distance in decameters, then by end distance
+    nearby_brunnels.sort(
+        key=lambda b: (
+            int(b.route_span.start_distance / 10) if b.route_span else 0,
+            b.route_span.end_distance if b.route_span else 0.0,
+        )
     )
 
-    logger.info(f"Included brunnels ({len(included_brunnels)}):")
-    for brunnel in included_brunnels:
-        logger.info(f"  {brunnel.get_log_description()}")
+    # Count bridges and tunnels by type and inclusion status
+    bridge_count = tunnel_count = 0
+    included_bridge_count = included_tunnel_count = 0
+
+    for brunnel in nearby_brunnels:
+        is_included = brunnel.exclusion_reason == ExclusionReason.NONE
+        if brunnel.brunnel_type == BrunnelType.BRIDGE:
+            bridge_count += 1
+            if is_included:
+                included_bridge_count += 1
+        else:  # TUNNEL
+            tunnel_count += 1
+            if is_included:
+                included_tunnel_count += 1
+
+    print(
+        f"Nearby brunnels ({included_bridge_count}/{bridge_count} bridges; {included_tunnel_count}/{tunnel_count} tunnels):"
+    )
+
+    # Calculate maximum digits needed for formatting alignment
+    max_distance = max(
+        brunnel.route_span.end_distance / 1000
+        for brunnel in nearby_brunnels
+        if brunnel.route_span
+    )
+    max_length = max(
+        (brunnel.route_span.end_distance - brunnel.route_span.start_distance) / 1000
+        for brunnel in nearby_brunnels
+        if brunnel.route_span
+    )
+
+    # Determine width needed for distances (digits before decimal point)
+    distance_width = len(f"{max_distance:.0f}") + 3  # +3 for ".XX"
+    length_width = len(f"{max_length:.0f}") + 3  # +3 for ".XX"
+
+    current_overlap_group = None
+
+    for brunnel in nearby_brunnels:
+        route_span = brunnel.route_span or RouteSpan(0, 0)
+        start_km = route_span.start_distance / 1000
+        end_km = route_span.end_distance / 1000
+        length_km = (route_span.end_distance - route_span.start_distance) / 1000
+
+        # Format with aligned padding
+        span_info = f"{start_km:{distance_width}.2f}-{end_km:{distance_width}.2f} km ({length_km:{length_width}.2f} km)"
+        annotation = "*"
+        reason = ""
+        if brunnel.exclusion_reason != ExclusionReason.NONE:
+            annotation = "-"
+            reason = f" ({brunnel.exclusion_reason.value})"
+        indent = "" if brunnel.overlap_group is None else "  "
+        if (
+            current_overlap_group is not None or brunnel.overlap_group is not None
+        ) and current_overlap_group != brunnel.overlap_group:
+            current_overlap_group = brunnel.overlap_group
+            if current_overlap_group is not None:
+                print("--- Overlapping ---" + "-" * (len(span_info) - 20))
+            else:
+                print("-" * len(span_info))
+
+        print(
+            f"{span_info} {annotation} {indent}{brunnel.get_short_description()} {reason}"
+        )
 
 
-def filter_uncontained_brunnels(
+def exclude_uncontained_brunnels(
     route_geometry: BaseGeometry, brunnels: Dict[str, Brunnel]
 ) -> None:
     """
-    Filters brunnels that are not contained within the given route geometry.
+    Excludes brunnels that are not contained within the given route geometry.
 
     Args:
         route_geometry: The Shapely geometry of the (buffered) route.
@@ -226,16 +305,22 @@ def filter_uncontained_brunnels(
     """
 
     for brunnel in brunnels.values():
-        if brunnel.filter_reason == FilterReason.NONE and not brunnel.is_contained_by(
-            route_geometry
+        if (
+            brunnel.exclusion_reason == ExclusionReason.NONE
+            and not brunnel.is_contained_by(route_geometry)
         ):
-            brunnel.filter_reason = FilterReason.NOT_CONTAINED
+            brunnel.exclusion_reason = ExclusionReason.OUTLIER
 
 
-def main():
+def _parse_and_validate_args() -> argparse.Namespace:
     """
-    Parses command-line arguments, processes the GPX file,
-    finds brunnels, and generates an interactive map.
+    Parse and validate command-line arguments.
+
+    Returns:
+        Parsed and validated arguments
+
+    Exits:
+        On argument validation failure
     """
     parser = create_argument_parser()
     args = parser.parse_args()
@@ -244,73 +329,112 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    if args.metrics:
-        args.log_level = "DEBUG"
+    return args
 
-    # Setup logging
-    setup_logging(args)
 
-    # Determine output filename
+def _load_route(filename: str) -> Route:
+    """
+    Load and parse the GPX file into a Route object.
+
+    Args:
+        filename: Path to the GPX file
+
+    Returns:
+        Route object created from GPX file
+
+    Exits:
+        On file loading or parsing errors
+    """
     try:
-        output_filename = determine_output_filename(args.filename, args.output)
-        logger.debug(f"Output filename: {output_filename}")
-    except (RuntimeError, ValueError):
-        sys.exit(1)
-
-    # Load and parse the GPX file into a route
-    try:
-        route = Route.from_file(args.filename)
+        route = Route.from_file(filename)
     except FileNotFoundError:
-        logger.error(f"GPX file not found: {args.filename}")
+        logger.error(f"GPX file not found: {filename}")
         sys.exit(1)
     except PermissionError:
-        logger.error(f"Cannot read GPX file (permission denied): {args.filename}")
+        logger.error(f"Cannot read GPX file (permission denied): {filename}")
         sys.exit(1)
     except gpx.GPXException as e:
         logger.error(f"Invalid GPX file: {e}")
         sys.exit(1)
-    logger.info(f"Loaded GPX route with {len(route)} points")
 
+    logger.info(f"Loaded GPX route with {len(route)} points")
     logger.info(f"Total route distance: {route.linestring.length / 1000:.2f} km")
 
+    return route
+
+
+def _discover_and_filter_brunnels(
+    route: Route, args: argparse.Namespace
+) -> Dict[str, Brunnel]:
+    """
+    Discover brunnels near the route and apply filtering.
+
+    Args:
+        route: Route object to search around
+        args: Command-line arguments containing filtering options
+
+    Returns:
+        Dictionary of discovered and filtered brunnels
+    """
     # Find bridges and tunnels near the route
     brunnels = route.find_brunnels(args)
-
     logger.info(f"Found {len(brunnels)} brunnels near route")
 
-    filtered_count = len(
-        [b for b in brunnels.values() if b.filter_reason != FilterReason.NONE]
+    excluded_count = len(
+        [b for b in brunnels.values() if b.exclusion_reason != ExclusionReason.NONE]
     )
+    if excluded_count > 0:
+        logger.debug(f"{excluded_count} brunnels excluded (will show greyed out)")
 
-    if filtered_count > 0:
-        logger.debug(f"{filtered_count} brunnels filtered (will show greyed out)")
-
+    # Apply geometric filtering
     route_geometry = route.calculate_buffered_route_geometry(args.route_buffer)
+    exclude_uncontained_brunnels(route_geometry, brunnels)
+    route.calculate_route_spans(brunnels)
 
-    # Check for containment within the route buffer
-    filter_uncontained_brunnels(route_geometry, brunnels)
-
-    # Filter misaligned brunnels based on bearing tolerance
+    # Exclude misaligned brunnels based on bearing tolerance
     if args.bearing_tolerance > 0:
-        route.filter_misaligned_brunnels(brunnels, args.bearing_tolerance)
+        route.exclude_misaligned_brunnels(brunnels, args.bearing_tolerance)
 
-    # Count contained vs total brunnels
+    # Log filtering results
     bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
     tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
-    contained_bridges = [b for b in bridges if b.filter_reason == FilterReason.NONE]
-    contained_tunnels = [b for b in tunnels if b.filter_reason == FilterReason.NONE]
-
+    contained_bridges = [
+        b for b in bridges if b.exclusion_reason == ExclusionReason.NONE
+    ]
+    contained_tunnels = [
+        b for b in tunnels if b.exclusion_reason == ExclusionReason.NONE
+    ]
     logger.debug(
-        f"Found {len(contained_bridges)}/{len(bridges)} contained bridges and {len(contained_tunnels)}/{len(tunnels)} contained tunnels"
+        f"Found {len(contained_bridges)}/{len(bridges)} nearby bridges and {len(contained_tunnels)}/{len(tunnels)} nearby tunnels"
     )
 
-    route.calculate_route_spans(brunnels)
+    # Apply compound brunnel detection and overlap exclusion
     find_compound_brunnels(brunnels)
-    if not args.no_overlap_filtering:
-        route.filter_overlapping_brunnels(brunnels)
+    route.exclude_overlapping_brunnels(brunnels)
 
-    # Log the final list of included brunnels (what will actually appear on the map)
-    log_final_included_brunnels(brunnels)
+    return brunnels
+
+
+def _generate_output(
+    route: Route,
+    brunnels: Dict[str, Brunnel],
+    output_filename: str,
+    args: argparse.Namespace,
+) -> None:
+    """
+    Generate the visualization map and handle output.
+
+    Args:
+        route: Route object
+        brunnels: Dictionary of filtered brunnels
+        output_filename: Path for output HTML file
+        args: Command-line arguments
+
+    Exits:
+        On map creation failure
+    """
+    # Log all nearby brunnels (included and excluded with reasons)
+    log_nearby_brunnels(brunnels)
 
     # Collect metrics before creating map
     metrics = collect_metrics(brunnels)
@@ -327,6 +451,34 @@ def main():
     # Automatically open the HTML file in the default browser
     if not args.no_open:
         open_file_in_browser(output_filename)
+
+
+def main():
+    """
+    Parses command-line arguments, processes the GPX file,
+    finds brunnels, and generates an interactive map.
+    """
+    # Parse and validate arguments
+    args = _parse_and_validate_args()
+
+    # Setup logging
+    setup_logging(args)
+
+    # Determine output filename
+    try:
+        output_filename = determine_output_filename(args.filename, args.output)
+        logger.debug(f"Output filename: {output_filename}")
+    except (RuntimeError, ValueError):
+        sys.exit(1)
+
+    # Load route from GPX file
+    route = _load_route(args.filename)
+
+    # Discover and filter brunnels
+    brunnels = _discover_and_filter_brunnels(route, args)
+
+    # Generate output
+    _generate_output(route, brunnels, output_filename, args)
 
 
 if __name__ == "__main__":
