@@ -78,11 +78,7 @@ class Route:
         Returns:
             Tuple of (south, west, north, east) in decimal degrees
 
-        Raises:
-            ValueError: If route is empty
         """
-        if not self.coords:
-            raise ValueError("Cannot calculate bounding box for empty route")
 
         # Ensure the base bounding box (0 buffer) is calculated and memoized
         if self.bbox is None:
@@ -301,8 +297,7 @@ class Route:
         Returns:
             List of (start_idx, end_idx, bbox) tuples for each chunk
         """
-        if not self.coords or len(self.coords) < 2:
-            return []
+        # Route constructor guarantees coords exist and len >= 2
 
         # Maximum bounding box size in square degrees
         # Roughly equivalent to 50,000 km² at equator (50000 / 111² ≈ 4.06)
@@ -397,8 +392,6 @@ class Route:
             Dictionary of Brunnel objects found near the route, with containment
             status set
         """
-        if not self.coords:
-            raise ValueError("Cannot find brunnels for empty route")
 
         # Check if route is long enough to need chunking
         route_length_km = self.linestring.length / 1000.0
@@ -625,10 +618,6 @@ class Route:
         Returns:
             Shapely geometry object or None if it could not be created.
         """
-        if not self.coords:
-            raise ValueError(
-                "Cannot calculate buffered geometry for empty route, coords are empty"
-            )
 
         route_line = self.linestring
         if route_line is None:

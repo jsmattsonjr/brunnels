@@ -28,7 +28,7 @@ python3 -m brunnels.cli your_route.gpx
 
 ### Testing
 ```bash
-# Run all tests
+# Run all tests; may take up to 10 minutes
 pytest
 
 # Run single test
@@ -99,3 +99,6 @@ The codebase follows a modular architecture with clear separation of concerns:
 - Integration tests use real GPX files in `tests/fixtures/`
 - Test files include various route types (urban, rural, international)
 - Tests validate end-to-end functionality including API calls and map generation
+
+### Git Commits
+- Include Jim Mattson <jsmattsonjr@gmail.com> as co-author.
