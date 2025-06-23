@@ -185,12 +185,14 @@ def _parse_separated_results(
     for element in elements:
         if element["type"] == "count":
             # First count is bridges, second count is tunnels
-            current_type = "tunnel" if current_type == "bridge" else "bridge"
-            logger.debug(f"Found {element['tags']['total']} {current_type}")
+            current_type = "tunnels" if current_type == "bridges" else "bridges"
+            logger.debug(
+                f"Overpass query found {element['tags']['total']} {current_type}s"
+            )
         elif element["type"] == "way":
-            if current_type == "bridge":
+            if current_type == "bridges":
                 bridges.append(element)
-            elif current_type == "tunnel":
+            elif current_type == "tunnels":
                 tunnels.append(element)
             else:
                 # Fallback: shouldn't happen with our query structure
@@ -198,7 +200,4 @@ def _parse_separated_results(
                     f"Found way {element.get('id')} before any count element"
                 )
 
-    logger.debug(
-        f"Parsed {len(bridges)} bridges and {len(tunnels)} tunnels from Overpass response"
-    )
     return bridges, tunnels
