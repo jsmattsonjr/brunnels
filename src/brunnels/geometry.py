@@ -73,3 +73,44 @@ def coords_to_polyline(
 
     # If no projection, use coordinates as is (assumed to be in lat/lon)
     return LineString(coord_tuples)
+
+
+def calculate_3d_haversine_distance(coord1: Position, coord2: Position) -> float:
+    """
+    Calculate 3D Haversine distance between two coordinates.
+
+    Uses Haversine formula for great circle distance, then applies
+    Pythagorean theorem to account for elevation difference.
+
+    Args:
+        coord1: First coordinate position
+        coord2: Second coordinate position
+
+    Returns:
+        Distance in meters
+    """
+    import math
+
+    # Haversine formula for great circle distance
+    lat1, lon1 = math.radians(coord1.latitude), math.radians(coord1.longitude)
+    lat2, lon2 = math.radians(coord2.latitude), math.radians(coord2.longitude)
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+
+    # Earth radius in meters
+    earth_radius = 6371000.0
+    haversine_distance = 2 * earth_radius * math.asin(math.sqrt(a))
+
+    # Add elevation component if available
+    if coord1.elevation is not None and coord2.elevation is not None:
+        elevation_diff = coord2.elevation - coord1.elevation
+        # 3D distance using Pythagorean theorem
+        return math.sqrt(haversine_distance**2 + elevation_diff**2)
+
+    return haversine_distance

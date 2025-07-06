@@ -20,6 +20,7 @@ from .geometry import (
     Position,
     coords_to_polyline,
     create_transverse_mercator_projection,
+    calculate_3d_haversine_distance,
 )
 
 logger = logging.getLogger(__name__)
@@ -608,14 +609,14 @@ class Route:
 
         for i in range(1, len(self.coords)):
             # Calculate Euclidean distance in projected coordinates
-            p1 = projected_coords[i - 1]
-            p2 = projected_coords[i]
-            euclidean_segment = math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+            p1 = Point(projected_coords[i - 1])
+            p2 = Point(projected_coords[i])
+            euclidean_segment = p1.distance(p2)
 
             # Calculate 3D Haversine distance
             coord1 = self.coords[i - 1]
             coord2 = self.coords[i]
-            haversine_segment = self._calculate_3d_haversine_distance(coord1, coord2)
+            haversine_segment = calculate_3d_haversine_distance(coord1, coord2)
 
             cumulative_euclidean += euclidean_segment
             cumulative_haversine += haversine_segment
@@ -625,39 +626,6 @@ class Route:
 
         self._cumulative_euclidean_distances = euclidean_distances
         self._cumulative_3d_haversine_distances = haversine_distances
-
-    def _calculate_3d_haversine_distance(
-        self, coord1: Position, coord2: Position
-    ) -> float:
-        """
-        Calculate 3D Haversine distance between two coordinates.
-
-        Uses Haversine formula for great circle distance, then applies
-        Pythagorean theorem to account for elevation difference.
-        """
-        # Haversine formula for great circle distance
-        lat1, lon1 = math.radians(coord1.latitude), math.radians(coord1.longitude)
-        lat2, lon2 = math.radians(coord2.latitude), math.radians(coord2.longitude)
-
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-
-        a = (
-            math.sin(dlat / 2) ** 2
-            + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-        )
-
-        # Earth radius in meters
-        earth_radius = 6371000.0
-        haversine_distance = 2 * earth_radius * math.asin(math.sqrt(a))
-
-        # Add elevation component if available
-        if coord1.elevation is not None and coord2.elevation is not None:
-            elevation_diff = coord2.elevation - coord1.elevation
-            # 3D distance using Pythagorean theorem
-            return math.sqrt(haversine_distance**2 + elevation_diff**2)
-
-        return haversine_distance
 
     @classmethod
     def from_gpx(cls, file_input: TextIO) -> "Route":
