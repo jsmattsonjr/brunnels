@@ -198,7 +198,7 @@ def setup_logging(args: argparse.Namespace) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def log_nearby_brunnels(route: "Route", brunnels: Dict[str, Brunnel]) -> None:
+def log_nearby_brunnels(route: Route, brunnels: Dict[str, Brunnel]) -> None:
     """
     Print all nearby brunnels (included, misaligned, and alternatives from overlap groups).
     Shows detailed analysis of what was found and why some were excluded.

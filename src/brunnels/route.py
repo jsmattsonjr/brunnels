@@ -8,6 +8,7 @@ import logging
 import math
 from math import cos, radians
 import argparse
+import bisect
 import gpxpy
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
@@ -560,17 +561,13 @@ class Route:
         if euclidean_distance >= self._cumulative_euclidean_distances[-1]:
             return self._cumulative_3d_haversine_distances[-1]
 
-        # Binary search to find the largest cumulative distance less than the given distance
-        left, right = 0, len(self._cumulative_euclidean_distances) - 1
-        while left < right:
-            mid = (left + right + 1) // 2
-            if self._cumulative_euclidean_distances[mid] <= euclidean_distance:
-                left = mid
-            else:
-                right = mid - 1
-
-        # left is now the index of the largest cumulative distance <= euclidean_distance
-        segment_idx = left
+        # Binary search to find the largest cumulative distance less than or equal to the given distance
+        segment_idx = (
+            bisect.bisect_right(
+                self._cumulative_euclidean_distances, euclidean_distance
+            )
+            - 1
+        )
 
         # If we're exactly at a point, return the cumulative distance
         if euclidean_distance == self._cumulative_euclidean_distances[segment_idx]:
