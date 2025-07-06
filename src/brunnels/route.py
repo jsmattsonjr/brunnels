@@ -541,25 +541,25 @@ class Route:
     def euclidean_to_3d_haversine_distance(self, euclidean_distance: float) -> float:
         """
         Convert a Euclidean distance along the route to a 3D Haversine distance.
-        
+
         Uses precomputed cumulative distances with binary search for efficiency.
         Includes elevation changes using the Pythagorean theorem.
-        
+
         Args:
             euclidean_distance: Distance in meters along the route in projected coordinates
-            
+
         Returns:
             Corresponding 3D Haversine distance in meters
         """
-        if not hasattr(self, '_cumulative_euclidean_distances'):
+        if not hasattr(self, "_cumulative_euclidean_distances"):
             self._precompute_cumulative_distances()
-        
+
         # Handle edge cases
         if euclidean_distance <= 0:
             return 0.0
         if euclidean_distance >= self._cumulative_euclidean_distances[-1]:
             return self._cumulative_3d_haversine_distances[-1]
-        
+
         # Binary search to find the largest cumulative distance less than the given distance
         left, right = 0, len(self._cumulative_euclidean_distances) - 1
         while left < right:
@@ -568,92 +568,98 @@ class Route:
                 left = mid
             else:
                 right = mid - 1
-        
+
         # left is now the index of the largest cumulative distance <= euclidean_distance
         segment_idx = left
-        
+
         # If we're exactly at a point, return the cumulative distance
         if euclidean_distance == self._cumulative_euclidean_distances[segment_idx]:
             return self._cumulative_3d_haversine_distances[segment_idx]
-        
+
         # Interpolate within the segment
         if segment_idx == len(self._cumulative_euclidean_distances) - 1:
             # We're at the end, just return the last cumulative distance
             return self._cumulative_3d_haversine_distances[segment_idx]
-        
+
         # Calculate interpolation factors
         segment_start_euclidean = self._cumulative_euclidean_distances[segment_idx]
         segment_end_euclidean = self._cumulative_euclidean_distances[segment_idx + 1]
         segment_start_3d = self._cumulative_3d_haversine_distances[segment_idx]
         segment_end_3d = self._cumulative_3d_haversine_distances[segment_idx + 1]
-        
+
         # Linear interpolation
-        t = (euclidean_distance - segment_start_euclidean) / (segment_end_euclidean - segment_start_euclidean)
+        t = (euclidean_distance - segment_start_euclidean) / (
+            segment_end_euclidean - segment_start_euclidean
+        )
         return segment_start_3d + t * (segment_end_3d - segment_start_3d)
-    
+
     def _precompute_cumulative_distances(self) -> None:
         """Precompute cumulative Euclidean and 3D Haversine distances."""
         if len(self.coords) < 2:
             self._cumulative_euclidean_distances = [0.0]
             self._cumulative_3d_haversine_distances = [0.0]
             return
-        
+
         euclidean_distances = [0.0]
         haversine_distances = [0.0]
-        
+
         cumulative_euclidean = 0.0
         cumulative_haversine = 0.0
-        
+
         # Get projected coordinates for Euclidean distance calculation
         projected_coords = list(self.linestring.coords)
-        
+
         for i in range(1, len(self.coords)):
             # Calculate Euclidean distance in projected coordinates
             p1 = projected_coords[i - 1]
             p2 = projected_coords[i]
-            euclidean_segment = math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
-            
+            euclidean_segment = math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+
             # Calculate 3D Haversine distance
             coord1 = self.coords[i - 1]
             coord2 = self.coords[i]
             haversine_segment = self._calculate_3d_haversine_distance(coord1, coord2)
-            
+
             cumulative_euclidean += euclidean_segment
             cumulative_haversine += haversine_segment
-            
+
             euclidean_distances.append(cumulative_euclidean)
             haversine_distances.append(cumulative_haversine)
-        
+
         self._cumulative_euclidean_distances = euclidean_distances
         self._cumulative_3d_haversine_distances = haversine_distances
-    
-    def _calculate_3d_haversine_distance(self, coord1: Position, coord2: Position) -> float:
+
+    def _calculate_3d_haversine_distance(
+        self, coord1: Position, coord2: Position
+    ) -> float:
         """
         Calculate 3D Haversine distance between two coordinates.
-        
+
         Uses Haversine formula for great circle distance, then applies
         Pythagorean theorem to account for elevation difference.
         """
         # Haversine formula for great circle distance
         lat1, lon1 = math.radians(coord1.latitude), math.radians(coord1.longitude)
         lat2, lon2 = math.radians(coord2.latitude), math.radians(coord2.longitude)
-        
+
         dlat = lat2 - lat1
         dlon = lon2 - lon1
-        
-        a = (math.sin(dlat / 2)**2 + 
-             math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2)
-        
+
+        a = (
+            math.sin(dlat / 2) ** 2
+            + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        )
+
         # Earth radius in meters
         earth_radius = 6371000.0
         haversine_distance = 2 * earth_radius * math.asin(math.sqrt(a))
-        
+
         # Add elevation component if available
         if coord1.elevation is not None and coord2.elevation is not None:
             elevation_diff = coord2.elevation - coord1.elevation
             # 3D distance using Pythagorean theorem
             return math.sqrt(haversine_distance**2 + elevation_diff**2)
-        
+
         return haversine_distance
 
     @classmethod
