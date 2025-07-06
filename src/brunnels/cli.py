@@ -198,12 +198,14 @@ def setup_logging(args: argparse.Namespace) -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
+def log_nearby_brunnels(route: "Route", brunnels: Dict[str, Brunnel]) -> None:
     """
     Print all nearby brunnels (included, misaligned, and alternatives from overlap groups).
     Shows detailed analysis of what was found and why some were excluded.
+    Uses 3D Haversine distances for display to match Biketerra's route editor.
 
     Args:
+        route: Route object for distance conversion
         brunnels: Dictionary of all brunnels to analyze
     """
     # Find all nearby brunnels (those with route spans, regardless of other exclusion reasons)
@@ -247,13 +249,15 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     )
 
     # Calculate maximum digits needed for formatting alignment
+    # Use 3D Haversine distances for consistent display
     max_distance = max(
-        brunnel.route_span.end_distance / 1000
+        route.euclidean_to_3d_haversine_distance(brunnel.route_span.end_distance) / 1000
         for brunnel in nearby_brunnels
         if brunnel.route_span
     )
     max_length = max(
-        (brunnel.route_span.end_distance - brunnel.route_span.start_distance) / 1000
+        (route.euclidean_to_3d_haversine_distance(brunnel.route_span.end_distance) - 
+         route.euclidean_to_3d_haversine_distance(brunnel.route_span.start_distance)) / 1000
         for brunnel in nearby_brunnels
         if brunnel.route_span
     )
@@ -266,9 +270,14 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
 
     for brunnel in nearby_brunnels:
         route_span = brunnel.route_span or RouteSpan(0, 0)
-        start_km = route_span.start_distance / 1000
-        end_km = route_span.end_distance / 1000
-        length_km = (route_span.end_distance - route_span.start_distance) / 1000
+        
+        # Convert Euclidean distances to 3D Haversine distances for display
+        start_3d_distance = route.euclidean_to_3d_haversine_distance(route_span.start_distance)
+        end_3d_distance = route.euclidean_to_3d_haversine_distance(route_span.end_distance)
+        
+        start_km = start_3d_distance / 1000
+        end_km = end_3d_distance / 1000
+        length_km = (end_3d_distance - start_3d_distance) / 1000
 
         # Format with aligned padding
         span_info = f"{start_km:{distance_width}.2f}-{end_km:{distance_width}.2f} km ({length_km:{length_width}.2f} km)"
@@ -434,7 +443,7 @@ def _generate_output(
         On map creation failure
     """
     # Log all nearby brunnels (included and excluded with reasons)
-    log_nearby_brunnels(brunnels)
+    log_nearby_brunnels(route, brunnels)
 
     # Collect metrics before creating map
     metrics = collect_metrics(brunnels)
