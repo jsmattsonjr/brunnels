@@ -202,7 +202,7 @@ def log_nearby_brunnels(route: Route, brunnels: Dict[str, Brunnel]) -> None:
     """
     Print all nearby brunnels (included, misaligned, and alternatives from overlap groups).
     Shows detailed analysis of what was found and why some were excluded.
-    Uses 3D Haversine distances for display to match Biketerra's route editor.
+    Uses Haversine distances for display to match Biketerra's route editor.
 
     Args:
         route: Route object for distance conversion
