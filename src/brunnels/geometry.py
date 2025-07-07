@@ -12,11 +12,10 @@ import pyproj
 
 
 class Position(NamedTuple):
-    """Represents a geographic position with latitude, longitude, and optional elevation."""
+    """Represents a geographic position with latitude and longitude."""
 
     latitude: float
     longitude: float
-    elevation: Optional[float] = None
 
 
 def create_transverse_mercator_projection(

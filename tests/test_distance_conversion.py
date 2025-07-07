@@ -14,9 +14,9 @@ class TestDistanceConversion:
     def test_simple_route_distance_conversion(self):
         """Test distance conversion with a simple 3-point route."""
         coords = [
-            Position(latitude=47.12322, longitude=-122.85051, elevation=30.84),
-            Position(latitude=47.12308, longitude=-122.85048, elevation=30.96),
-            Position(latitude=47.12299, longitude=-122.85039, elevation=31.15),
+            Position(latitude=47.12322, longitude=-122.85051),
+            Position(latitude=47.12308, longitude=-122.85048),
+            Position(latitude=47.12299, longitude=-122.85039),
         ]
 
         route = Route(coords)
@@ -26,9 +26,7 @@ class TestDistanceConversion:
 
         # Test full route distance
         euclidean_distance = route.linestring.length
-        haversine_distance = route.euclidean_to_haversine_distance(
-            euclidean_distance
-        )
+        haversine_distance = route.euclidean_to_haversine_distance(euclidean_distance)
 
         # The distances should be similar but not identical
         assert abs(haversine_distance - euclidean_distance) < 1.0  # Within 1 meter
@@ -43,18 +41,16 @@ class TestDistanceConversion:
     def test_route_without_elevation(self):
         """Test distance conversion with a route that has no elevation data."""
         coords = [
-            Position(latitude=47.12322, longitude=-122.85051, elevation=None),
-            Position(latitude=47.12308, longitude=-122.85048, elevation=None),
-            Position(latitude=47.12299, longitude=-122.85039, elevation=None),
+            Position(latitude=47.12322, longitude=-122.85051),
+            Position(latitude=47.12308, longitude=-122.85048),
+            Position(latitude=47.12299, longitude=-122.85039),
         ]
 
         route = Route(coords)
 
         # Test conversion still works
         euclidean_distance = route.linestring.length
-        haversine_distance = route.euclidean_to_haversine_distance(
-            euclidean_distance
-        )
+        haversine_distance = route.euclidean_to_haversine_distance(euclidean_distance)
 
         # Should still provide meaningful results
         assert haversine_distance > 0
@@ -63,16 +59,14 @@ class TestDistanceConversion:
     def test_distance_beyond_route_length(self):
         """Test distance conversion beyond the route length."""
         coords = [
-            Position(latitude=47.12322, longitude=-122.85051, elevation=30.84),
-            Position(latitude=47.12308, longitude=-122.85048, elevation=30.96),
+            Position(latitude=47.12322, longitude=-122.85051),
+            Position(latitude=47.12308, longitude=-122.85048),
         ]
 
         route = Route(coords)
 
         euclidean_distance = route.linestring.length
-        haversine_distance = route.euclidean_to_haversine_distance(
-            euclidean_distance
-        )
+        haversine_distance = route.euclidean_to_haversine_distance(euclidean_distance)
 
         # Test distance beyond route length
         beyond_distance = euclidean_distance * 2

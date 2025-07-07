@@ -656,7 +656,6 @@ class Route:
                         Position(
                             latitude=point.latitude,
                             longitude=point.longitude,
-                            elevation=point.elevation,
                         )
                     )
 
