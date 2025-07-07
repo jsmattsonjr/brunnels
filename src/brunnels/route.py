@@ -20,7 +20,7 @@ from .geometry import (
     Position,
     coords_to_polyline,
     create_transverse_mercator_projection,
-    calculate_3d_haversine_distance,
+    calculate_haversine_distance,
 )
 
 logger = logging.getLogger(__name__)
@@ -540,18 +540,18 @@ class Route:
 
         return total_distance / len(points) / 1000.0  # Convert to kilometers
 
-    def euclidean_to_3d_haversine_distance(self, euclidean_distance: float) -> float:
+    def euclidean_to_haversine_distance(self, euclidean_distance: float) -> float:
         """
-        Convert a Euclidean distance along the route to a 3D Haversine distance.
+        Convert a Euclidean distance along the route to a Haversine distance.
 
         Uses precomputed cumulative distances with binary search for efficiency.
-        Includes elevation changes using the Pythagorean theorem.
+        Uses standard Haversine formula for great circle distance.
 
         Args:
             euclidean_distance: Distance in meters along the route in projected coordinates
 
         Returns:
-            Corresponding 3D Haversine distance in meters
+            Corresponding Haversine distance in meters
         """
         if not hasattr(self, "_cumulative_euclidean_distances"):
             self._precompute_cumulative_distances()
@@ -560,7 +560,7 @@ class Route:
         if euclidean_distance <= 0:
             return 0.0
         if euclidean_distance >= self._cumulative_euclidean_distances[-1]:
-            return self._cumulative_3d_haversine_distances[-1]
+            return self._cumulative_haversine_distances[-1]
 
         # Binary search to find the largest cumulative distance less than or equal to the given distance
         segment_idx = (
@@ -572,30 +572,32 @@ class Route:
 
         # If we're exactly at a point, return the cumulative distance
         if euclidean_distance == self._cumulative_euclidean_distances[segment_idx]:
-            return self._cumulative_3d_haversine_distances[segment_idx]
+            return self._cumulative_haversine_distances[segment_idx]
 
         # Interpolate within the segment
         if segment_idx == len(self._cumulative_euclidean_distances) - 1:
             # We're at the end, just return the last cumulative distance
-            return self._cumulative_3d_haversine_distances[segment_idx]
+            return self._cumulative_haversine_distances[segment_idx]
 
         # Calculate interpolation factors
         segment_start_euclidean = self._cumulative_euclidean_distances[segment_idx]
         segment_end_euclidean = self._cumulative_euclidean_distances[segment_idx + 1]
-        segment_start_3d = self._cumulative_3d_haversine_distances[segment_idx]
-        segment_end_3d = self._cumulative_3d_haversine_distances[segment_idx + 1]
+        segment_start_haversine = self._cumulative_haversine_distances[segment_idx]
+        segment_end_haversine = self._cumulative_haversine_distances[segment_idx + 1]
 
         # Linear interpolation
         t = (euclidean_distance - segment_start_euclidean) / (
             segment_end_euclidean - segment_start_euclidean
         )
-        return segment_start_3d + t * (segment_end_3d - segment_start_3d)
+        return segment_start_haversine + t * (
+            segment_end_haversine - segment_start_haversine
+        )
 
     def _precompute_cumulative_distances(self) -> None:
-        """Precompute cumulative Euclidean and 3D Haversine distances."""
+        """Precompute cumulative Euclidean and Haversine distances."""
         if len(self.coords) < 2:
             self._cumulative_euclidean_distances = [0.0]
-            self._cumulative_3d_haversine_distances = [0.0]
+            self._cumulative_haversine_distances = [0.0]
             return
 
         euclidean_distances = [0.0]
@@ -613,10 +615,10 @@ class Route:
             p2 = Point(projected_coords[i])
             euclidean_segment = p1.distance(p2)
 
-            # Calculate 3D Haversine distance
+            # Calculate Haversine distance
             coord1 = self.coords[i - 1]
             coord2 = self.coords[i]
-            haversine_segment = calculate_3d_haversine_distance(coord1, coord2)
+            haversine_segment = calculate_haversine_distance(coord1, coord2)
 
             cumulative_euclidean += euclidean_segment
             cumulative_haversine += haversine_segment
@@ -625,7 +627,7 @@ class Route:
             haversine_distances.append(cumulative_haversine)
 
         self._cumulative_euclidean_distances = euclidean_distances
-        self._cumulative_3d_haversine_distances = haversine_distances
+        self._cumulative_haversine_distances = haversine_distances
 
     @classmethod
     def from_gpx(cls, file_input: TextIO) -> "Route":

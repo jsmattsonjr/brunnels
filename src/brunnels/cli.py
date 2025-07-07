@@ -249,18 +249,16 @@ def log_nearby_brunnels(route: Route, brunnels: Dict[str, Brunnel]) -> None:
     )
 
     # Calculate maximum digits needed for formatting alignment
-    # Use 3D Haversine distances for consistent display
+    # Use Haversine distances for consistent display
     max_distance = max(
-        route.euclidean_to_3d_haversine_distance(brunnel.route_span.end_distance) / 1000
+        route.euclidean_to_haversine_distance(brunnel.route_span.end_distance) / 1000
         for brunnel in nearby_brunnels
         if brunnel.route_span
     )
     max_length = max(
         (
-            route.euclidean_to_3d_haversine_distance(brunnel.route_span.end_distance)
-            - route.euclidean_to_3d_haversine_distance(
-                brunnel.route_span.start_distance
-            )
+            route.euclidean_to_haversine_distance(brunnel.route_span.end_distance)
+            - route.euclidean_to_haversine_distance(brunnel.route_span.start_distance)
         )
         / 1000
         for brunnel in nearby_brunnels
@@ -276,17 +274,17 @@ def log_nearby_brunnels(route: Route, brunnels: Dict[str, Brunnel]) -> None:
     for brunnel in nearby_brunnels:
         route_span = brunnel.route_span or RouteSpan(0, 0)
 
-        # Convert Euclidean distances to 3D Haversine distances for display
-        start_3d_distance = route.euclidean_to_3d_haversine_distance(
+        # Convert Euclidean distances to Haversine distances for display
+        start_haversine_distance = route.euclidean_to_haversine_distance(
             route_span.start_distance
         )
-        end_3d_distance = route.euclidean_to_3d_haversine_distance(
+        end_haversine_distance = route.euclidean_to_haversine_distance(
             route_span.end_distance
         )
 
-        start_km = start_3d_distance / 1000
-        end_km = end_3d_distance / 1000
-        length_km = (end_3d_distance - start_3d_distance) / 1000
+        start_km = start_haversine_distance / 1000
+        end_km = end_haversine_distance / 1000
+        length_km = (end_haversine_distance - start_haversine_distance) / 1000
 
         # Format with aligned padding
         span_info = f"{start_km:{distance_width}.2f}-{end_km:{distance_width}.2f} km ({length_km:{length_width}.2f} km)"

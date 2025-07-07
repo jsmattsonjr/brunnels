@@ -9,7 +9,7 @@ from brunnels.route import Route
 
 
 class TestDistanceConversion:
-    """Test distance conversion from Euclidean to 3D Haversine."""
+    """Test distance conversion from Euclidean to Haversine."""
 
     def test_simple_route_distance_conversion(self):
         """Test distance conversion with a simple 3-point route."""
@@ -22,11 +22,11 @@ class TestDistanceConversion:
         route = Route(coords)
 
         # Test edge cases
-        assert route.euclidean_to_3d_haversine_distance(0.0) == 0.0
+        assert route.euclidean_to_haversine_distance(0.0) == 0.0
 
         # Test full route distance
         euclidean_distance = route.linestring.length
-        haversine_distance = route.euclidean_to_3d_haversine_distance(
+        haversine_distance = route.euclidean_to_haversine_distance(
             euclidean_distance
         )
 
@@ -35,7 +35,7 @@ class TestDistanceConversion:
 
         # Test intermediate distance
         mid_distance = euclidean_distance / 2
-        mid_haversine = route.euclidean_to_3d_haversine_distance(mid_distance)
+        mid_haversine = route.euclidean_to_haversine_distance(mid_distance)
 
         # Should be approximately half the total distance
         assert abs(mid_haversine - haversine_distance / 2) < 1.0
@@ -52,7 +52,7 @@ class TestDistanceConversion:
 
         # Test conversion still works
         euclidean_distance = route.linestring.length
-        haversine_distance = route.euclidean_to_3d_haversine_distance(
+        haversine_distance = route.euclidean_to_haversine_distance(
             euclidean_distance
         )
 
@@ -70,13 +70,13 @@ class TestDistanceConversion:
         route = Route(coords)
 
         euclidean_distance = route.linestring.length
-        haversine_distance = route.euclidean_to_3d_haversine_distance(
+        haversine_distance = route.euclidean_to_haversine_distance(
             euclidean_distance
         )
 
         # Test distance beyond route length
         beyond_distance = euclidean_distance * 2
-        beyond_haversine = route.euclidean_to_3d_haversine_distance(beyond_distance)
+        beyond_haversine = route.euclidean_to_haversine_distance(beyond_distance)
 
         # Should return the maximum distance
         assert beyond_haversine == haversine_distance
@@ -87,7 +87,7 @@ class TestDistanceConversion:
             route = Route.from_file("tests/fixtures/Chehalis.gpx")
 
             euclidean_distance = route.linestring.length
-            haversine_distance = route.euclidean_to_3d_haversine_distance(
+            haversine_distance = route.euclidean_to_haversine_distance(
                 euclidean_distance
             )
 
