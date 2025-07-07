@@ -332,7 +332,9 @@ class Route:
                 math.sin(dlat / 2) ** 2
                 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
             )
-            distance = 2 * 6371000 * math.asin(math.sqrt(a))  # Earth radius in meters
+            distance = (
+                2 * 6378137.0 * math.asin(math.sqrt(a))
+            )  # WGS84 equatorial radius in meters
             cumulative_distance += distance
 
             # Update bounding box incrementally (much faster than recalculating)

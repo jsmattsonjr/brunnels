@@ -101,8 +101,8 @@ def calculate_haversine_distance(coord1: Position, coord2: Position) -> float:
         + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     )
 
-    # Earth radius in meters
-    earth_radius = 6371000.0
+    # WGS84 equatorial radius in meters (appropriate for non-polar regions)
+    earth_radius = 6378137.0
     haversine_distance = 2 * earth_radius * math.asin(math.sqrt(a))
 
     return haversine_distance
