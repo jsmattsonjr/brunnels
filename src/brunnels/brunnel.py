@@ -207,10 +207,14 @@ class Brunnel:
             other: Another Brunnel object
 
         Returns:
-            True if their route spans overlap, False otherwise.
+            True if their route spans overlap and they have the same brunnel type, False otherwise.
             Returns False if either brunnel does not have a route_span.
         """
-        if self.route_span is None or other.route_span is None:
+        if (
+            self.route_span is None
+            or other.route_span is None
+            or self.brunnel_type != other.brunnel_type
+        ):
             return False
         return (
             self.route_span.start_distance <= other.route_span.end_distance
