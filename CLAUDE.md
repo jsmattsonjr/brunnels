@@ -100,5 +100,5 @@ The codebase follows a modular architecture with clear separation of concerns:
 - Test files include various route types (urban, rural, international)
 - Tests validate end-to-end functionality including API calls and map generation
 
-### Git Commits
+### Git Commit Messages
 - Include Jim Mattson <jsmattsonjr@gmail.com> as co-author.
