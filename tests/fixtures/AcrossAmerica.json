@@ -5,7 +5,7 @@
   "route_type": "transcontinental",
   "description": "Transcontinental route from San Diego, CA to Washington, DC with 167 bridges",
   "expected_results": {
-    "total_brunnels_found": "33637-33840",
+    "total_brunnels_found": "33637-33850",
     "nearby_bridges": "167",
     "nearby_tunnels": "0",
     "final_included_total": "167",
