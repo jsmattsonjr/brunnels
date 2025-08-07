@@ -312,6 +312,27 @@ def exclude_uncontained_brunnels(
             brunnel.exclusion_reason = ExclusionReason.OUTLIER
 
 
+def _log_filtering_results(brunnels: Dict[str, Brunnel]) -> None:
+    """
+    Log the results of brunnel filtering by type.
+
+    Args:
+        brunnels: Dictionary of all brunnels to analyze
+    """
+    bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
+    tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
+    contained_bridges = [
+        b for b in bridges if b.exclusion_reason == ExclusionReason.NONE
+    ]
+    contained_tunnels = [
+        b for b in tunnels if b.exclusion_reason == ExclusionReason.NONE
+    ]
+    logger.debug(
+        f"Found {len(contained_bridges)}/{len(bridges)} nearby bridges and "
+        f"{len(contained_tunnels)}/{len(tunnels)} nearby tunnels"
+    )
+
+
 def _parse_and_validate_args() -> argparse.Namespace:
     """
     Parse and validate command-line arguments.
@@ -396,20 +417,21 @@ def _discover_and_filter_brunnels(
         route.exclude_misaligned_brunnels(brunnels, args.bearing_tolerance)
 
     # Log filtering results
-    bridges = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.BRIDGE]
-    tunnels = [b for b in brunnels.values() if b.brunnel_type == BrunnelType.TUNNEL]
-    contained_bridges = [
-        b for b in bridges if b.exclusion_reason == ExclusionReason.NONE
-    ]
-    contained_tunnels = [
-        b for b in tunnels if b.exclusion_reason == ExclusionReason.NONE
-    ]
-    logger.debug(
-        f"Found {len(contained_bridges)}/{len(bridges)} nearby bridges and {len(contained_tunnels)}/{len(tunnels)} nearby tunnels"
-    )
+    _log_filtering_results(brunnels)
 
     # Apply compound brunnel detection and overlap exclusion
-    find_compound_brunnels(brunnels)
+    # Separate brunnels by type for compound detection
+    bridges = {
+        k: v for k, v in brunnels.items() if v.brunnel_type == BrunnelType.BRIDGE
+    }
+    tunnels = {
+        k: v for k, v in brunnels.items() if v.brunnel_type == BrunnelType.TUNNEL
+    }
+
+    # Find compound brunnels separately for each type
+    find_compound_brunnels(bridges)
+    find_compound_brunnels(tunnels)
+
     route.exclude_overlapping_brunnels(brunnels)
 
     return brunnels
