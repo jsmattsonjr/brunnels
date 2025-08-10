@@ -1407,9 +1407,11 @@ class TestVVValDeZafanRoute(BaseRouteTest):
         """Path to VV Val de Zafán GPX file"""
         return Path(__file__).parent / "fixtures" / "VV_Val_de_Zafan.gpx"
 
-    def test_default_settings(self, gpx_file: Path, metadata: Dict[str, Any]):
+    def test_default_settings(
+        self, default_result: BrunnelsTestResult, metadata: Dict[str, Any]
+    ):
         """Test VV Val de Zafán route with default settings"""
-        result = run_brunnels_cli(gpx_file)
+        result = default_result
         assert result.exit_code == 0
 
         # Verify basic metrics match expectations
@@ -1419,14 +1421,14 @@ class TestVVValDeZafanRoute(BaseRouteTest):
             "total_brunnels_found",
         )
         assert_in_range(
-            result.metrics["final_included_total"], 
+            result.metrics["final_included_total"],
             metadata["expected_results"]["final_included_total"],
             "final_included_total",
         )
 
-    def test_html_output_validity(self, gpx_file: Path):
+    def test_html_output_validity(self, default_result: BrunnelsTestResult):
         """Test that HTML output is generated and valid"""
-        result = run_brunnels_cli(gpx_file)
+        result = default_result
         assert result.exit_code == 0
         assert result.html_content is not None, "No HTML content generated"
 
@@ -1440,7 +1442,9 @@ class TestVVValDeZafanRoute(BaseRouteTest):
         # Map elements
         assert "leaflet" in html_content.lower()
 
-    def test_mixed_bridge_tunnel_infrastructure(self, gpx_file: Path, metadata: Dict[str, Any]):
+    def test_mixed_bridge_tunnel_infrastructure(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
         """Test that both bridges and tunnels are detected on railway conversion"""
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
@@ -1448,20 +1452,22 @@ class TestVVValDeZafanRoute(BaseRouteTest):
         # Should find both bridges and tunnels
         assert result.metrics["nearby_bridges"] > 15
         assert result.metrics["nearby_tunnels"] > 10
-        
+
         # Verify against expected ranges
         assert_in_range(
             result.metrics["nearby_bridges"],
-            metadata["expected_results"]["nearby_bridges"], 
+            metadata["expected_results"]["nearby_bridges"],
             "nearby_bridges",
         )
         assert_in_range(
             result.metrics["nearby_tunnels"],
             metadata["expected_results"]["nearby_tunnels"],
-            "nearby_tunnels", 
+            "nearby_tunnels",
         )
 
-    def test_known_bridges_and_tunnels_present(self, gpx_file: Path, metadata: Dict[str, Any]):
+    def test_known_bridges_and_tunnels_present(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
         """Test that known bridges and tunnels are detected"""
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
@@ -1469,14 +1475,16 @@ class TestVVValDeZafanRoute(BaseRouteTest):
         # Check for known bridges
         if "known_bridges" in metadata:
             self.assert_known_bridges_present(result, metadata)
-        
+
         # Check for known tunnels
         included_names = [b["name"] for b in result.included_brunnels]
         for tunnel in metadata.get("known_tunnels", []):
             tunnel_found = tunnel["name"] in included_names
             assert tunnel_found, f"Known tunnel {tunnel['name']} not found"
 
-    def test_overlap_exclusion_functionality(self, gpx_file: Path, metadata: Dict[str, Any]):
+    def test_overlap_exclusion_functionality(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
         """Test that overlapping brunnels are handled correctly"""
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
@@ -1485,18 +1493,26 @@ class TestVVValDeZafanRoute(BaseRouteTest):
         # because they have different brunnel types
         total_excluded_alternative = result.exclusion_details.get("alternative", 0)
         # This route should have no overlap exclusions due to type separation
-        assert total_excluded_alternative == 0, "No alternative exclusions expected with type separation"
+        assert (
+            total_excluded_alternative == 0
+        ), "No alternative exclusions expected with type separation"
 
-    def test_bearing_alignment_filtering(self, gpx_file: Path, metadata: Dict[str, Any]):
+    def test_bearing_alignment_filtering(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
         """Test bearing alignment filtering on railway infrastructure"""
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
 
         # Should have at least one misaligned exclusion
         total_excluded_misaligned = result.exclusion_details.get("misaligned", 0)
-        assert total_excluded_misaligned >= 1, "Expected at least one misaligned exclusion"
+        assert (
+            total_excluded_misaligned >= 1
+        ), "Expected at least one misaligned exclusion"
 
-    def test_railway_conversion_characteristics(self, gpx_file: Path, metadata: Dict[str, Any]):
+    def test_railway_conversion_characteristics(
+        self, gpx_file: Path, metadata: Dict[str, Any]
+    ):
         """Test characteristics typical of converted railway infrastructure"""
         result = run_brunnels_cli(gpx_file)
         assert result.exit_code == 0
@@ -1504,7 +1520,7 @@ class TestVVValDeZafanRoute(BaseRouteTest):
         # Railway conversions typically have good brunnel density
         route_distance_km = metadata["distance_km"]
         brunnels_per_km = result.metrics["final_included_total"] / route_distance_km
-        
+
         # Via verdes should have reasonable brunnel density (tunnels + bridges)
         assert brunnels_per_km > 0.3, f"Low brunnel density: {brunnels_per_km:.2f}/km"
 
@@ -1521,7 +1537,7 @@ class TestVVValDeZafanRoute(BaseRouteTest):
             max_time = float(time_range.split("-")[1])
         else:
             max_time = float(time_range)
-            
+
         assert (
             result.processing_time <= max_time
         ), f"Processing took {result.processing_time:.2f}s, expected <={max_time}s"
