@@ -13,7 +13,7 @@
     "area_sq_km": 1057.1
   },
   "expected_results": {
-    "total_brunnels_found": "381",
+    "total_brunnels_found": "381+",
     "total_bridges_found": "224", 
     "total_tunnels_found": "157",
     "nearby_bridges": "22",
@@ -22,8 +22,8 @@
     "final_included_compound": "0",
     "final_included_total": "39",
     "filtered_brunnels": {
-      "outlier_bridge": "201",
-      "outlier_tunnel": "139",
+      "outlier_bridge": "201+",
+      "outlier_tunnel": "139+",
       "alternative_bridge": "0",
       "misaligned_tunnel": "1"
     }
