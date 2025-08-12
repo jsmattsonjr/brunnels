@@ -497,7 +497,8 @@ class Route:
                 brunnel = Brunnel.from_overpass_data(
                     way_data, BrunnelType.BRIDGE, self.projection
                 )
-                brunnels[brunnel.get_id()] = brunnel
+                brunnel_id = brunnel.get_id()
+                brunnels[brunnel_id] = brunnel
             except (KeyError, ValueError) as e:
                 logger.warning(f"Failed to parse bridge way: {e}")
                 continue
@@ -508,7 +509,13 @@ class Route:
                 brunnel = Brunnel.from_overpass_data(
                     way_data, BrunnelType.TUNNEL, self.projection
                 )
-                brunnels[brunnel.get_id()] = brunnel
+                brunnel_id = brunnel.get_id()
+                if brunnel_id in brunnels:
+                    logger.error(
+                        f"OSM database error: way {brunnel_id} tagged as both bridge and tunnel; ignoring tunnel tag"
+                    )
+                    continue
+                brunnels[brunnel_id] = brunnel
             except (KeyError, ValueError) as e:
                 logger.warning(f"Failed to parse tunnel way: {e}")
                 continue
