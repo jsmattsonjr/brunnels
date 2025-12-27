@@ -72,8 +72,8 @@
 	"known_tunnels": [],
 	"known_bridges_bicycle_infrastructure": [
 		{
-			"name": "San Diego-Coronado Bridge",
-			"osm_way_ids": [25500844, 153343716],
+			"name": "San Diego–Coronado Bridge",
+			"osm_way_ids": [25500844],
 			"approximate_km": 31.4,
 			"length_km": 2.7,
 			"type": "compound_bridge",
@@ -82,7 +82,7 @@
 	],
 	"known_tunnels_bicycle_infrastructure": [
 		{
-			"name": "unnamed",
+			"name": "4th Street",
 			"osm_way_id": 680052718,
 			"approximate_km": 34.4,
 			"length_km": 0.02

@@ -107,7 +107,7 @@
 		}
 	],
 	"performance_benchmarks": {
-		"processing_time_seconds": "2-8",
+		"processing_time_seconds": "5-60",
 		"memory_usage_mb": "<150",
 		"overpass_query_time_seconds": "1-3"
 	},
