@@ -1,163 +1,160 @@
 {
-  "route_name": "Coronado Bay Trail",
-  "location": "Coronado, California, USA",
-  "distance_km": 35.14,
-  "track_points": 686,
-  "description": "Bayshore bikeway route through Coronado with multiple bridge crossings",
-  "test_purpose": "moderate_coastal_route",
-  "bounding_box": {
-    "south": 32.5878,
-    "west": -117.1759,
-    "north": 32.7012,
-    "east": -117.0897,
-    "area_sq_km": 101.8
-  },
-  "expected_results": {
-    "total_brunnels_found": "101+",
-    "total_bridges_found": "92+",
-    "total_tunnels_found": "10+",
-    "nearby_bridges": "7",
-    "nearby_tunnels": "0",
-    "final_included_individual": "7",
-    "final_included_compound": "0",
-    "final_included_total": "7",
-    "filtered_brunnels": {
-      "outlier": "94+"
-    }
-  },
-  "known_bridges": [
-    {
-      "name": "Bayshore Bikeway",
-      "osm_way_id": 549619423,
-      "approximate_km": 14.6,
-      "length_km": 0.04
-    },
-    {
-      "name": "Bayshore Bikeway",
-      "osm_way_id": 549619421,
-      "approximate_km": 15.1,
-      "length_km": 0.06
-    },
-    {
-      "name": "Bayshore Bikeway",
-      "osm_way_id": 841519152,
-      "approximate_km": 19.4,
-      "length_km": 0.01
-    },
-    {
-      "name": "Bayshore Bikeway",
-      "osm_way_id": 232486558,
-      "approximate_km": 23.2,
-      "length_km": 0.03
-    },
-    {
-      "name": "Bayshore Bikeway",
-      "osm_way_id": 699795181,
-      "approximate_km": 26.7,
-      "length_km": 0.04
-    },
-    {
-      "name": "East Harbor Drive",
-      "osm_way_id": 319527833,
-      "approximate_km": 28.7,
-      "length_km": 0.07
-    },
-    {
-      "name": "Bayshore Bikeway",
-      "osm_way_id": 554351624,
-      "approximate_km": 23.0,
-      "length_km": 0.13
-    }
-  ],
-  "known_tunnels": [],
-  "known_bridges_bicycle_infrastructure": [
-    {
-      "name": "San Diego-Coronado Bridge",
-      "osm_way_ids": [
-        25500844,
-        153343716
-      ],
-      "approximate_km": 31.4,
-      "length_km": 2.70,
-      "type": "compound_bridge",
-      "segments": 2
-    }
-  ],
-  "known_tunnels_bicycle_infrastructure": [
-    {
-      "name": "unnamed",
-      "osm_way_id": 680052718,
-      "approximate_km": 34.4,
-      "length_km": 0.02
-    }
-  ],
-  "test_scenarios": [
-    {
-      "name": "default_settings",
-      "args": {},
-      "expected_included": 6,
-      "expected_compounds": 0
-    },
-    {
-      "name": "strict_bearing_tolerance",
-      "args": {
-        "bearing_tolerance": 10.0
-      },
-      "expected_final_included_total": "7",
-      "notes": "Some bridges may be filtered due to tighter alignment"
-    },
-    {
-      "name": "loose_route_buffer",
-      "args": {
-        "route_buffer": 15.0
-      },
-      "expected_included": "9",
-      "notes": "Larger buffer may include additional borderline bridges"
-    },
-    {
-      "name": "include_bicycle_infrastructure",
-      "args": {
-        "route_buffer": 5.0,
-        "include_bicycle_no": true
-      },
-      "expected_final_included_total": "9",
-      "expected_final_included_individual": "8",
-      "expected_final_included_compound": "1",
-      "expected_nearby_bridges": "8",
-      "expected_nearby_tunnels": "1",
-      "expected_total_brunnels_found": "186+",
-      "notes": "Including bicycle infrastructure reveals compound bridge and tunnel"
-    }
-  ],
-  "performance_benchmarks": {
-    "processing_time_seconds": "3-15",
-    "memory_usage_mb": "<150",
-    "overpass_query_time_seconds": "1-3"
-  },
-  "test_categories": [
-    "coastal_route",
-    "recreational_bikeway",
-    "moderate_distance",
-    "bearing_alignment_testing",
-    "bicycle_infrastructure_testing",
-    "compound_bridge_testing"
-  ],
-  "notes": [
-    "Good test for bearing alignment validation",
-    "Bayshore bikeway with consistent bridge naming",
-    "Moderate route length (35.14 km) tests typical cycling distance",
-    "Coastal San Diego area with recreational infrastructure",
-    "Excellent test for --include-bicycle-no flag effects",
-    "Contains major compound bridge (San Diego-Coronado Bridge)",
-    "Tests bicycle infrastructure filtering and inclusion"
-  ],
-  "osm_data_characteristics": {
-    "brunnel_density": "medium",
-    "mapping_quality": "good",
-    "railway_infrastructure": "minimal",
-    "stability": "high"
-  },
-  "osm_data_date": "2024-12-17",
-  "baseline_established": "2024-12-17",
-  "stability": "high"
+	"route_name": "Coronado Bay Trail",
+	"location": "Coronado, California, USA",
+	"distance_km": 35.14,
+	"track_points": 686,
+	"description": "Bayshore bikeway route through Coronado with multiple bridge crossings",
+	"test_purpose": "moderate_coastal_route",
+	"bounding_box": {
+		"south": 32.5878,
+		"west": -117.1759,
+		"north": 32.7012,
+		"east": -117.0897,
+		"area_sq_km": 101.8
+	},
+	"expected_results": {
+		"total_brunnels_found": "101+",
+		"total_bridges_found": "92+",
+		"total_tunnels_found": "10+",
+		"nearby_bridges": "7",
+		"nearby_tunnels": "0",
+		"final_included_individual": "7",
+		"final_included_compound": "0",
+		"final_included_total": "7",
+		"filtered_brunnels": {
+			"outlier": "94+"
+		}
+	},
+	"known_bridges": [
+		{
+			"name": "Bayshore Bikeway",
+			"osm_way_id": 549619423,
+			"approximate_km": 14.6,
+			"length_km": 0.04
+		},
+		{
+			"name": "Bayshore Bikeway",
+			"osm_way_id": 549619421,
+			"approximate_km": 15.1,
+			"length_km": 0.06
+		},
+		{
+			"name": "Bayshore Bikeway",
+			"osm_way_id": 841519152,
+			"approximate_km": 19.4,
+			"length_km": 0.01
+		},
+		{
+			"name": "Bayshore Bikeway",
+			"osm_way_id": 232486558,
+			"approximate_km": 23.2,
+			"length_km": 0.03
+		},
+		{
+			"name": "Bayshore Bikeway",
+			"osm_way_id": 699795181,
+			"approximate_km": 26.7,
+			"length_km": 0.04
+		},
+		{
+			"name": "East Harbor Drive",
+			"osm_way_id": 319527833,
+			"approximate_km": 28.7,
+			"length_km": 0.07
+		},
+		{
+			"name": "Bayshore Bikeway",
+			"osm_way_id": 554351624,
+			"approximate_km": 23.0,
+			"length_km": 0.13
+		}
+	],
+	"known_tunnels": [],
+	"known_bridges_bicycle_infrastructure": [
+		{
+			"name": "San Diego-Coronado Bridge",
+			"osm_way_ids": [25500844, 153343716],
+			"approximate_km": 31.4,
+			"length_km": 2.7,
+			"type": "compound_bridge",
+			"segments": 2
+		}
+	],
+	"known_tunnels_bicycle_infrastructure": [
+		{
+			"name": "unnamed",
+			"osm_way_id": 680052718,
+			"approximate_km": 34.4,
+			"length_km": 0.02
+		}
+	],
+	"test_scenarios": [
+		{
+			"name": "default_settings",
+			"args": {},
+			"expected_included": 6,
+			"expected_compounds": 0
+		},
+		{
+			"name": "strict_bearing_tolerance",
+			"args": {
+				"bearing_tolerance": 10.0
+			},
+			"expected_final_included_total": "7",
+			"notes": "Some bridges may be filtered due to tighter alignment"
+		},
+		{
+			"name": "loose_route_buffer",
+			"args": {
+				"route_buffer": 15.0
+			},
+			"expected_included": "9",
+			"notes": "Larger buffer may include additional borderline bridges"
+		},
+		{
+			"name": "include_bicycle_infrastructure",
+			"args": {
+				"route_buffer": 5.0,
+				"include_bicycle_no": true
+			},
+			"expected_final_included_total": "9",
+			"expected_final_included_individual": "8",
+			"expected_final_included_compound": "1",
+			"expected_nearby_bridges": "8",
+			"expected_nearby_tunnels": "1",
+			"expected_total_brunnels_found": "186+",
+			"notes": "Including bicycle infrastructure reveals compound bridge and tunnel"
+		}
+	],
+	"performance_benchmarks": {
+		"processing_time_seconds": "3-15",
+		"memory_usage_mb": "<150",
+		"overpass_query_time_seconds": "1-3"
+	},
+	"test_categories": [
+		"coastal_route",
+		"recreational_bikeway",
+		"moderate_distance",
+		"bearing_alignment_testing",
+		"bicycle_infrastructure_testing",
+		"compound_bridge_testing"
+	],
+	"notes": [
+		"Good test for bearing alignment validation",
+		"Bayshore bikeway with consistent bridge naming",
+		"Moderate route length (35.14 km) tests typical cycling distance",
+		"Coastal San Diego area with recreational infrastructure",
+		"Excellent test for --include-bicycle-no flag effects",
+		"Contains major compound bridge (San Diego-Coronado Bridge)",
+		"Tests bicycle infrastructure filtering and inclusion"
+	],
+	"osm_data_characteristics": {
+		"brunnel_density": "medium",
+		"mapping_quality": "good",
+		"railway_infrastructure": "minimal",
+		"stability": "high"
+	},
+	"osm_data_date": "2024-12-17",
+	"baseline_established": "2024-12-17",
+	"stability": "high"
 }

@@ -1,135 +1,127 @@
 {
-  "route_name": "Toronto Waterfront Recreation Trail",
-  "location": "Toronto, Ontario, Canada",
-  "distance_km": 22.43,
-  "track_points": 4182,
-  "description": "Urban waterfront recreational trail with multiple bridge crossings",
-  "test_purpose": "urban_dense",
-  "bounding_box": {
-    "south": 43.6107,
-    "west": -79.4876,
-    "north": 43.6704,
-    "east": -79.2860,
-    "area_sq_km": 107.4
-  },
-  "expected_results": {
-    "total_brunnels_found": "1013+",
-    "total_bridges_found": "459",
-    "total_tunnels_found": "547",
-    "nearby_bridges": "7",
-    "nearby_tunnels": "0",
-    "final_included_individual": "5",
-    "final_included_compound": "2",
-    "final_included_total": "7",
-    "filtered_brunnels": {
-      "outlier": "1002+"
-    }
-  },
-  "known_bridges": [
-    {
-      "name": "Waterfront Recreational Trail",
-      "osm_way_id": 222183028,
-      "approximate_km": 5.4,
-      "length_km": 0.03
-    },
-    {
-      "name": "Cherry Street",
-      "osm_way_ids": [
-        24382063,
-        1330056252,
-        1330056251
-      ],
-      "approximate_km": 7.8,
-      "length_km": 0.12,
-      "type": "compound_bridge",
-      "segments": 3
-    },
-    {
-      "name": "Waterfront Recreational Trail",
-      "osm_way_ids": [
-        1101486832,
-        1352972087,
-        1352972086
-      ],
-      "approximate_km": 8.2,
-      "length_km": 0.11,
-      "type": "compound_bridge",
-      "segments": 3
-    },
-    {
-      "name": "Waterfront Recreational Trail",
-      "osm_way_id": 1352972070,
-      "approximate_km": 8.6,
-      "length_km": 0.06
-    },
-    {
-      "name": "Waterfront Recreational Trail",
-      "osm_way_id": 146154648,
-      "approximate_km": 11.9,
-      "length_km": 0.02
-    },
-    {
-      "name": "Waterfront Recreational Trail",
-      "osm_way_id": 33398082,
-      "approximate_km": 19.4,
-      "length_km": 0.13
-    },
-    {
-      "name": "Waterfront Recreational Trail",
-      "osm_way_id": 33539707,
-      "approximate_km": 20.9,
-      "length_km": 0.05
-    }
-  ],
-  "test_scenarios": [
-    {
-      "name": "default_settings",
-      "args": {},
-      "expected_included": 7,
-      "expected_compounds": 2
-    },
-    {
-      "name": "strict_bearing_tolerance",
-      "args": {
-        "bearing_tolerance": 10.0
-      },
-      "expected_final_included_total": "7",
-      "notes": "Some bridges may be filtered due to tighter alignment"
-    },
-    {
-      "name": "loose_route_buffer",
-      "args": {
-        "route_buffer": 10.0
-      },
-      "expected_included": "8",
-      "notes": "Larger buffer may include additional borderline bridges"
-    }
-  ],
-  "performance_benchmarks": {
-    "processing_time_seconds": "5-20",
-    "memory_usage_mb": "<200",
-    "overpass_query_time_seconds": "1-3"
-  },
-  "test_categories": [
-    "urban_dense",
-    "recreational_trail",
-    "compound_brunnel_testing",
-    "tag_filtering_validation"
-  ],
-  "notes": [
-    "Excellent test for compound brunnel creation",
-    "Good mix of individual and adjacent bridge segments",
-    "High brunnel density area for filtering validation",
-    "Waterfront trail typical of urban recreational cycling",
-    "No tunnels expected - surface trail"
-  ],
-  "osm_data_characteristics": {
-    "brunnel_density": "high",
-    "mapping_quality": "excellent",
-    "railway_infrastructure": "heavy",
-    "stability": "high"
-  },
-  "osm_data_date": "2024-12-17",
-  "baseline_established": "2024-12-17",
-  "stability": "high"
+	"route_name": "Toronto Waterfront Recreation Trail",
+	"location": "Toronto, Ontario, Canada",
+	"distance_km": 22.43,
+	"track_points": 4182,
+	"description": "Urban waterfront recreational trail with multiple bridge crossings",
+	"test_purpose": "urban_dense",
+	"bounding_box": {
+		"south": 43.6107,
+		"west": -79.4876,
+		"north": 43.6704,
+		"east": -79.286,
+		"area_sq_km": 107.4
+	},
+	"expected_results": {
+		"total_brunnels_found": "1013+",
+		"total_bridges_found": "459",
+		"total_tunnels_found": "547",
+		"nearby_bridges": "7",
+		"nearby_tunnels": "0",
+		"final_included_individual": "5",
+		"final_included_compound": "2",
+		"final_included_total": "7",
+		"filtered_brunnels": {
+			"outlier": "1002+"
+		}
+	},
+	"known_bridges": [
+		{
+			"name": "Waterfront Recreational Trail",
+			"osm_way_id": 222183028,
+			"approximate_km": 5.4,
+			"length_km": 0.03
+		},
+		{
+			"name": "Cherry Street",
+			"osm_way_ids": [24382063, 1330056252, 1330056251],
+			"approximate_km": 7.8,
+			"length_km": 0.12,
+			"type": "compound_bridge",
+			"segments": 3
+		},
+		{
+			"name": "Waterfront Recreational Trail",
+			"osm_way_ids": [1101486832, 1352972087, 1352972086],
+			"approximate_km": 8.2,
+			"length_km": 0.11,
+			"type": "compound_bridge",
+			"segments": 3
+		},
+		{
+			"name": "Waterfront Recreational Trail",
+			"osm_way_id": 1352972070,
+			"approximate_km": 8.6,
+			"length_km": 0.06
+		},
+		{
+			"name": "Waterfront Recreational Trail",
+			"osm_way_id": 146154648,
+			"approximate_km": 11.9,
+			"length_km": 0.02
+		},
+		{
+			"name": "Waterfront Recreational Trail",
+			"osm_way_id": 33398082,
+			"approximate_km": 19.4,
+			"length_km": 0.13
+		},
+		{
+			"name": "Waterfront Recreational Trail",
+			"osm_way_id": 33539707,
+			"approximate_km": 20.9,
+			"length_km": 0.05
+		}
+	],
+	"test_scenarios": [
+		{
+			"name": "default_settings",
+			"args": {},
+			"expected_included": 7,
+			"expected_compounds": 2
+		},
+		{
+			"name": "strict_bearing_tolerance",
+			"args": {
+				"bearing_tolerance": 10.0
+			},
+			"expected_final_included_total": "7",
+			"notes": "Some bridges may be filtered due to tighter alignment"
+		},
+		{
+			"name": "loose_route_buffer",
+			"args": {
+				"route_buffer": 10.0
+			},
+			"expected_included": "8",
+			"notes": "Larger buffer may include additional borderline bridges"
+		}
+	],
+	"performance_benchmarks": {
+		"processing_time_seconds": "5-20",
+		"memory_usage_mb": "<200",
+		"overpass_query_time_seconds": "1-3"
+	},
+	"test_categories": [
+		"urban_dense",
+		"recreational_trail",
+		"compound_brunnel_testing",
+		"tag_filtering_validation"
+	],
+	"notes": [
+		"Excellent test for compound brunnel creation",
+		"Good mix of individual and adjacent bridge segments",
+		"High brunnel density area for filtering validation",
+		"Waterfront trail typical of urban recreational cycling",
+		"No tunnels expected - surface trail"
+	],
+	"osm_data_characteristics": {
+		"brunnel_density": "high",
+		"mapping_quality": "excellent",
+		"railway_infrastructure": "heavy",
+		"stability": "high"
+	},
+	"osm_data_date": "2024-12-17",
+	"baseline_established": "2024-12-17",
+	"stability": "high"
 }

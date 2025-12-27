@@ -1,80 +1,80 @@
 {
-  "route_name": "Area 51 Desert Route",
-  "location": "Nevada, USA (near Area 51)",
-  "distance_km": 1.89,
-  "track_points": 329,
-  "description": "Short desert route in remote Nevada with no civilian infrastructure",
-  "test_purpose": "zero_brunnels_edge_case",
-  "bounding_box": {
-    "south": 37.2389,
-    "west": -115.8183,
-    "north": 37.2437,
-    "east": -115.8126,
-    "area_sq_km": 0.3
-  },
-  "expected_results": {
-    "total_brunnels_found": "0",
-    "total_bridges_found": "0",
-    "total_tunnels_found": "0",
-    "nearby_bridges": "0",
-    "nearby_tunnels": "0",
-    "final_included_individual": "0",
-    "final_included_compound": "0",
-    "final_included_total": "0",
-    "filtered_brunnels": {}
-  },
-  "known_bridges": [],
-  "known_tunnels": [],
-  "test_scenarios": [
-    {
-      "name": "default_settings",
-      "args": {},
-      "expected_included": 0,
-      "expected_compounds": 0
-    },
-    {
-      "name": "loose_route_buffer",
-      "args": {
-        "route_buffer": 50.0
-      },
-      "expected_final_included_total": "0",
-      "notes": "Even with larger buffer, no infrastructure expected in desert"
-    },
-    {
-      "name": "disable_tag_filtering",
-      "args": {
-        "no_tag_filtering": true
-      },
-      "expected_total_brunnels": "0",
-      "notes": "No brunnels to filter"
-    }
-  ],
-  "performance_benchmarks": {
-    "processing_time_seconds": "0.5-5",
-    "memory_usage_mb": "<50",
-    "overpass_query_time_seconds": "0.5-2"
-  },
-  "test_categories": [
-    "edge_case",
-    "zero_brunnels",
-    "short_route",
-    "desert_remote",
-    "military_area"
-  ],
-  "notes": [
-    "Excellent test for zero brunnels edge case",
-    "Tests behavior when no infrastructure is present",
-    "Very short route (1.89 km) tests minimal distance scenarios",
-    "Desert/military area with no civilian bridges or tunnels",
-    "Small query area (0.3 sq km) tests efficient querying"
-  ],
-  "osm_data_characteristics": {
-    "brunnel_density": "none",
-    "mapping_quality": "minimal",
-    "railway_infrastructure": "none",
-    "stability": "high"
-  },
-  "osm_data_date": "2024-12-17",
-  "baseline_established": "2024-12-17",
-  "stability": "high"
+	"route_name": "Area 51 Desert Route",
+	"location": "Nevada, USA (near Area 51)",
+	"distance_km": 1.89,
+	"track_points": 329,
+	"description": "Short desert route in remote Nevada with no civilian infrastructure",
+	"test_purpose": "zero_brunnels_edge_case",
+	"bounding_box": {
+		"south": 37.2389,
+		"west": -115.8183,
+		"north": 37.2437,
+		"east": -115.8126,
+		"area_sq_km": 0.3
+	},
+	"expected_results": {
+		"total_brunnels_found": "0",
+		"total_bridges_found": "0",
+		"total_tunnels_found": "0",
+		"nearby_bridges": "0",
+		"nearby_tunnels": "0",
+		"final_included_individual": "0",
+		"final_included_compound": "0",
+		"final_included_total": "0",
+		"filtered_brunnels": {}
+	},
+	"known_bridges": [],
+	"known_tunnels": [],
+	"test_scenarios": [
+		{
+			"name": "default_settings",
+			"args": {},
+			"expected_included": 0,
+			"expected_compounds": 0
+		},
+		{
+			"name": "loose_route_buffer",
+			"args": {
+				"route_buffer": 50.0
+			},
+			"expected_final_included_total": "0",
+			"notes": "Even with larger buffer, no infrastructure expected in desert"
+		},
+		{
+			"name": "disable_tag_filtering",
+			"args": {
+				"no_tag_filtering": true
+			},
+			"expected_total_brunnels": "0",
+			"notes": "No brunnels to filter"
+		}
+	],
+	"performance_benchmarks": {
+		"processing_time_seconds": "0.5-5",
+		"memory_usage_mb": "<50",
+		"overpass_query_time_seconds": "0.5-2"
+	},
+	"test_categories": [
+		"edge_case",
+		"zero_brunnels",
+		"short_route",
+		"desert_remote",
+		"military_area"
+	],
+	"notes": [
+		"Excellent test for zero brunnels edge case",
+		"Tests behavior when no infrastructure is present",
+		"Very short route (1.89 km) tests minimal distance scenarios",
+		"Desert/military area with no civilian bridges or tunnels",
+		"Small query area (0.3 sq km) tests efficient querying"
+	],
+	"osm_data_characteristics": {
+		"brunnel_density": "none",
+		"mapping_quality": "minimal",
+		"railway_infrastructure": "none",
+		"stability": "high"
+	},
+	"osm_data_date": "2024-12-17",
+	"baseline_established": "2024-12-17",
+	"stability": "high"
 }
