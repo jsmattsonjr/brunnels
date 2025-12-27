@@ -51,7 +51,7 @@ def _build_railway_exclusions(
     )
 
     bridge_railway_exclusion = f"\n  - way[bridge]{railway_exclusion}"
-    tunnel_railway_exclusion = f"\n  - way[tunnel]{railway_exclusion}"
+    tunnel_railway_exclusion = f'\n  - way[tunnel]["tunnel"!="building_passage"]{railway_exclusion}'
 
     return bridge_railway_exclusion, tunnel_railway_exclusion
 
@@ -78,9 +78,9 @@ def _build_overpass_query(
         f"out geom qt;\n"
         f"(\n"
         f"  (\n"
-        f"    way[tunnel]{base_filters}(if:!is_closed());{tunnel_railway_exclusion}\n"
+        f'    way[tunnel]["tunnel"!="building_passage"]{base_filters}(if:!is_closed());{tunnel_railway_exclusion}\n'
         f"  );\n"
-        f"  way[tunnel][highway=cycleway](if:!is_closed());\n"
+        f'  way[tunnel]["tunnel"!="building_passage"][highway=cycleway](if:!is_closed());\n'
         f");\n"
         f"out count;\n"
         f"out geom qt;\n"
