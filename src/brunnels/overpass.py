@@ -51,7 +51,9 @@ def _build_railway_exclusions(
     )
 
     bridge_railway_exclusion = f"\n  - way[bridge]{railway_exclusion}"
-    tunnel_railway_exclusion = f'\n  - way[tunnel]["tunnel"!="building_passage"]{railway_exclusion}'
+    tunnel_railway_exclusion = (
+        f'\n  - way[tunnel]["tunnel"!="building_passage"]{railway_exclusion}'
+    )
 
     return bridge_railway_exclusion, tunnel_railway_exclusion
 
