@@ -126,7 +126,7 @@ def query_overpass_brunnels(
 
     url = OVERPASS_API_URL
     attempt = 0
-    max_retries = 5
+    max_retries = 9
     base_delay = 2.0
 
     while True:
