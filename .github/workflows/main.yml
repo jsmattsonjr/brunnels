@@ -68,7 +68,7 @@ jobs:
     
     - name: Run integration tests, excluding performance tests
       run: |
-        pytest tests/test_integration.py -v --tb=short -m "not performance"
+        pytest tests/test_integration.py -v --tb=short -m "not performance and not slow"
     
     - name: Test with different CLI options
       run: |

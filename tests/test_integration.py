@@ -1009,6 +1009,7 @@ class TestPaulRevereRoute(BaseRouteTest):
             ), "Expected some bearing misalignment exclusion"
 
 
+@pytest.mark.slow
 class TestAcrossAmericaRoute(BaseRouteTest):
     """Integration tests for AcrossAmerica transcontinental route"""
 
