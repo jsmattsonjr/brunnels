@@ -211,7 +211,7 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         b
         for b in brunnels.values()
         if b.is_representative()
-        and b.route_span is not None
+        and b.get_route_span() is not None
         and b.exclusion_reason != ExclusionReason.OUTLIER
     ]
 
@@ -222,8 +222,8 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     # Sort by start distance in decameters, then by end distance
     nearby_brunnels.sort(
         key=lambda b: (
-            int(b.route_span.start_distance / 10) if b.route_span else 0,
-            b.route_span.end_distance if b.route_span else 0.0,
+            int(b.get_route_span().start_distance / 10) if b.get_route_span() else 0,
+            b.get_route_span().end_distance if b.get_route_span() else 0.0,
         )
     )
 
@@ -248,14 +248,14 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
 
     # Calculate maximum digits needed for formatting alignment
     max_distance = max(
-        brunnel.route_span.end_distance / 1000
+        brunnel.get_route_span().end_distance / 1000
         for brunnel in nearby_brunnels
-        if brunnel.route_span
+        if brunnel.get_route_span()
     )
     max_length = max(
-        (brunnel.route_span.end_distance - brunnel.route_span.start_distance) / 1000
+        (brunnel.get_route_span().end_distance - brunnel.get_route_span().start_distance) / 1000
         for brunnel in nearby_brunnels
-        if brunnel.route_span
+        if brunnel.get_route_span()
     )
 
     # Determine width needed for distances (digits before decimal point)
@@ -265,7 +265,7 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     current_overlap_group = None
 
     for brunnel in nearby_brunnels:
-        route_span = brunnel.route_span or RouteSpan(0, 0)
+        route_span = brunnel.get_route_span() or RouteSpan(0, 0)
         start_km = route_span.start_distance / 1000
         end_km = route_span.end_distance / 1000
         length_km = (route_span.end_distance - route_span.start_distance) / 1000
