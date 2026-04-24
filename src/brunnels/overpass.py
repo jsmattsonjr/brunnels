@@ -4,9 +4,13 @@ import logging
 import argparse
 import time
 
+from brunnels import __version__
 
 DEFAULT_API_TIMEOUT = 30
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
+REQUEST_HEADERS = {
+    "User-Agent": f"brunnels/{__version__} (https://github.com/jsmattsonjr/brunnels)",
+}
 
 # Active railway types that are filtered out by default (unless --include-active-railways is used)
 ACTIVE_RAILWAY_TYPES = [
@@ -131,7 +135,9 @@ def query_overpass_brunnels(
 
     while True:
         try:
-            response = requests.post(url, data=query.strip(), timeout=args.timeout)
+            response = requests.post(
+                url, data=query.strip(), timeout=args.timeout, headers=REQUEST_HEADERS
+            )
             response.raise_for_status()
             elements = response.json().get("elements", [])
             return _parse_separated_results(elements)
@@ -150,7 +156,14 @@ def query_overpass_brunnels(
                 logger.debug(f"Response type: {type(e.response)}")
 
             if _is_retryable_error(e) and attempt < max_retries:
-                delay = base_delay * (2**attempt)
+                if status_code == 429 and e.response is not None:
+                    retry_after = e.response.headers.get("Retry-After")
+                    try:
+                        delay = float(retry_after)
+                    except (TypeError, ValueError):
+                        delay = base_delay * (2**attempt)
+                else:
+                    delay = base_delay * (2**attempt)
                 error_type = (
                     "Server error"
                     if status_code and status_code >= 500
