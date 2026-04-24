@@ -85,6 +85,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Set logging level (default: WARNING)",
     )
     parser.add_argument(
+        "--no-map",
+        action="store_true",
+        help="Skip map visualization entirely",
+    )
+    parser.add_argument(
         "--no-open",
         action="store_true",
         help="Don't automatically open the HTML file in browser",
@@ -486,12 +491,13 @@ def main():
     # Setup logging
     setup_logging(args)
 
-    # Determine output filename
-    try:
-        output_filename = determine_output_filename(args.filename, args.output)
-        logger.debug(f"Output filename: {output_filename}")
-    except (RuntimeError, ValueError):
-        sys.exit(1)
+    # Determine output filename (skip if --no-map)
+    if not args.no_map:
+        try:
+            output_filename = determine_output_filename(args.filename, args.output)
+            logger.debug(f"Output filename: {output_filename}")
+        except (RuntimeError, ValueError):
+            sys.exit(1)
 
     # Load route from GPX file
     route = _load_route(args.filename)
@@ -500,7 +506,12 @@ def main():
     brunnels = _discover_and_filter_brunnels(route, args)
 
     # Generate output
-    _generate_output(route, brunnels, output_filename, args)
+    if args.no_map:
+        log_nearby_brunnels(brunnels)
+        metrics = collect_metrics(brunnels)
+        log_metrics(brunnels, metrics, args)
+    else:
+        _generate_output(route, brunnels, output_filename, args)
 
 
 if __name__ == "__main__":
