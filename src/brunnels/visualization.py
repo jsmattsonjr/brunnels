@@ -295,13 +295,14 @@ def _setup_map_with_layers(center_lat: float, center_lon: float) -> folium.Map:
         tiles=None,
     )
 
-    # Add Standard layer (CartoDB positron)
+    # Add Standard layer (Esri World Light Gray Canvas). CARTO's positron tiles
+    # now watermark unauthenticated requests with "API KEY REQUIRED".
     folium.TileLayer(
-        tiles="CartoDB positron",
-        attr=(
-            "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> "
-            "contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>"
+        tiles=(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/"
+            "Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
         ),
+        attr="Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
         name="Standard",
         control=True,
         show=True,  # Show by default
@@ -317,6 +318,19 @@ def _setup_map_with_layers(center_lat: float, center_lon: float) -> folium.Map:
         name="Satellite",
         control=True,
         show=False,  # Initially hidden
+    ).add_to(route_map)
+
+    # Add place/street labels as an overlay (the light gray base carries none)
+    folium.TileLayer(
+        tiles=(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/"
+            "Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+        ),
+        attr="Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+        name="Labels",
+        overlay=True,
+        control=True,
+        show=True,
     ).add_to(route_map)
 
     # Add LayerControl
