@@ -21,6 +21,7 @@ from shapely.geometry.base import BaseGeometry
 
 from . import __version__
 from . import visualization
+from .biketerra import unsupported_options
 from .metrics import collect_metrics, log_metrics
 from .route import Route
 from .brunnel import (
@@ -107,23 +108,32 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-bicycle-no",
         action="store_true",
-        help="Include ways tagged bicycle=no in the Overpass query",
+        help="Include ways tagged bicycle=no (forces the Overpass API)",
     )
     parser.add_argument(
         "--include-waterways",
         action="store_true",
-        help="Include ways tagged waterway in the Overpass query",
+        help="Include ways tagged waterway (forces the Overpass API)",
     )
     parser.add_argument(
         "--include-active-railways",
         action="store_true",
-        help="Include ways tagged railway (excluding inactive types: abandoned, dismantled, disused, historic, razed, removed)",
+        help="Include ways tagged railway (excluding inactive types: abandoned, dismantled, disused, historic, razed, removed); forces the Overpass API",
     )
     parser.add_argument(
         "--timeout",
         type=int,
         default=30,
-        help="Overpass API timeout in seconds (default: 30)",
+        help="API timeout in seconds (default: 30)",
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default="auto",
+        choices=["auto", "biketerra", "overpass"],
+        help="Where to fetch bridge/tunnel data: the Biketerra brunnels server, "
+        "the Overpass API, or auto to try Biketerra and fall back to Overpass "
+        "(default: auto)",
     )
     return parser
 
@@ -354,6 +364,14 @@ def _parse_and_validate_args() -> argparse.Namespace:
     if not args.filename:
         parser.print_help()
         sys.exit(1)
+
+    if args.source == "biketerra":
+        unsupported = unsupported_options(args)
+        if unsupported:
+            parser.error(
+                f"the Biketerra server cannot honor {', '.join(unsupported)}; "
+                f"use --source overpass"
+            )
 
     return args
 

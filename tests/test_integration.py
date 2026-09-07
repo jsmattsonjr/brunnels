@@ -287,6 +287,13 @@ def _run_brunnels_cli(gpx_file: Path, **kwargs) -> BrunnelsTestResult:
             "--metrics",  # Always include metrics for structured parsing
         ]
 
+        # These baselines count every brunnel in the query bounding box, which
+        # only the Overpass query returns; the Biketerra server pre-filters to
+        # the route corridor. Tests that want the default source pass
+        # source= explicitly.
+        if "source" not in kwargs:
+            cmd.extend(["--source", "overpass"])
+
         # Add optional arguments
         for key, value in kwargs.items():
             arg_name = f"--{key.replace('_', '-')}"

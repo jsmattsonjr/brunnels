@@ -9,11 +9,13 @@ import math
 from math import cos, radians
 import argparse
 import gpxpy
+import requests
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
 
 from .brunnel import Brunnel, BrunnelType, ExclusionReason
+from .biketerra import query_biketerra_brunnels, unsupported_options
 from .overpass import query_overpass_brunnels
 from .geometry import (
     Position,
@@ -382,8 +384,11 @@ class Route:
     def find_brunnels(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
         """
         Find all bridges and tunnels near this route and check for containment
-        within route buffer. For long routes, breaks into chunks to avoid large
-        bounding box queries.
+        within route buffer.
+
+        Queries the Biketerra brunnels server by default, falling back to the
+        Overpass API when the server is unreachable or when the requested
+        options need a query only Overpass can express.
 
         Args:
             args: argparse.Namespace object containing all settings
@@ -391,6 +396,44 @@ class Route:
         Returns:
             Dictionary of Brunnel objects found near the route, with containment
             status set
+        """
+        if args.source != "overpass":
+            # --source biketerra with unsupported options is rejected in the CLI,
+            # so reaching here with any means --source auto.
+            unsupported = unsupported_options(args)
+            if unsupported:
+                logger.info(
+                    f"Using Overpass API: Biketerra server cannot honor "
+                    f"{', '.join(unsupported)}"
+                )
+            else:
+                try:
+                    return self._find_brunnels_biketerra(args)
+                except requests.exceptions.RequestException as e:
+                    if args.source == "biketerra":
+                        raise
+                    logger.warning(
+                        f"Biketerra server query failed ({e}); "
+                        f"falling back to Overpass API"
+                    )
+
+        return self._find_brunnels_overpass(args)
+
+    def _find_brunnels_biketerra(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
+        """Find brunnels by sending the route polyline to the Biketerra server."""
+        logger.debug(
+            f"Querying Biketerra server for bridges and tunnels along "
+            f"{self.linestring.length / 1000:.1f} km route..."
+        )
+
+        raw_bridges, raw_tunnels = query_biketerra_brunnels(self.coords, args)
+
+        return self._process_raw_brunnel_data(raw_bridges, raw_tunnels)
+
+    def _find_brunnels_overpass(self, args: argparse.Namespace) -> Dict[str, Brunnel]:
+        """Find brunnels via the Overpass API.
+
+        For long routes, breaks into chunks to avoid large bounding box queries.
         """
 
         # Check if route is long enough to need chunking

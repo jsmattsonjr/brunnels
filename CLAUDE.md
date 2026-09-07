@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## About This Project
 
-Brunnels is a Python CLI tool that analyzes GPX routes to identify bridges and tunnels along the path. It uses OpenStreetMap data via the Overpass API and generates interactive HTML maps with sophisticated filtering and visualization.
+Brunnels is a Python CLI tool that analyzes GPX routes to identify bridges and tunnels along the path. It uses OpenStreetMap data — from the Biketerra brunnels server by default, with the Overpass API as a fallback — and generates interactive HTML maps with sophisticated filtering and visualization.
 
 ## Development Commands
 
@@ -54,23 +54,24 @@ The codebase follows a modular architecture with clear separation of concerns:
 ### Core Modules
 
 - **`cli.py`**: Main entry point that orchestrates the workflow (GPX loading → Route creation → Brunnel discovery → Filtering → Visualization)
-- **`route.py`**: Core `Route` class that manages GPX routes, coordinates brunnel discovery via Overpass API, and performs geometric filtering operations
+- **`route.py`**: Core `Route` class that manages GPX routes, coordinates brunnel discovery via the Biketerra server or Overpass API, and performs geometric filtering operations
 - **`brunnel.py`**: Data structures for bridges/tunnels including `Brunnel` class with containment analysis, bearing alignment, and compound brunnel support
 - **`geometry.py`**: Geometric utilities using Shapely and pyproj for accurate coordinate transformations, bearing calculations, and spatial operations
-- **`overpass.py`**: OpenStreetMap Overpass API interface with retry logic and configurable filtering
+- **`biketerra.py`**: Biketerra brunnels server interface (the default source) — POSTs the route polyline, chunked to the server's 2500-point limit
+- **`overpass.py`**: OpenStreetMap Overpass API interface with retry logic and configurable filtering (the fallback source)
 - **`visualization.py`**: Interactive map generation using Folium with color-coded brunnel display and custom legends
 - **`metrics.py`**: Statistical analysis and structured logging of brunnel processing results
 - **`file_utils.py`**: File operations including automatic output filename generation with conflict resolution
 
 ### Key Dependencies
 - Route → Brunnel: Creates and manages brunnel collections
-- Route → Overpass: Fetches OpenStreetMap data
+- Route → Biketerra/Overpass: Fetches OpenStreetMap data
 - Route/Brunnel → Geometry: Uses projections and spatial calculations
 - Visualization → Route/Brunnel: Renders maps from data structures
 
 ### Data Flow
 1. GPX file parsed into Route object
-2. Route queries Overpass API for bridge/tunnel data in bounding box
+2. Route queries the Biketerra server with the route polyline, or (fallback) the Overpass API with the route bounding box
 3. Raw OSM data converted to Brunnel objects
 4. Multiple filtering stages: containment, bearing alignment, overlap exclusion
 5. Filtered brunnels rendered to interactive HTML map
@@ -88,6 +89,18 @@ The codebase follows a modular architecture with clear separation of concerns:
 - Bearing alignment checks prevent inclusion of perpendicular infrastructure
 - Overlap exclusion keeps nearest brunnel among overlapping route spans
 - Adjacent brunnel merging combines fragmented OSM ways into continuous segments
+
+### Brunnel Sources
+`--source auto` (default) tries the Biketerra server, then falls back to Overpass on
+failure. The server filters to a fixed 25 m corridor around the polyline and applies
+brunnels' default cycling-relevance filtering, with no options of its own — so the
+`--include-*` flags and a `--query-buffer` above 25 m force the Overpass path
+(`unsupported_options()` in `biketerra.py` is the list). `--source overpass` skips the
+server; `--source biketerra` rejects the options it can't honor rather than falling back.
+
+The integration-test baselines in `tests/fixtures/*.json` count every brunnel in the
+query bounding box, which only Overpass returns, so `tests/test_integration.py` passes
+`--source overpass` unless a test asks for a source explicitly.
 
 ### Filtering Pipeline
 1. **Cycling relevance**: Excludes `bicycle=no`, active railways, pure waterways

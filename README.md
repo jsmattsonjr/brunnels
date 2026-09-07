@@ -9,7 +9,7 @@ A GPX route analysis tool that identifies bridges and tunnels along your route a
 ## Features
 
 - **GPX Route Processing**: Parse GPX files containing GPS tracks from cycling computers, fitness apps, or route planning tools
-- **OpenStreetMap Integration**: Query real bridge and tunnel data from OpenStreetMap via the Overpass API
+- **OpenStreetMap Integration**: Query real bridge and tunnel data from OpenStreetMap via the Biketerra brunnels server, falling back to the Overpass API
 - **Smart Exclusion**: Exclude bridges/tunnels based on cycling relevance (bicycle access, infrastructure type)
 - **Containment Analysis**: Identify which bridges/tunnels your route actually crosses vs. those merely nearby
 - **Vector Alignment**: Exclude bridges/tunnels that aren't aligned with your route direction (configurable tolerance)
@@ -65,7 +65,7 @@ python3 -m brunnels.cli your_route.gpx
 
 This will:
 1. Parse your GPX file
-2. Find all bridges and tunnels in an area extending 10m beyond your route's bounding box
+2. Find all bridges and tunnels within 25m of your route (or, on the Overpass fallback, in an area extending 10m beyond your route's bounding box)
 3. Exclude brunnels based on cycling relevance and vector alignment with your route
 4. Generate an interactive map with a filename based on your input file (e.g., `route.gpx` → `route map.html`)
 5. Automatically open the map in your default browser
@@ -105,10 +105,11 @@ brunnels large_route.gpx --timeout 300
 - `--query-buffer DISTANCE`: Search radius around route in meters (default: 10m)
 - `--route-buffer DISTANCE`: Route containment buffer in meters (default: 3.0m)
 - `--bearing-tolerance DEGREES`: Vector alignment tolerance in degrees (default: 20.0°)
-- `--timeout SECONDS`: Overpass API timeout in seconds (default: 30)
-- `--include-bicycle-no`: Include ways tagged `bicycle=no` in the Overpass query
-- `--include-waterways`: Include ways tagged as `waterway` in the Overpass query
-- `--include-active-railways`: Include ways tagged as active `railway` types (`rail`, `light_rail`, `subway`, `tram`, `narrow_gauge`, `funicular`, `monorail`, `miniature`, `preserved`)
+- `--timeout SECONDS`: API timeout in seconds (default: 30)
+- `--source {auto,biketerra,overpass}`: Where to fetch bridge/tunnel data (default: `auto`)
+- `--include-bicycle-no`: Include ways tagged `bicycle=no` (forces the Overpass API)
+- `--include-waterways`: Include ways tagged as `waterway` (forces the Overpass API)
+- `--include-active-railways`: Include ways tagged as active `railway` types (`rail`, `light_rail`, `subway`, `tram`, `narrow_gauge`, `funicular`, `monorail`, `miniature`, `preserved`); forces the Overpass API
 - `--log-level LEVEL`: Set logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) (default: WARNING)
 - `--metrics`: Output detailed structured metrics about the processing of brunnels to stderr
 - `--no-open`: Don't automatically open the HTML file in browser
@@ -201,9 +202,26 @@ The tool automatically merges adjacent brunnels of the same type (bridge or tunn
 - Handles routes worldwide (excludes polar regions and antimeridian crossings)
 
 ### Data Sources
-- Brunnel data from OpenStreetMap via Overpass API
+- Brunnel data from OpenStreetMap, via the Biketerra brunnels server by default
+  and the Overpass API as a fallback
 - Respects OSM usage policies with reasonable request timeouts
 - Processes OSM tags for cycling relevance and infrastructure type
+
+#### Choosing a source
+
+`--source auto` (the default) sends the route polyline to the Biketerra
+brunnels server at `https://tiles.biketerra.com/brunnels`, and falls back to
+Overpass if that request fails. The server searches a corridor around the
+route rather than its bounding box, so it returns only the ways that are
+actually near the route — a much smaller response than the equivalent Overpass
+query, without Overpass' rate limiting.
+
+The server applies the default cycling-relevance filtering (no waterways, no
+`bicycle=no`, no active railways) and a fixed 25 m corridor, and takes no
+options. Asking for anything outside that — any of the `--include-*` flags, or
+a `--query-buffer` wider than 25 m — needs a query only Overpass can express,
+so `auto` uses Overpass for those runs and `--source biketerra` rejects them.
+Use `--source overpass` to skip the server entirely.
 
 ### Geometric Analysis
 - Uses Shapely for precise geometric containment checking
