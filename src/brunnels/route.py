@@ -4,12 +4,15 @@ Route data model for brunnel analysis.
 """
 
 from typing import Tuple, List, TextIO, Dict
+import bisect
 import logging
 import math
+from itertools import accumulate
 from math import cos, radians
 import argparse
 import gpxpy
 import requests
+import pyproj
 import gpxpy.gpx
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry import LineString, Point
@@ -69,6 +72,16 @@ class Route:
         coord_tuples = [(pos.longitude, pos.latitude) for pos in self.coords]
         self.linestring: LineString = coords_to_polyline(coord_tuples, self.projection)
 
+        # Stationing along the route is reported in geodesic metres, not in the
+        # metres of the projected plane.  The projection is conformal, so its
+        # scale factor grows with distance from the central meridian: on a route
+        # wide enough in longitude that inflates lengths by over 1% (about 75 km
+        # on a coast-to-coast route).  These two parallel cumulative arrays let
+        # a distance produced by linestring.project() -- which must stay in
+        # projected units, since Shapely operates in the projected plane -- be
+        # converted to the true distance along the ground.
+        self._proj_stations, self._geo_stations = self._build_stationing()
+
     def get_bbox(self, buffer: float = 0.0) -> Tuple[float, float, float, float]:
         """
         Get bounding box for this route, optionally with a buffer.
@@ -110,6 +123,53 @@ class Route:
             f"Returning on-the-fly buffered bounding box: ({buffered_south:.4f}, {buffered_west:.4f}, {buffered_north:.4f}, {buffered_east:.4f}) with {buffer}m buffer from base _bbox"
         )
         return (buffered_south, buffered_west, buffered_north, buffered_east)
+
+    def _build_stationing(self) -> Tuple[List[float], List[float]]:
+        """Cumulative projected and geodesic distance at each route vertex."""
+        coords = list(self.linestring.coords)
+        proj_stations = [0.0] + list(
+            accumulate(
+                math.hypot(
+                    coords[i][0] - coords[i - 1][0], coords[i][1] - coords[i - 1][1]
+                )
+                for i in range(1, len(coords))
+            )
+        )
+
+        lons = [pos.longitude for pos in self.coords]
+        lats = [pos.latitude for pos in self.coords]
+        _, _, seg_lengths = pyproj.Geod(ellps="WGS84").inv(
+            lons[:-1], lats[:-1], lons[1:], lats[1:]
+        )
+        geo_stations = [0.0] + list(accumulate(seg_lengths))
+        return proj_stations, geo_stations
+
+    @property
+    def length(self) -> float:
+        """Total route length in geodesic metres."""
+        return self._geo_stations[-1]
+
+    def geodesic_distance(self, projected_distance: float) -> float:
+        """Convert a distance along the projected linestring to a ground distance.
+
+        Args:
+            projected_distance: A distance in projected metres, as returned by
+                ``self.linestring.project(point)``.
+
+        Returns:
+            The corresponding distance from the route start, in geodesic metres.
+        """
+        proj, geo = self._proj_stations, self._geo_stations
+        if projected_distance <= 0.0:
+            return 0.0
+        if projected_distance >= proj[-1]:
+            return geo[-1]
+        i = min(bisect.bisect_right(proj, projected_distance) - 1, len(proj) - 2)
+        segment = proj[i + 1] - proj[i]
+        # Within one segment the two scales differ by a constant factor, so the
+        # fractional position carries across exactly.
+        fraction = 0.0 if segment == 0 else (projected_distance - proj[i]) / segment
+        return geo[i] + fraction * (geo[i + 1] - geo[i])
 
     def _calculate_bbox(self) -> Tuple[float, float, float, float]:
         """
@@ -423,7 +483,7 @@ class Route:
         """Find brunnels by sending the route polyline to the Biketerra server."""
         logger.debug(
             f"Querying Biketerra server for bridges and tunnels along "
-            f"{self.linestring.length / 1000:.1f} km route..."
+            f"{self.length / 1000:.1f} km route..."
         )
 
         raw_bridges, raw_tunnels = query_biketerra_brunnels(self.coords, args)
@@ -437,7 +497,7 @@ class Route:
         """
 
         # Check if route is long enough to need chunking
-        route_length_km = self.linestring.length / 1000.0
+        route_length_km = self.length / 1000.0
         max_chunk_area_sq_km = 50000.0
 
         if route_length_km <= 500.0:  # Still use distance for very short routes
@@ -479,7 +539,7 @@ class Route:
         chunks = self._chunk_route_for_queries(args.query_buffer)
 
         logger.info(
-            f"Long route ({self.linestring.length/1000:.1f}km) - "
+            f"Long route ({self.length/1000:.1f}km) - "
             f"breaking into {len(chunks)} chunks for Overpass queries"
         )
 

@@ -252,7 +252,9 @@ class Brunnel:
             min_distance = min(min_distance, distance)
             max_distance = max(max_distance, distance)
 
-        self.route_span = RouteSpan(min_distance, max_distance)
+        self.route_span = RouteSpan(
+            route.geodesic_distance(min_distance), route.geodesic_distance(max_distance)
+        )
 
     def is_aligned_with_route(self, route, tolerance_degrees: float) -> bool:
         """

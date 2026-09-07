@@ -1,7 +1,7 @@
 {
 	"route_name": "AcrossAmerica",
 	"track_points": 45794,
-	"distance_km": 4965.2,
+	"distance_km": 4889.7,
 	"route_type": "transcontinental",
 	"description": "Transcontinental route from San Diego, CA to Washington, DC with 167 bridges",
 	"expected_results": {

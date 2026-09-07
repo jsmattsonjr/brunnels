@@ -274,8 +274,8 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
     )
 
     # Determine width needed for distances (digits before decimal point)
-    distance_width = len(f"{max_distance:.0f}") + 3  # +3 for ".XX"
-    length_width = len(f"{max_length:.0f}") + 3  # +3 for ".XX"
+    distance_width = len(f"{max_distance:.0f}") + 4  # +4 for ".XXX"
+    length_width = len(f"{max_length:.0f}") + 4  # +4 for ".XXX"
 
     current_overlap_group = None
 
@@ -286,7 +286,11 @@ def log_nearby_brunnels(brunnels: Dict[str, Brunnel]) -> None:
         length_km = (route_span.end_distance - route_span.start_distance) / 1000
 
         # Format with aligned padding
-        span_info = f"{start_km:{distance_width}.2f}-{end_km:{distance_width}.2f} km ({length_km:{length_width}.2f} km)"
+        # Three decimals: this report is a machine interface as much as a human
+        # one -- downstream tools parse these spans and replay saved reports --
+        # and 0.01 km rounding quantised every endpoint to the nearest 10 m,
+        # which is wider than some of the bridges being reported.
+        span_info = f"{start_km:{distance_width}.3f}-{end_km:{distance_width}.3f} km ({length_km:{length_width}.3f} km)"
         annotation = "*"
         reason = ""
         if brunnel.exclusion_reason != ExclusionReason.NONE:
@@ -402,7 +406,7 @@ def _load_route(filename: str) -> Route:
         sys.exit(1)
 
     logger.info(f"Loaded GPX route with {len(route)} points")
-    logger.info(f"Total route distance: {route.linestring.length / 1000:.2f} km")
+    logger.info(f"Total route distance: {route.length / 1000:.2f} km")
 
     return route
 
